@@ -1,0 +1,28 @@
+---
+title: "Assignment1_Data621"
+author: "Mubashira Qari"
+date: "2025-02-09"
+output: pdf_document
+---
+
+### Load Libraries
+
+```{r}
+
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(tools)
+library(stringdist)
+
+```
+
+
+```{r}
+
+moneyball_evaluation <- read.csv("")
+
+
+```
