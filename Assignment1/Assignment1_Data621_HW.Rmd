@@ -382,13 +382,15 @@ The column is mostly empty and not critical.
 Example: TEAM_BATTING_HBP (if missing in most rows).
 
 ```{r}
-# Install if not installed
-install.packages("dplyr")  
- 
-# Load dplyr
-library(dplyr)
 
-train_df <- train_df %>% select(-TEAM_BATTING_HBP)
+library(naniar)
+library(visdat)
+library(dplyr)
+library(tidyr)  # tidyr is loaded to use pivot_longer()
+
+train_df <- train_df[, !names(train_df) %in% "INDEX"]
+train_df <- train_df[, !names(train_df) %in% "TEAM_BATTING_HBP"]
+train_df
 
 ```
 
@@ -425,16 +427,6 @@ colSums(is.na(train_df))  # Missing values per column
 ```{r}
 names(train_data)
 ```
-
-### Removing INDEX Column
-
-```{r}
-
-train_df <- train_df %>% select(-INDEX)
-train_df
-
-```
-
 
 ### Building Three Multiple Linear Regression Models with Manual Variable Selection:
 
@@ -865,4 +857,153 @@ To finalize the model, we should re-run it without TEAM_BATTING_2B to see if it 
 
 Making Predictions Using the Evaluation Dataset:
 
+### Data Preparation:
 
+- Analyze Missing Values from Train Datasets.
+
+
+```{r}
+
+missing_values <- eval_df %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Missing_Count")
+
+print(missing_values)
+
+
+```
+
+### Removing Mostly NA and INDEX Column:
+
+```{r}
+
+eval_df <- eval_df[, !names(eval_df) %in% "INDEX"]
+eval_df <- eval_df[, !names(eval_df) %in% "TEAM_BATTING_HBP"]
+eval_df
+```
+### Mean/Median Imputation (For Numeric Data)
+
+Instead of removing missing values, fill them with the mean or median:
+
+```{r}
+
+eval_df$TEAM_BATTING_SO[is.na(eval_df$TEAM_BATTING_SO)] <- mean(eval_df$TEAM_BATTING_SO, na.rm = TRUE)
+eval_df$TEAM_BASERUN_SB[is.na(eval_df$TEAM_BASERUN_SB)] <- mean(eval_df$TEAM_BASERUN_SB, na.rm = TRUE)
+eval_df$TEAM_BASERUN_CS[is.na(eval_df$TEAM_BASERUN_CS)] <- mean(eval_df$TEAM_BASERUN_CS, na.rm = TRUE)
+eval_df$TEAM_FIELDING_DP[is.na(eval_df$TEAM_FIELDING_DP)] <- mean(eval_df$TEAM_FIELDING_DP, na.rm = TRUE)
+eval_df$TEAM_PITCHING_SO[is.na(eval_df$TEAM_PITCHING_SO)] <- mean(eval_df$TEAM_PITCHING_SO, na.rm = TRUE)
+```
+
+### 4. Verifying That Missing Values Are Fixed
+
+```{r}
+
+sum(is.na(eval_df))  # Total missing values
+colSums(is.na(eval_df))  # Missing values per column
+
+```
+
+```{r}
+
+skim(eval_df)
+```
+
+### Make Predictions Using the Improved_Model:
+
+```{r}
+
+# Generate predictions using the trained Improved Model
+eval_df$PREDICTED_WINS <- predict(improved_model, newdata = eval_df)
+
+# View a sample of predictions
+head(eval_df$PREDICTED_WINS)
+
+```
+### Interpretation of Predicted TARGET_WINS Values
+
+The predicted values represent the expected number of wins for teams based on their batting, pitching, and fielding statistics using the Improved Model.
+
+For example:
+
+A team with a predicted 69.15 wins is expected to win around 69 games in a full season.
+A team with a predicted 82.52 wins is expected to perform better, likely finishing with around 82-83 wins.
+The variation in predictions suggests that some teams are stronger than others based on key performance metrics (hits, home runs, walks, strikeouts, fielding errors, etc.).
+
+### Evaluating the Accuracy of Predictions Against Actual TARGET_WINS
+
+Now that we have predicted TARGET_WINS, we need to compare these predictions with the actual values in the TARGET_WINS column to assess model accuracy.
+
+### Step 1: Compute Error Metrics
+
+```{r}
+# Check structure of the dataset
+str(eval_df)
+
+# Check if ACTUAL_WINS and PREDICTED_WINS are numeric
+is.numeric(eval_df$ACTUAL_WINS)
+is.numeric(eval_df$PREDICTED_WINS)
+
+```
+### Step 2: Add an INDEX Column to Each Dataset
+
+```{r}
+# Add a row index to both datasets
+train_df$INDEX <- seq_len(nrow(train_df))  
+eval_df$INDEX <- seq_len(nrow(eval_df))
+
+```
+
+
+
+### Step 3: Align and Merge the Datasets
+
+```{r}
+# First, check if both datasets have a common identifier (like INDEX)
+head(train_df$INDEX)
+head(eval_df$INDEX)
+
+# Merge train_df and eval_df using INDEX (if applicable)
+merged_df <- merge(train_df[, c("INDEX", "TARGET_WINS")], 
+                   eval_df[, c("INDEX", "PREDICTED_WINS")], 
+                   by = "INDEX", all = FALSE)
+
+# Now check if both columns have equal length
+nrow(merged_df)  
+
+
+```
+Ensure data consistency before calculating accuracy metrics.
+Convert to numeric to avoid errors in correlation or calculations.
+
+### Step 4: Compute Accuracy Metrics
+
+```{r}
+# Load necessary libraries
+library(Metrics)  # For MAE and RMSE
+library(ggplot2)  # For visualizations
+
+# Compute MAE, RMSE, and R²
+mae <- mae(merged_df$TARGET_WINS, merged_df$PREDICTED_WINS)  
+rmse <- rmse(merged_df$TARGET_WINS, merged_df$PREDICTED_WINS)  
+r_squared <- cor(merged_df$TARGET_WINS, merged_df$PREDICTED_WINS)^2  
+
+# Print results
+cat("Model Accuracy Metrics:\n")
+cat("Mean Absolute Error (MAE):", round(mae, 2), "\n")
+cat("Root Mean Squared Error (RMSE):", round(rmse, 2), "\n")
+cat("R-Squared (R²):", round(r_squared, 4), "\n")
+
+```
+### Interpretation of Model Accuracy Metrics
+
+The evaluation results indicate that our Improved Model is not performing well in predicting TARGET_WINS.
+
+The Mean Absolute Error (MAE) of 13.87 suggests that, on average, predictions deviate by about 14 wins per team, which is quite high. 
+
+Additionally, the Root Mean Squared Error (RMSE) of 17.38 implies that some predictions have even larger errors, highlighting potential inconsistencies or missing key predictors. 
+
+Most concerning is the R-Squared (R²) value of 0.001, which means that the model explains almost none of the variation in team wins—essentially, the predictions are no better than random guesses. 
+
+This suggests that the model may be overfitting the training data and failing to generalize, or that it lacks critical predictive features. 
+
+To improve performance, we should consider adding more relevant predictors (such as ERA or OBP), removing unimportant or noisy variables, and potentially using alternative mo
