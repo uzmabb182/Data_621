@@ -2,12 +2,14 @@
 title: "Assignment1_Data621"
 author: "Mubashira Qari"
 date: "2025-02-09"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ### Load Libraries
 
-```{r}
+```{r global_options, include=FALSE}
 
 library(tidyverse)
 library(readxl)
@@ -48,7 +50,7 @@ library(skimr)
 
 ```
 
-### Data Explorarion:
+## Data Exploration
 
 ### Loading Datasets
 
@@ -58,8 +60,8 @@ eval_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs
 
 train_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment1/moneyball-training-data%20(1).csv")
 
-print(eval_data)
-print(train_data)
+head(eval_data)
+head(train_data)
 ```
 ### Understanding the TARGET_WINS Field in the Moneyball Dataset:
 
@@ -74,7 +76,6 @@ We are trying to predict TARGET_WINS based on other team performance metrics.
 ```{r}
 names(eval_data)
 names(train_data)
-
 ```
 ### Viewing Field Values:
 
@@ -177,7 +178,7 @@ Before fitting a multiple linear regression (MLR) model, we analyze the dataset 
 
 Here's what we can infer from the summary statistics:
 
-### 1. Understanding the Target Variable (TARGET_WINS)
+#### 1. Understanding the Target Variable (TARGET_WINS)
 
 Range: 0 to 146 wins
 
@@ -187,7 +188,7 @@ Median: 82 wins
 
 Distribution: The min value of 0 and max of 146 suggest some potential outliers or erroneous data points, since most teams win between 50-110 games in a season.
 
-### 2. Missing Values
+#### 2. Missing Values
 
 - Some variables have a significant number of missing values:
 
@@ -203,13 +204,13 @@ TEAM_PITCHING_SO (102 missing values)
 
 TEAM_FIELDING_DP (286 missing values)
 
-### Actionable Steps:
+#### Actionable Steps:
 
 - Impute missing values (using mean/median or regression techniques).
 
 - Consider removing TEAM_BATTING_HBP and TEAM_BASERUN_CS if they are highly incomplete and do not contribute much.
 
-### 3. Potential Outliers & Data Issues
+#### 3. Potential Outliers & Data Issues
 
 - Several variables have extreme max values that seem unrealistic:
 
@@ -221,13 +222,13 @@ TEAM_PITCHING_BB (Max = 3,645) <- Very high (typical range: 300 - 700).
 
 TEAM_FIELDING_E (Max = 1,898) <- Likely an error since the normal range is ~ 70-200.
 
-### Actionable Steps:
+#### Actionable Steps:
 
 - Check for data entry errors.
 
 - Remove extreme outliers if they distort model performance.
 
-### 4. Feature Selection Considerations:
+#### 4. Feature Selection Considerations:
 
 Batting Variables: TEAM_BATTING_H, TEAM_BATTING_2B, TEAM_BATTING_3B, TEAM_BATTING_HR, TEAM_BATTING_BB are likely strong predictors of team wins.
 
@@ -235,13 +236,13 @@ Pitching Variables: TEAM_PITCHING_H, TEAM_PITCHING_HR, TEAM_PITCHING_BB, TEAM_PI
 
 Fielding Variables: TEAM_FIELDING_E (errors) and TEAM_FIELDING_DP (double plays) may have a weaker impact compared to batting and pitching.
 
-### Multicollinearity Check Needed:
+#### Multicollinearity Check Needed:
 
 TEAM_PITCHING_H, TEAM_PITCHING_HR, and TEAM_PITCHING_BB may be highly correlated, which can cause multicollinearity in the regression model.
 
 TEAM_BATTING_H, TEAM_BATTING_2B, and TEAM_BATTING_3B may also be strongly correlated since total hits include doubles and triples.
 
-### 5. Data Cleaning Recommendations Before Fitting the Model
+#### 5. Data Cleaning Recommendations Before Fitting the Model
 
 Handle Missing Values
 
@@ -267,7 +268,7 @@ The dataset contains inconsistencies, missing values, and extreme outliers that 
 
 Once cleaned, feature selection and multicollinearity checks will be essential to ensure a robust and interpretable model for predicting team wins.
 
-### Visualizing Training Dataset:
+## Visualizing Training Dataset:
 
 
 ```{r}
@@ -277,19 +278,19 @@ boxplot(train_df$TARGET_WINS, main="Distribution of Team Wins", ylab="Wins", col
 
 ```
 
-### Analysis of the Box Plot for TARGET_WINS (Team Wins Distribution)
+## Analysis of the Box Plot for TARGET_WINS (Team Wins Distribution)
 
 This box plot provides valuable insights into the distribution of team wins in the training dataset. 
 
 Here’s what we can infer:
 
-### 1. Median and Spread of Wins
+#### 1. Median and Spread of Wins
 
 The thick horizontal line inside the box represents the median (~82 wins).
 
 The box itself (Interquartile Range - IQR) shows the middle 50% of the data, which seems to range roughly from 70 to 92 wins.
 
-### 1. Box Plot – for Outlier Detection & Distribution Analysis:
+#### 2. Box Plot – for Outlier Detection & Distribution Analysis:
 
 - Low-end outliers (~0-40 wins): There are several small circles (outliers) below the lower whisker.
 
@@ -303,7 +304,7 @@ The box itself (Interquartile Range - IQR) shows the middle 50% of the data, whi
 
 - If extreme values skew the regression, we might need transformations (log scaling)
 
-### 3. Data Skewness and Symmetry
+#### 3. Data Skewness and Symmetry
 
 The box is fairly centered, suggesting a roughly symmetric distribution.
 
@@ -335,7 +336,7 @@ lines(density(train_df$TARGET_WINS, na.rm = TRUE),
       col = "red", 
       lwd = 2)  # Adds a red density curve
 ```
-### Data Preparation:
+## Data Preparation
 
 - Analyze Missing Values from Train Datasets.
 
@@ -373,13 +374,11 @@ ggplot(missing_values, aes(y = reorder(Variable, Missing_Count), x = Missing_Cou
 
 There are four main options for handling missing values:
 
-### 1. Remove Columns with Too Many Missing Values
+#### 1. Remove Columns with Too Many Missing Values
 
 If a column has too many missing values (e.g., >50% missing), it may be better to remove it.
 
-The column is mostly empty and not critical.
-
-Example: TEAM_BATTING_HBP (if missing in most rows).
+The _TEAM_BATTING_HBP_ column is mostly empty and not critical.
 
 ```{r}
 
@@ -395,7 +394,7 @@ train_df
 ```
 
 
-### 2. Remove Rows with Missing Target (TARGET_WINS)
+#### 2. Remove Rows with Missing Target (TARGET_WINS)
 
 If the TARGET_WINS column has missing values, remove those rows since we can’t predict missing outcomes.
 
@@ -406,7 +405,7 @@ train_df
 
 ```
 
-### 3. Create a "Missing Indicator" Column
+#### 3. Create a "Missing Indicator" Column
 
 If a column has many missing values, but we want to remove it, we create a new feature that flags missing values:
 
@@ -416,7 +415,7 @@ train_df <- train_df %>%
 train_df$TEAM_BASERUN_SB_Missing
 ```
 
-### 4. Verifying That Missing Values Are Fixed
+#### 4. Verifying That Missing Values Are Fixed
 
 ```{r}
 
@@ -424,13 +423,10 @@ sum(is.na(train_df))  # Total missing values
 colSums(is.na(train_df))  # Missing values per column
 
 ```
-```{r}
-names(train_data)
-```
 
-### Building Three Multiple Linear Regression Models with Manual Variable Selection:
+### Handling Additional Missing Values
 
-### Reasons for Removing Missing Values
+#### Reasons for Removing Missing Values
 
 - Missing Values Cause Errors in Regression Models
 
@@ -450,6 +446,7 @@ sum(is.na(train_df1))  # Total missing values
 colSums(is.na(train_df1))  # Missing values per column
 
 ```
+
 
 ### Preventing Bias in Model Predictions
 
@@ -476,14 +473,20 @@ train_df$TEAM_BASERUN_CS[is.na(train_df$TEAM_BASERUN_CS)] <- mean(train_df$TEAM_
 train_df$TEAM_PITCHING_SO[is.na(train_df$TEAM_PITCHING_SO)] <- mean(train_df$TEAM_PITCHING_SO, na.rm = TRUE)
 train_df$TEAM_FIELDING_DP[is.na(train_df$TEAM_FIELDING_DP)] <- mean(train_df$TEAM_FIELDING_DP, na.rm = TRUE)
 
+
+plot_qq(train_df, sampled_rows = 1000L)
+
 ```
 
 
 ```{r}
 
+train_df_clean <- train_df
 sum(is.na(train_df))  # Total missing values
 colSums(is.na(train_df))  # Missing values per column
 ```
+
+## Building Three Multiple Linear Regression Models with Manual Variable Selection
 
 ### Model 1: Base Baseball Stats Model
 
@@ -824,6 +827,54 @@ vif(high_impact_model)
 
 ```
 
+### Model 4: Variabls Selection Using Backward Selection 
+
+For this model, we are using backward selection to arrive at the smallest number of variables with statistical significance. In this case, we begin by creating a model containing all
+predictors, then gradually remove the variable with the highest P-value until only the variables with statistical significance remain. 
+
+Before starting, we dropped the _TEAM_BATTING_2B_ (2 base hits), _TEAM_BATTING_3B_ (3 base hits), _TEAM_BATTING_HR_ (home runs) as data for these columns is represented in the _TEAM_BATTING_H_ (total hits) column, thus signaling the existence of dependence between hit count variables and total hits. 
+
+Alternatively, we could have created a new column (TEAM_BATTING_1B) by subtracting the sum of 2 base hits, 3 base hits, and homeruns from total hits, but this alternatively solution would have a) added complexity into our model and b) added uncertainty due to possible missing values in the homeruns columns. 
+
+```{r backwards-selection}
+
+# drop unnecessary columns
+train_df2 <- drop_columns(train_df_clean, c("TEAM_BATTING_2B", "TEAM_BATTING_3B", "TEAM_BATTING_HR", "TEAM_PITCHING_HR", "TEAM_BASERUN_SB_Missing"))
+
+model_bs <- lm(TARGET_WINS ~ ., data = train_df2)
+summary(model_bs)
+AIC(model_bs)
+
+model_bs2 <- update(model_bs, . ~ . - TEAM_PITCHING_BB)
+summary(model_bs2)
+AIC(model_bs2)
+
+model_bs2 <- update(model_bs2, . ~ . - TEAM_BATTING_SO)
+summary(model_bs2)
+AIC(model_bs2)
+
+model_bs3 <- update(model_bs2, . ~ . - TEAM_BASERUN_CS)
+summary(model_bs3)
+AIC(model_bs3)
+
+```
+
+Backward selection using P-values arrives at a model with seven variables of statistical significance — six strong (< 0.001) and one moderate (0.05). However, when comparing the models Akaike information criterion (AIC) we see that the last version of this model which removed _TEAM_BASERUN_CS_ sees the AIC increasing. Generally, models with lower AIC scores have a better fit than higher AIC scores. This suggests that we may want to reconsider removing this variable.
+
+
+```{r model-4-diagnostic plots}
+plot(model_bs2)
+plot(model_bs3)
+```
+
+#### Model 5: Best Subset Selection
+
+```{r}
+library(leaps)
+regfit_full = regsubsets(TARGET_WINS ~ ., data = train_df2)
+summary(regfit_full)
+```
+
 ### Conclusion:
 
 If interpretability is most important → Use base Stats Model.
@@ -833,9 +884,9 @@ If statistical optimization is preferred → Use High-Impact Model.
 If non-linearity is a concern → Use Log-Transformed Model.
 
 
-### Select Model:
+## Select Model:
 
-### Final Analysis:
+### Final Analysis
 
 The Improved Model is the best choice for predicting TARGET_WINS because it has the highest R² (27.89%), the lowest residual standard error (13.25), and avoids severe multicollinearity issues. 
 
@@ -894,7 +945,7 @@ eval_df$TEAM_FIELDING_DP[is.na(eval_df$TEAM_FIELDING_DP)] <- mean(eval_df$TEAM_F
 eval_df$TEAM_PITCHING_SO[is.na(eval_df$TEAM_PITCHING_SO)] <- mean(eval_df$TEAM_PITCHING_SO, na.rm = TRUE)
 ```
 
-### 4. Verifying That Missing Values Are Fixed
+#### 4. Verifying That Missing Values Are Fixed
 
 ```{r}
 
@@ -908,7 +959,7 @@ colSums(is.na(eval_df))  # Missing values per column
 skim(eval_df)
 ```
 
-### Make Predictions Using the Improved_Model:
+## Make Predictions Using the Improved_Model:
 
 ```{r}
 
@@ -919,7 +970,7 @@ eval_df$PREDICTED_WINS <- predict(improved_model, newdata = eval_df)
 head(eval_df$PREDICTED_WINS)
 
 ```
-### Interpretation of Predicted TARGET_WINS Values
+## Interpretation of Predicted TARGET_WINS Values
 
 The predicted values represent the expected number of wins for teams based on their batting, pitching, and fielding statistics using the Improved Model.
 
@@ -933,7 +984,7 @@ The variation in predictions suggests that some teams are stronger than others b
 
 Now that we have predicted TARGET_WINS, we need to compare these predictions with the actual values in the TARGET_WINS column to assess model accuracy.
 
-### Step 1: Compute Error Metrics
+#### Step 1: Compute Error Metrics
 
 ```{r}
 # Check structure of the dataset
@@ -944,7 +995,7 @@ is.numeric(eval_df$ACTUAL_WINS)
 is.numeric(eval_df$PREDICTED_WINS)
 
 ```
-### Step 2: Add an INDEX Column to Each Dataset
+#### Step 2: Add an INDEX Column to Each Dataset
 
 ```{r}
 # Add a row index to both datasets
@@ -955,7 +1006,7 @@ eval_df$INDEX <- seq_len(nrow(eval_df))
 
 
 
-### Step 3: Align and Merge the Datasets
+#### Step 3: Align and Merge the Datasets
 
 ```{r}
 # First, check if both datasets have a common identifier (like INDEX)
@@ -975,7 +1026,7 @@ nrow(merged_df)
 Ensure data consistency before calculating accuracy metrics.
 Convert to numeric to avoid errors in correlation or calculations.
 
-### Step 4: Compute Accuracy Metrics
+#### Step 4: Compute Accuracy Metrics
 
 ```{r}
 # Load necessary libraries
