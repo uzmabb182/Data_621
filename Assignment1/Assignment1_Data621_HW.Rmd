@@ -92,7 +92,6 @@ glimpse(train_data)
 ```{r}
 eval_df <- data.frame(eval_data)
 train_df <- data.frame(train_data)
-train_df
 
 ```
 
@@ -101,7 +100,6 @@ train_df
 ```{r}
 str(eval_df)
 str(train_df)
-
 ```
 
 
@@ -132,6 +130,7 @@ ggplot(correlation_data, aes(x = reorder(Variable, Correlation), y = Correlation
   labs(title = "Correlation with Target Wins", x = "Variables", y = "Correlation") +
   scale_fill_manual(values = c("red", "blue")) +
   theme_minimal()
+
 ```
 ### Checking Correlations and Finding	Action:
 
@@ -190,21 +189,20 @@ Distribution: The min value of 0 and max of 146 suggest some potential outliers 
 
 #### 2. Missing Values
 
-- Some variables have a significant number of missing values:
+Some variables have a significant number of missing values. In particular:
 
-TEAM_BATTING_SO (102 missing values)
+- TEAM_BATTING_SO (102 missing values)
+- TEAM_BASERUN_SB (131 missing values)
+- TEAM_BASERUN_CS (772 missing values) <- potentially unreliable
+- TEAM_BATTING_HBP (2085 missing values) <- very unreliable
+- TEAM_PITCHING_SO (102 missing values)
+- TEAM_FIELDING_DP (286 missing values)
 
-TEAM_BASERUN_SB (131 missing values)
+Additionally, four variables have values of zero (0) reported that appear suspicious. In particular:
+- TEAM_BATTING_SO & TEAM_PITHCING_SO have the same rows entered as zero suggesting that data may not have been available for these entries.
+- TEAM_BATTING_HR & TEAM_PITHCING_HR have the same rows entered as zero suggesting that data may not have been available for these entries.
 
-TEAM_BASERUN_CS (772 missing values) <- potentially unreliable
-
-TEAM_BATTING_HBP (2085 missing values) <- very unreliable
-
-TEAM_PITCHING_SO (102 missing values)
-
-TEAM_FIELDING_DP (286 missing values)
-
-#### Actionable Steps:
+_Actionable Steps:_
 
 - Impute missing values (using mean/median or regression techniques).
 
@@ -212,17 +210,15 @@ TEAM_FIELDING_DP (286 missing values)
 
 #### 3. Potential Outliers & Data Issues
 
-- Several variables have extreme max values that seem unrealistic:
+Several variables have extreme max values that seem unrealistic. Specifically:
 
-TEAM_PITCHING_H (Max = 30,132) <- Likely an error since typical values range from 1,200 - 1,700.
+- TEAM_PITCHING_H (Max = 30,132) <- Likely an error since typical values range from 1,200 - 1,700.
+- TEAM_PITCHING_SO (Max = 19,278) <- Suspiciously high (typical range: 500 - 1,500).
 
-TEAM_PITCHING_SO (Max = 19,278) <- Suspiciously high (typical range: 500 - 1,500).
+- TEAM_PITCHING_BB (Max = 3,645) <- Very high (typical range: 300 - 700).
+- TEAM_FIELDING_E (Max = 1,898) <- Likely an error since the normal range is ~ 70-200.
 
-TEAM_PITCHING_BB (Max = 3,645) <- Very high (typical range: 300 - 700).
-
-TEAM_FIELDING_E (Max = 1,898) <- Likely an error since the normal range is ~ 70-200.
-
-#### Actionable Steps:
+_Actionable Steps:_
 
 - Check for data entry errors.
 
@@ -230,13 +226,13 @@ TEAM_FIELDING_E (Max = 1,898) <- Likely an error since the normal range is ~ 70-
 
 #### 4. Feature Selection Considerations:
 
-Batting Variables: TEAM_BATTING_H, TEAM_BATTING_2B, TEAM_BATTING_3B, TEAM_BATTING_HR, TEAM_BATTING_BB are likely strong predictors of team wins.
+Batting Variables: TEAM_BATTING_H, TEAM_BATTING_2B, TEAM_BATTING_3B, TEAM_BATTING_HR, TEAM_BATTING_BB are likely strong predictors of team wins. Note that TEAM_BATTING_H includes TEAM_BATTING_2B, TEAM_BATTING_3B, TEAM_BATTING_HR data.
 
 Pitching Variables: TEAM_PITCHING_H, TEAM_PITCHING_HR, TEAM_PITCHING_BB, TEAM_PITCHING_SO will impact defensive strength.
 
 Fielding Variables: TEAM_FIELDING_E (errors) and TEAM_FIELDING_DP (double plays) may have a weaker impact compared to batting and pitching.
 
-#### Multicollinearity Check Needed:
+_Actionable Steps:_
 
 TEAM_PITCHING_H, TEAM_PITCHING_HR, and TEAM_PITCHING_BB may be highly correlated, which can cause multicollinearity in the regression model.
 
@@ -445,6 +441,16 @@ train_df1
 sum(is.na(train_df1))  # Total missing values
 colSums(is.na(train_df1))  # Missing values per column
 
+train_df1 %>%
+  gather(variable, value, -TARGET_WINS) %>%
+  ggplot(., aes(value, TARGET_WINS)) + 
+  geom_point(fill = "#628B3A", color="#628B3A")  + 
+  geom_smooth(method = "lm", se = FALSE, color = "black") + 
+  facet_wrap(~variable, scales ="free", ncol = 4) +
+  labs(x = element_blank(), y = "Wins")
+
+#plot_qq(train_df1, sampled_rows = 1000L)
+
 ```
 
 
@@ -475,6 +481,7 @@ train_df$TEAM_FIELDING_DP[is.na(train_df$TEAM_FIELDING_DP)] <- mean(train_df$TEA
 
 
 plot_qq(train_df, sampled_rows = 1000L)
+
 
 ```
 
@@ -743,7 +750,6 @@ summary(high_impact_model)
 # Check for multicollinearity
 vif(high_impact_model)
 
-
 ```
 
 ### Why these variables?
@@ -827,52 +833,253 @@ vif(high_impact_model)
 
 ```
 
-### Model 4: Variabls Selection Using Backward Selection 
+### Model 4: Variable Selection Using Backward Selection 
 
 For this model, we are using backward selection to arrive at the smallest number of variables with statistical significance. In this case, we begin by creating a model containing all
 predictors, then gradually remove the variable with the highest P-value until only the variables with statistical significance remain. 
 
-Before starting, we dropped the _TEAM_BATTING_2B_ (2 base hits), _TEAM_BATTING_3B_ (3 base hits), _TEAM_BATTING_HR_ (home runs) as data for these columns is represented in the _TEAM_BATTING_H_ (total hits) column, thus signaling the existence of dependence between hit count variables and total hits. 
+Before starting, we dropped the _TEAM_BATTING_2B_ (2 base hits), _TEAM_BATTING_3B_ (3 base hits), _TEAM_BATTING_HR_ (home runs) as data for these columns is represented in the _TEAM_BATTING_H_ (total hits) column, thus signaling the existence of dependence between hit count variables and total hits. It is not totally clear if _TEAM_PITCHING_HR_ is also included in _TEAM_PITCHING_H_ from the supporting document but we will remove it in the event that a similar relationship exists. __Alternatively__, we could have created a new column (TEAM_BATTING_1B) by subtracting the sum of 2 base hits, 3 base hits, and homeruns from total hits, but this alternatively solution would have a) added complexity into our model and b) added uncertainty due to possible missing values in the homeruns columns. 
 
-Alternatively, we could have created a new column (TEAM_BATTING_1B) by subtracting the sum of 2 base hits, 3 base hits, and homeruns from total hits, but this alternatively solution would have a) added complexity into our model and b) added uncertainty due to possible missing values in the homeruns columns. 
 
-```{r backwards-selection}
 
-# drop unnecessary columns
-train_df2 <- drop_columns(train_df_clean, c("TEAM_BATTING_2B", "TEAM_BATTING_3B", "TEAM_BATTING_HR", "TEAM_PITCHING_HR", "TEAM_BASERUN_SB_Missing"))
+```{r model4-transformations}
+stp_train_df <- train_df_clean |> 
+    drop_columns(c("TEAM_BATTING_2B", "TEAM_BATTING_3B", "TEAM_BATTING_HR", "TEAM_PITCHING_HR", "TEAM_BASERUN_SB_Missing"))
+```
 
-model_bs <- lm(TARGET_WINS ~ ., data = train_df2)
-summary(model_bs)
-AIC(model_bs)
+Of the remaining variables, _TEAM_BATTING_SO_ and _TEAM_PITCHING_SO_ included a several observations with a value of zero. As the rows were the same for both variables, it appears that these may also be missing observations as the likelihood that a team's batters did not have a single strikeout nor did their pitchers pitch a single strikeout over the course of a 162 game season is highly unlikely. We will therefore treat these as missing observations and impute using the median value. We will also drop rows where the team did not win a single game, as these too look dubious.
 
-model_bs2 <- update(model_bs, . ~ . - TEAM_PITCHING_BB)
-summary(model_bs2)
-AIC(model_bs2)
+```{r model4-transformations}
 
-model_bs2 <- update(model_bs2, . ~ . - TEAM_BATTING_SO)
-summary(model_bs2)
-AIC(model_bs2)
+library(miscTools)
 
-model_bs3 <- update(model_bs2, . ~ . - TEAM_BASERUN_CS)
-summary(model_bs3)
-AIC(model_bs3)
+# Convert dubious stats to NAs for pitching
+# and drop unnecessary columns
+stp_train_df <- stp_train_df |>
+  mutate(
+    TEAM_BATTING_SO = if_else(TEAM_BATTING_SO > 0, TEAM_BATTING_SO, NA_integer_),
+    TEAM_PITCHING_SO = if_else(TEAM_PITCHING_SO > 0, TEAM_PITCHING_SO, NA_integer_)
+  ) |>
+  filter(TARGET_WINS > 0) 
+  
+
+# get means
+train_median_val <- colMedians(stp_train_df, na.rm = TRUE)
+
+# Impute using Means
+for(i in colnames(stp_train_df))
+    stp_train_df[,i][is.na(stp_train_df[,i])] <- as.integer(train_median_val[i])
+
+sum(is.na(stp_train_df))  # Total missing values
+colSums(is.na(stp_train_df))  # Missing values per column
 
 ```
 
-Backward selection using P-values arrives at a model with seven variables of statistical significance — six strong (< 0.001) and one moderate (0.05). However, when comparing the models Akaike information criterion (AIC) we see that the last version of this model which removed _TEAM_BASERUN_CS_ sees the AIC increasing. Generally, models with lower AIC scores have a better fit than higher AIC scores. This suggests that we may want to reconsider removing this variable.
+```{r model4-distributions}
+
+stp_train_df %>%
+  gather(variable, value, -TARGET_WINS) %>%
+  ggplot(., aes(value, TARGET_WINS)) + 
+  geom_point(fill = "#628B3A", color="#628B3A")  + 
+  geom_smooth(method = "lm", se = FALSE, color = "black") + 
+  facet_wrap(~variable, scales ="free", ncol = 4) +
+  labs(x = element_blank(), y = "Wins")
+
+#plot_qq(stp_train_df, sampled_rows = 1000L)
+
+```
+
+
+
+##### Splitting the training dataset
+
+We will split the original training dataset into a training and testing dataset in order to test the strength of our model without testing the model on data that the model has already seen. The training dataset will hold 75% of our original observations, while the test dataset will hold 25%. 
+
+```{r model4-split-data}
+
+smp_size <- floor(0.75 * nrow(stp_train_df))
+
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(stp_train_df)), size = smp_size)
+
+stp75_train_df <- stp_train_df[train_ind, ]
+stp25_test_df <- stp_train_df[-train_ind, ]
+```
+
+##### Best Subset Selection
+We will use Best Subset Selection to get a sense of the optimal number of predictors in our model. This test will use Mallows’ Cp.
+
+```{r model4-best-subset}
+library(leaps)
+regfit_full = regsubsets(TARGET_WINS ~ ., data = stp75_train_df, nvmax = 11)
+regfit_summary = summary(regfit_full)
+plot(regfit_summary$cp, xlab="Number of variables", ylab="cp")
+points(which.min(regfit_summary$cp),regfit_summary$cp[which.min(regfit_summary$cp)], pch=20,col="red")
+
+```
+Based on the _Best Subset Selection_ method, we estimate that our model should have `r which.min(regfit_summary$cp)` observations.
+
+### Model 6: Cross Validation 
+  
+
+```{r}
+set.seed(11)
+folds=sample(rep(1:5,length=nrow(stp75_train_df)))
+table(folds)
+cv.errors = matrix(NA,5,10)
+for(k in 1:5) {
+  best.fit = regsubsets(TARGET_WINS ~ ., data=stp75_train_df[folds!=k,], nvmax=10, method="forward")
+  for(i in 1:10) {
+    # Extract the selected coefficients for the i-th model
+    selected_coefs = coef(best.fit, id = i)
+    
+    # Predict manually by calculating the linear combination of the features
+    # First, subset the data for the k-th fold
+    test_data = stp75_train_df[folds == k, ]
+    
+    # Only include the predictors that were selected
+    predictors = names(selected_coefs)[-1]  # Exclude the intercept term
+    
+    # Calculate the predictions (including the intercept)
+    pred = as.matrix(test_data[, predictors]) %*% selected_coefs[predictors] + selected_coefs[1]  
+    
+    cv.errors[k,i]=mean((stp75_train_df$TARGET_WINS[folds==k] - pred)^2)
+  }
+}
+
+rmse.cv=sqrt(apply(cv.errors,2,mean))
+plot(rmse.cv, pch=5, type="b")
+
+
+typeof(rmse.cv)
+
+which.min(rmse.cv)
+```
+
+
+```{r backward-selection}
+stp_model <- lm(TARGET_WINS ~ ., data = stp75_train_df)
+summary(stp_model)
+AIC(stp_model)
+```
+_TEAM_PITCHING_BB_ has the highest p-value. We removed TEAM_PITCHING_BB from our predictors and update the model.
+
+```{r}
+stp_model2 <- update(stp_model, . ~ . - TEAM_PITCHING_BB)
+summary(stp_model2)
+AIC(stp_model2)
+```
+
+_TEAM_BATTING_SO_ has the highest p-value. We removed TEAM_BATTING_SO from our predictors and update the model.
+
+```{r}
+stp_model2 <- update(stp_model2, . ~ . - TEAM_BATTING_SO)
+summary(stp_model2)
+AIC(stp_model2)
+```
+
+_TEAM_BASERUN_CS_ has the highest p-value; since this p-value is above 0.05, it may not be statistically significant. We remove TEAM_BASERUN_CS from our predictors and update the model.
+
+
+```{r}
+stp_model2 <- update(stp_model2, . ~ . - TEAM_BASERUN_CS)
+summary(stp_model2)
+AIC(stp_model2)
+
+```
+
+Backward selection using P-values arrives at a model with seven variables of statistical significance — six strong (< 0.001) and one moderate (0.05). 
 
 
 ```{r model-4-diagnostic plots}
-plot(model_bs2)
-plot(model_bs3)
+
+vif(stp_model2)
+plot(stp_model2)
+
+vif(stp_model3)
+plot(stp_model3)
 ```
 
-#### Model 5: Best Subset Selection
+#### Model 4 with Log Transformations
+
 
 ```{r}
-library(leaps)
-regfit_full = regsubsets(TARGET_WINS ~ ., data = train_df2)
-summary(regfit_full)
+
+# Convert dubious stats to NAs for pitching
+# and drop unnecessary columns
+head(eval_df)
+eval_df2 <- eval_df |>
+  mutate(
+    TEAM_BATTING_HR = if_else(TEAM_BATTING_HR > 0, TEAM_BATTING_HR, NA_integer_),
+    TEAM_PITCHING_HR = if_else(TEAM_PITCHING_HR > 0, TEAM_PITCHING_HR, NA_integer_)
+  ) |> 
+  drop_columns(c("INDEX", "TEAM_BATTING_HBP", "TEAM_BATTING_2B", "TEAM_BATTING_3B", "TEAM_BATTING_HR", "TEAM_PITCHING_HR"))
+
+# get means
+eval_mean_val <- colMeans(eval_df2, na.rm = TRUE)
+
+# Impute using Means
+for(i in colnames(eval_df2))
+    eval_df2[,i][is.na(eval_df2[,i])] <- eval_mean_val[i]
+
+# get medians
+#median_val <- colMedians(eval_df2, na.rm = TRUE)
+
+
+#x.test = model.matrix(TARGET_WINS ~ ., data = eval_df2)
+```
+
+
+
+```{r model4_log_transform}
+
+stplg_train_df <- stp_train_df |>
+  mutate(
+    TEAM_PITCHING_SO = log1p(TEAM_PITCHING_SO),
+    TEAM_PITCHING_BB = log1p(TEAM_PITCHING_BB),
+    TEAM_PITCHING_H = log1p(TEAM_PITCHING_H),
+  )
+
+stplg_train_df %>%
+  gather(variable, value, -TARGET_WINS) %>%
+  ggplot(., aes(value, TARGET_WINS)) + 
+  geom_point(fill = "#628B3A", color="#628B3A")  + 
+  geom_smooth(method = "lm", se = FALSE, color = "black") + 
+  facet_wrap(~variable, scales ="free", ncol = 4) +
+  labs(x = element_blank(), y = "Wins")
+
+plot_qq(stplg_train_df, sampled_rows = 1000L)
+
+```
+
+### Model 6: Ridge Regression 
+
+
+```{r}
+library(glmnet)
+x = model.matrix(TARGET_WINS ~ ., data = train_df2)
+y = train_df2$TARGET_WINS
+fit.ridge = glmnet(x, y, alpha=0)
+plot(fit.ridge, xvar="lambda", label=TRUE)
+cv.ridge = cv.glmnet(x,y,alpha=0)
+plot(cv.ridge)
+```
+### Model 7: Lasso 
+
+Lasso subset selection shrinkage approach  
+
+
+```{r}
+fit.lasso = glmnet(x, y, alpha=1)
+plot(fit.lasso, xvar="lambda", label=TRUE)
+plot(fit.lasso, xvar="dev", label=TRUE)
+cv.lasso = cv.glmnet(x,y,alpha=1)
+plot(cv.lasso)
+coef(cv.lasso)
+```
+```{r}
+#lasso.tr
 ```
 
 ### Conclusion:
