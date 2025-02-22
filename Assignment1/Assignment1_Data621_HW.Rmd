@@ -462,7 +462,6 @@ If missing values are not randomly distributed, removing them may bias the datas
 
 Instead of na.omit(), imputation methods (like mean/median filling) may be better for handling missing data.
 
-
 ### Alternative Solutions Instead of na.omit()
 
 Removing rows with missing data is sometimes not the best approach, especially if a large portion of data is lost. Here are alternative methods:
@@ -508,7 +507,7 @@ summary(base_model)
 
 
 ```
-### Why were these variables selected?
+#### Why were these variables selected?
 
 TEAM_BATTING_H (Hits): More hits increase the chances of scoring.
 
@@ -524,7 +523,7 @@ TEAM_BASERUN_SB (Stolen Bases): Limited impact on overall wins.
 
 TEAM_PITCHING_BB (Walks Allowed): May not be as predictive when combined with strikeouts.
 
-### Interpreting the Coefficients of the Regression Model
+#### Interpreting the Coefficients of the Regression Model
 
 1- Intercept (8.715)
 
@@ -573,7 +572,7 @@ Interpretation: For every additional error, a team is expected to lose 0.021 mor
 Example: A team with 50 more errors in a season would lose ~1 more game (50 × 0.021).
 Conclusion: More errors directly hurt a team’s chances of winning, which makes sense in baseball.
 
-### Key Metric Interpretation:
+#### Key Metric Interpretation:
 
 Residual Std. Error	13.78	The average prediction error is ~13.78 wins.
 
@@ -583,7 +582,7 @@ F-Statistic	175.6 (p < 2.2e-16)	The overall model is statistically significant.
 
 p < 2.2e-16 → The probability of getting this result by random chance is essentially 0 (very small).
 
-### Conclusion: 
+#### Conclusion: 
 
 At least one of the predictor variables in the model significantly affects TARGET_WINS.
 
@@ -599,7 +598,7 @@ However, we still need to check which specific variables are the most meaningful
 
 ### Implementing Improvement in the Model:
 
-### Step 1: Check for Multicollinearity (VIF Test)
+#### Step 1: Check for Multicollinearity (VIF Test)
 
 Multicollinearity occurs when predictor variables are highly correlated, leading to unstable coefficients and inflated standard errors.
 
@@ -615,7 +614,7 @@ vif(vif_model)
 
 ```
 
-### Interpretation
+#### Interpretation
 Since all VIF values are below 5, there is no significant multicollinearity in the model. This means:
 
 Each predictor contributes unique information to explaining TARGET_WINS.
@@ -623,7 +622,7 @@ Regression coefficients are stable, and we do not need to remove any variables d
 The model is not distorted by highly correlated predictors.
 
 
-### Step 2: Test Interaction Term (TEAM_BATTING_HR * TEAM_BATTING_BB)
+#### Step 2: Test Interaction Term (TEAM_BATTING_HR * TEAM_BATTING_BB)
 
 If a team hits more home runs and draws more walks, they likely score more runs.
 We test if walks amplify the impact of home runs on wins.
@@ -638,7 +637,7 @@ interaction_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BA
 summary(interaction_model)
 
 ```
-### Interpretation:
+#### Interpretation:
 
 Model now includes an interaction term (TEAM_BATTING_HR:TEAM_BATTING_BB) to see if walks (BB) affect the impact of home runs (HR) on wins. Let’s break down the results.
 
@@ -660,7 +659,7 @@ Positive Coefficient (+0.000301)
 Teams that hit home runs AND get on base with walks tend to win more games.
 This confirms that home runs are more valuable when combined with walks.
 
-### Visualizing the Interaction Effect:
+#### Visualizing the Interaction Effect:
 We want to see how home runs (TEAM_BATTING_HR) and walks (TEAM_BATTING_BB) impact wins (TARGET_WINS) together.
 
 ```{r}
@@ -682,7 +681,7 @@ Red (high walks) teams should have higher wins for the same HRs.
 Blue (low walks) teams may not benefit as much from HRs.
 The trendline is steeper for teams with more walks, confirming that walks amplify HR impact.
 
-### Adding TEAM_BATTING_2B (Doubles) to the Model:
+#### Adding TEAM_BATTING_2B (Doubles) to the Model:
 Doubles (2B) are a strong indicator of offensive power and often correlate with scoring more runs.
 If a team doesn’t hit home runs, but hits many doubles, it can still score efficiently.
 
@@ -695,14 +694,14 @@ improved_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTI
 summary(improved_model)
 
 ```
-### Interpretation:
+#### Interpretation:
 
 The average prediction error is ±13.25 wins (slightly better than before).
 The model explains 27.9% of the variance in wins (slightly better than 27.2% in the previous model).
 Adjusted for number of predictors (still an improvement from before).
 The model is statistically significant overall.
 
-### Improvement After Adding TEAM_BATTING_2B (Doubles)?
+#### Improvement After Adding TEAM_BATTING_2B (Doubles)?
 Model performance improved slightly (R² increased from 27.2% → 27.9%).
 Doubles (TEAM_BATTING_2B) unexpectedly have a negative impact on wins.
 
@@ -711,7 +710,7 @@ Solution: We will Check multicollinearity (VIF) or add an interaction term (e.g.
 HRs alone are still negative (-0.1612), but the interaction term remains strong.
 Conclusion: HRs are only useful when paired with walks.
 
-### Key Findings
+#### Key Findings
 Adding TEAM_BATTING_2B slightly improves model performance 
 
 R² increased from 27.2% → 27.9% (small improvement).
@@ -752,7 +751,7 @@ vif(high_impact_model)
 
 ```
 
-### Why these variables?
+#### Why these variables?
 
 TEAM_BATTING_2B (Doubles): Important for offensive production.
 
@@ -788,7 +787,7 @@ summary(log_model)
 
 
 ```
-### Why log transformation?
+#### Why log transformation?
 
 Fixes right-skewed distributions (e.g., extreme HR and SO values).
 
@@ -802,7 +801,7 @@ More stable regression coefficients with reduced variability.
 
 Improves the model fit for non-linear relationships.
 
-### Comparision between three Models:
+#### Comparision between three Models:
 
 - Compare Adjusted R² across models:
 
@@ -975,7 +974,7 @@ for(k in 1:5) {
 rmse_cv = sqrt(apply(cv_errors,2,mean))
 plot(rmse_cv, pch=5, type="b")
 ```
-Based on the _Best Subset Selection_ method, we estimate that our model should have `r which.min(rmse_cv)` observations.
+Based on the _Cross Validation_ method, we estimate that our model should have `r which.min(rmse_cv)` observations.
 
 ##### Backward Selection Method
 
@@ -1080,29 +1079,6 @@ The function _compare_performance_ allows comparison of various metrics across d
 compare_performance(stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, rank = TRUE)
 ```
 
-##### Testing the model
-
-In this section, we will use the test dataframe to test the accuracy of our model's predictions. 
-
-```{r model4-test}
-
-predictedWins = predict(stp_model, stp25_test_df)
-stp25_test_df["PREDICTED_WINS"] = predictedWins
-
-stp25_test_df <- stp25_test_df %>% 
-  relocate("PREDICTED_WINS", .after = "TARGET_WINS")  %>% 
-  mutate(
-    PREDICT_ERR = TARGET_WINS - PREDICTED_WINS
-  )  %>% 
-  relocate("PREDICT_ERR", .after = "PREDICTED_WINS")
-
-pred = lm(stp25_test_df$PREDICTED_WINS~stp25_test_df$TARGET_WINS)
-
-plot(stp25_test_df$PREDICTED_WINS, stp25_test_df$TARGET_WINS,xlab="Actual Wins", ylab="Predicted Wins")
-abline(pred)
-summary(pred)
-```
-The summary and diagnostic plot reveals that our model is statistically significant and somewhat linear.
 
 #### Tuning with Log Transformations
 
@@ -1141,13 +1117,14 @@ Our scatter plots show some improvement in our outliers.
 We will run Best Subset Selection & Cross-Validation tests again to get a sense of the ideal number of predictors.
 
 ```{r model4lg-best-subset-cv}
+## 
 library(leaps)
 regfit_full = regsubsets(TARGET_WINS ~ ., data = stplg75_train_df, nvmax = 11)
 regfit_summary = summary(regfit_full)
 plot(regfit_summary$cp, xlab="Number of variables", ylab="cp")
 points(which.min(regfit_summary$cp), regfit_summary$cp[which.min(regfit_summary$cp)], pch=20,col="red")
 
-
+## CV
 set.seed(11)
 folds=sample(rep(1:5,length=nrow(stplg75_train_df)))
 
@@ -1174,9 +1151,11 @@ for(k in 1:5) {
 
 rmse_cv = sqrt(apply(cv_errors,2,mean))
 plot(rmse_cv, pch=5, type="b")
+
+
 ```
 
-We get the same number of observations after testing for Best Subset Selection & Cross-Validation, with `r which.min(regfit_summary$cp)` and `r which.min(rmse_cv)` observations respectively.
+We get similar number of predictors after testing for Best Subset Selection & Cross-Validation, with `r which.min(regfit_summary$cp)` and `r which.min(rmse_cv)` observations respectively.
 
 #### Backwards Selection
 
@@ -1193,7 +1172,6 @@ Looking at the summary for this model shows that all predictors have high statis
 
 ```{r}
 summary(stplg_model)
-stplg_model_ph <- stplg_model
 ```
 
 The Residuals vs. Fitted and QQ Plots show a fairly linear pattern, while Scale-Location plot suggest Homoscedasticity. The Residuals vs Leverage plot reveals that our outliers have less leverage than in the pre- log transformed model. 
@@ -1219,43 +1197,14 @@ Running our performance test shows that our new model with log transformations i
 compare_performance(stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, stplg_model, rank = TRUE)
 ```
 
-#### Testing the model (revisited)
-
-In this section, we will use the test dataframe to test the accuracy of our model's predictions
-
-```{r model4lg-test}
-
-predictedWins = predict(stplg_model, stplg25_test_df)
-stplg25_test_df["PREDICTED_WINS"] = predictedWins
-
-stplg25_test_df <- stplg25_test_df %>% 
-  relocate("PREDICTED_WINS", .after = "TARGET_WINS")  %>% 
-  mutate(
-    PREDICT_ERR = TARGET_WINS - PREDICTED_WINS
-  )  %>% 
-  relocate("PREDICT_ERR", .after = "PREDICTED_WINS")
-
-pred = lm(stplg25_test_df$PREDICTED_WINS~stplg25_test_df$TARGET_WINS)
-
-plot(stplg25_test_df$PREDICTED_WINS, stplg25_test_df$TARGET_WINS,xlab="Actual Wins", ylab="Predicted Wins")
-abline(pred)
-summary(pred)
-```
-
-_Original Model_
-Adjusted R-squared:  0.3205
-
-_Log Tranformed Model_
-Adjusted R-squared:  0.3171
-
 
 ### Model 6: Lasso Regression 
 
-Lasso subset selection uses a shrinkage approach  to 
+The Least Absolute Shrinkage and Selection Operator (LASSO) selection method uses a shrinkage approach to determining the optimal predictors by attempting to find a balance between simplicity and accuracy.It applies a penalty to the standard linear regression model to encourage the coefficients of features with weak influence to equal zero to prevent overfitting.
 
 ```{r}
 library(glmnet)
-x = model.matrix(TARGET_WINS ~ ., data = stp75_train_df)
+x = model.matrix(TARGET_WINS ~ ., data = stplg75_train_df)
 y = stplg75_train_df$TARGET_WINS
 
 fit_lasso = glmnet(x, y, alpha=1)
@@ -1265,36 +1214,61 @@ cv_lasso = cv.glmnet(x,y,alpha=1)
 coef(cv_lasso)
 ```
 
+Performing LASSO on our training subset -- 75% of full training set with log transformation applied --  gives us 7 predictors:
+- TEAM_BATTING_H 
+- TEAM_BATTING_3B 
+- TEAM_BATTING_BB 
+- TEAM_BASERUN_SB 
+- TEAM_PITCHING_HR 
+- TEAM_FIELDING_E 
+- TEAM_FIELDING_DP
+ 
 
-```{r}
-lasso_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_3B + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_PITCHING_HR + TEAM_FIELDING_E + TEAM_FIELDING_DP, data = stp75_train_df)
+```{r lasso-summary}
+lasso_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_3B + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_PITCHING_HR + TEAM_FIELDING_E + TEAM_FIELDING_DP, data = stplg75_train_df)
 
+plot(lasso_model)
 summary(lasso_model)
 vif(lasso_model)
-
-compare_performance(stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, stplg_model, lasso_model, rank = TRUE)
 ```
 
+Our VIF test shows no strong correlation between predictors. The Residuals vs. Fitted and QQ Plots show a fairly linear pattern, while Scale-Location plot suggest Homoscedasticity. The Residuals vs Leverage plot reveals that our outliers have less leverage than in the pre- log transformed model. 
 
-```{r model5-test}
+### Comparing All Models
 
-predictedWins = predict(lasso_model, stp25_test_df)
-stp25_test_df["PREDICTED_WINS"] = predictedWins
+Here we are comparing the all models using our training subset (75% of observations).
 
-stp25_test_df <- stp25_test_df %>% 
-  relocate("PREDICTED_WINS", .after = "TARGET_WINS")  %>% 
+```{r lasso-compare}
+
+base_model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = stp75_train_df)
+
+high_impact_model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_HR +
+                        TEAM_PITCHING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = stp75_train_df)
+
+# Apply log transformation to selected variables
+stp75lf2_train_df <- stp75_train_df %>%
   mutate(
-    PREDICT_ERR = TARGET_WINS - PREDICTED_WINS
-  )  %>% 
-  relocate("PREDICT_ERR", .after = "PREDICTED_WINS")
+    log_BATTING_H = log1p(TEAM_BATTING_H),
+    log_BATTING_HR = log1p(TEAM_BATTING_HR),
+    log_PITCHING_SO = log1p(TEAM_PITCHING_SO)
+  )
 
-pred = lm(stp25_test_df$PREDICTED_WINS~stp25_test_df$TARGET_WINS)
+stp25lf2_train_df <- stp25_test_df %>%
+  mutate(
+    log_BATTING_H = log1p(TEAM_BATTING_H),
+    log_BATTING_HR = log1p(TEAM_BATTING_HR),
+    log_PITCHING_SO = log1p(TEAM_PITCHING_SO)
+  )
 
-plot(stp25_test_df$PREDICTED_WINS, stp25_test_df$TARGET_WINS,xlab="Actual Wins", ylab="Predicted Wins")
-abline(pred)
-summary(pred)
+log_model2 <- lm(TARGET_WINS ~ log_BATTING_H + log_BATTING_HR + log_PITCHING_SO + TEAM_FIELDING_E, data = stp75lf2_train_df)
+
+compare_performance(base_model2, high_impact_model2, log_model2, stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, stplg_model, lasso_model)
 ```
+
+
+
 ### Conclusion:
+
 
 If interpretability is most important → Use base Stats Model.
 
@@ -1302,8 +1276,116 @@ If statistical optimization is preferred → Use High-Impact Model.
 
 If non-linearity is a concern → Use Log-Transformed Model.
 
+If statistical significance is most important → Log-Transformed Step-wise Model 
 
-## Select Model:
+## Model Selection
+
+#### Testing the model
+
+In this section, we will use the test dataframe to test the accuracy of our model's predictions
+
+```{r model4lg-test}
+
+# Load necessary libraries
+library(Metrics)  # For MAE and RMSE
+
+# Stats Model predictions
+predictedWins = predict(base_model2, stp25_test_df)
+stp25_test_df["PREDICTED_WINS"] = predictedWins
+
+# High-Impact Model
+predictedWins = predict(high_impact_model2, stp25_test_df)
+stp25_test_df["PREDICTED_WINS_HIM"] = predictedWins
+
+# Log-Transformed Model
+predictedWins = predict(log_model2, stp25lf2_train_df)
+stp25lf2_train_df["PREDICTED_WINS_LOG"] = predictedWins
+
+# Log-Transformed Step-wise Model
+predictedWins = predict(stplg_model, stplg25_test_df)
+stplg25_test_df["PREDICTED_WINS_STP"] = predictedWins
+
+# Create a df to store our results
+evaluation_metrics <- data.frame(
+  model_name = character(0), 
+  MAE = numeric(0),     
+  RMSE = numeric(0),    
+  RSquared = numeric(0)      
+)
+  
+eval_predictions <- function(model, predict_col, target_col, model_name) {
+  
+  pred = lm(predict_col ~ target_col)
+  plot(predict_col, target_col, xlab="Actual Wins", ylab="Predicted Wins")
+  abline(pred)
+  
+  plot(model$residuals)
+  
+  model_metrics = data.frame(
+    model_name = model_name,
+    MAE = mae(target_col, predict_col),
+    RMSE = rmse(target_col, predict_col),
+    RSquared = (cor(target_col, predict_col)^2 )
+  )
+  
+  print(model_metrics)
+  
+  evaluation_metrics <<- rbind(evaluation_metrics, model_metrics)
+  
+}
+
+# Evaluate Stats Model predictions
+eval_predictions(base_model2, stp25_test_df$PREDICTED_WINS, stp25_test_df$TARGET_WINS, "Stats")
+
+```
+```{r}
+# Evaluate High-Impact Model
+eval_predictions(high_impact_model2, stp25_test_df$PREDICTED_WINS_HIM, stp25_test_df$TARGET_WINS, "High-Impact")
+```
+```{r}
+# Evaluate Log-Transformed Model
+eval_predictions(log_model2, stp25lf2_train_df$PREDICTED_WINS_LOG, stp25lf2_train_df$TARGET_WINS, "Log-Tranformed")
+```
+
+```{r}
+
+# Evaluate Log-Transformed Step-wise Model
+eval_predictions(stplg_model, stplg25_test_df$PREDICTED_WINS_STP, stplg25_test_df$TARGET_WINS, "LT Step-wise")
+```
+To evaluate the accuracy of each our model's predictions, we will compare:
+- the Mean Absolute Error (MAE)
+- the Root Mean Squared Error (RMSE)
+- the R-squared (R²)
+
+```{r}
+print(evaluation_metrics)
+```
+A quick examination of these shows the Log-Transformed Step-wise Model has the lowest MAE and RMSE as well as the highest R-squared, suggesting that this model is somewhat more accurate than the other four evaluated. For confirmation we will perform a 5-fold cross-validation below:
+
+```{r model4lg-cross-validation}
+library(caret)
+
+train_control <- trainControl(method = "cv", number = 5)  # 10-fold cross-validation
+
+model_cv <- train(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + 
+    TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
+    TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_BB + TEAM_PITCHING_SO + 
+    TEAM_FIELDING_E + TEAM_FIELDING_DP, data = stplg75_train_df, method = "lm", trControl = train_control)
+
+print(model_cv)
+```
+MAE and RMSE is even lower when using cross-validation. Although our R-squared value decreased from 0.3183 to 0.3034024, this value is still higher than the next most performant model which had an R-squared value of 0.2368 ().
+
+### Applying Prediction to Our Evalution
+
+With our models tested and evaluated, we can no apply our model to our final evaluation dataframe.
+
+```{r final-predictions}
+
+predictedWins = predict(stplg_model, eval_df)
+eval_df["PREDICTED_WINS"] = predictedWins
+
+```
 
 ### Final Analysis
 
