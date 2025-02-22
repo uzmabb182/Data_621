@@ -102,7 +102,7 @@ str(eval_df)
 str(train_df)
 
 ```
-
+### Faceted Scatter Plot with Linear Regression Lines:
 
 ```{r}
 train_df %>%
@@ -113,6 +113,26 @@ train_df %>%
   facet_wrap(~variable, scales ="free", ncol = 4) +
   labs(x = element_blank(), y = "Wins")
 ```
+### Interpretation:
+
+Each small plot (facet) shows the relationship between one predictor variable and TARGET_WINS.
+
+Data points are plotted where the x-axis represents the predictor variable, and the y-axis represents the number of wins.
+
+A black trend line is fitted using linear regression is showing the general direction of the relationship.
+
+The slope of the regression line in each facet indicates whether a variable has a positive or negative correlation with TARGET_WINS.
+
+If the points are closely clustered around the line, it suggests a stronger linear relationship.
+
+If the points are widely scattered, the variable may not strongly predict TARGET_WINS.
+
+If the trend line is flat, there is likely no meaningful relationship between that variable and TARGET_WINS.
+
+Positive Predictors of Wins: TEAM_BATTING_2B, TEAM_BATTING_BB, TEAM_BATTING_H, TEAM_PITCHING_BB (unexpected).
+Negative Predictors of Wins: TEAM_FIELDING_E, TEAM_PITCHING_H, TEAM_PITCHING_SO.
+Weak or No Influence: INDEX, TEAM_BATTING_3B, TEAM_BATTING_HBP, TEAM_BATTING_SO, TEAM_FIELDING_DP, TEAM_PITCHING_HR.
+
 ### Sorted Correlations
 
 ```{r}
@@ -120,6 +140,9 @@ correlation_with_target <- cor(train_df, use = "complete.obs")["TARGET_WINS", ] 
   sort(decreasing = TRUE)  # Sort from highest to lowest correlation
 print(correlation_with_target)
 ```
+
+
+
 ```{r}
 library(ggplot2)
 
@@ -485,6 +508,7 @@ sum(is.na(train_df))  # Total missing values
 colSums(is.na(train_df))  # Missing values per column
 ```
 
+
 ### Model 1: Base Baseball Stats Model
 
 - This model includes fundamental offensive, defensive, and pitching stats that logically contribute to wins.
@@ -498,6 +522,8 @@ summary(base_model)
 
 
 ```
+
+
 ### Why were these variables selected?
 
 TEAM_BATTING_H (Hits): More hits increase the chances of scoring.
@@ -628,6 +654,7 @@ interaction_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BA
 summary(interaction_model)
 
 ```
+
 ### Interpretation:
 
 Model now includes an interaction term (TEAM_BATTING_HR:TEAM_BATTING_BB) to see if walks (BB) affect the impact of home runs (HR) on wins. Let’s break down the results.
@@ -721,6 +748,57 @@ Decision: Should we keep TEAM_BATTING_2B?
 If VIF test shows high correlation with TEAM_BATTING_H, we should drop it.
 If interaction terms (e.g., TEAM_BATTING_2B * TEAM_BATTING_H) make sense, we could try that instead.
 
+### Test Four Assumptions:
+
+```{r}
+plot(improved_model)
+```
+
+### Normality Check:
+
+
+```{r check-for-normality}
+
+shapiro.test(residuals(improved_model))
+# Shapiro-Wilk normality test: look for high p-value
+```
+Test Statistics W = 0.99682 is close to 1 showing Normality, but 
+p-value = 0.0001093 < 0.05 suggest that residuals do not follow a normal distribution
+
+### Homoscedasticity:
+
+```{r echo: false}
+library(lmtest)
+bptest(improved_model)
+# Breusch-Pagan test; look for high p-value
+```
+Test Statistic (BP = 272.22) suggest higher evidence of heteroscedasticity
+p-value is extremely small (much less than 0.05) suggest higher evidence of heteroscedasticity
+and we may need to transform the data.
+
+### Independence:
+
+```{r}
+
+durbinWatsonTest(improved_model)
+# Durbin Watson test: should be close to 2
+
+```
+ Autocorrelation = 0.4966624, This value is positive, indicating that residuals are positively correlated
+D-W Statistic = 1.003569 < 2.0 suggest Positive autocorrelation (residuals are correlated)
+ p-value = 0 < 0.05, suggest there is strong evidence of autocorrelation
+
+### Multicolinearity:
+
+```{r}
+
+# Check Variance Inflation Factor (VIF)
+vif(improved_model)
+    
+```
+TEAM_BATTING_H,  TEAM_BATTING_2B,  TEAM_PITCHING_SO,  TEAM_FIELDING_E are in the range of (1-5) - No significant multicollinearity (good)
+
+TEAM_BATTING_HR, TEAM_BATTING_HR:TEAM_BATTING_BB are in the range of (> 10) shows Severe multicollinearity (highly problematic).
 
 
 ### Model 2: High-Impact Features Model (Based on Correlation & VIF)
@@ -994,6 +1072,7 @@ cat("Root Mean Squared Error (RMSE):", round(rmse, 2), "\n")
 cat("R-Squared (R²):", round(r_squared, 4), "\n")
 
 ```
+
 ### Interpretation of Model Accuracy Metrics
 
 The evaluation results indicate that our Improved Model is not performing well in predicting TARGET_WINS.
