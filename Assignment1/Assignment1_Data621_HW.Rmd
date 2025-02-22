@@ -835,19 +835,9 @@ vif(high_impact_model)
 
 ### Model 4: Variable Selection Using Backward Selection 
 
-For this model, we are using backward selection to arrive at the smallest number of variables with statistical significance. In this case, we begin by creating a model containing all
-predictors, then gradually remove the variable with the highest P-value until only the variables with statistical significance remain. 
+For this model, we are using backward selection to arrive at the smallest number of variables with statistical significance. In this case, we begin by creating a model containing all predictors, then gradually remove the variable with the highest P-value until only the variables with statistical significance remain. 
 
-Before starting, we dropped the _TEAM_BATTING_2B_ (2 base hits), _TEAM_BATTING_3B_ (3 base hits), _TEAM_BATTING_HR_ (home runs) as data for these columns is represented in the _TEAM_BATTING_H_ (total hits) column, thus signaling the existence of dependence between hit count variables and total hits. It is not totally clear if _TEAM_PITCHING_HR_ is also included in _TEAM_PITCHING_H_ from the supporting document but we will remove it in the event that a similar relationship exists. __Alternatively__, we could have created a new column (TEAM_BATTING_1B) by subtracting the sum of 2 base hits, 3 base hits, and homeruns from total hits, but this alternatively solution would have a) added complexity into our model and b) added uncertainty due to possible missing values in the homeruns columns. 
-
-
-
-```{r model4-transformations}
-stp_train_df <- train_df_clean |> 
-    drop_columns(c("TEAM_BATTING_2B", "TEAM_BATTING_3B", "TEAM_BATTING_HR", "TEAM_PITCHING_HR", "TEAM_BASERUN_SB_Missing"))
-```
-
-Of the remaining variables, _TEAM_BATTING_SO_ and _TEAM_PITCHING_SO_ included a several observations with a value of zero. As the rows were the same for both variables, it appears that these may also be missing observations as the likelihood that a team's batters did not have a single strikeout nor did their pitchers pitch a single strikeout over the course of a 162 game season is highly unlikely. We will therefore treat these as missing observations and impute using the median value. We will also drop the single row where the team did not win a single game, as this is also suspicious.
+The remaining variables _TEAM_BATTING_SO_, _TEAM_PITCHING_SO_, _TEAM_BATTING_HR_, and _TEAM_PITCHING_HR_ included a several observations with a value of zero. As the rows were the same for both variables, it appears that these may also be missing observations as the likelihood that a team's batters did not have a single strikeout nor did their pitchers pitch a single strikeout over the course of a 162 game season is highly unlikely. We will therefore treat these as missing observations and impute using the median value which is more robust to outliers then using the mean values. We will also drop the single row where the team did not win a single game, as this is also suspicious.
 
 ```{r model4-transformations}
 
@@ -855,58 +845,90 @@ library(miscTools)
 
 # Convert dubious stats to NAs for pitching
 # and drop unnecessary columns
-stp_train_df <- stp_train_df |>
+train_df_clean <- train_df_clean |>
   mutate(
     TEAM_BATTING_SO = if_else(TEAM_BATTING_SO > 0, TEAM_BATTING_SO, NA_integer_),
-    TEAM_PITCHING_SO = if_else(TEAM_PITCHING_SO > 0, TEAM_PITCHING_SO, NA_integer_)
+    TEAM_PITCHING_SO = if_else(TEAM_PITCHING_SO > 0, TEAM_PITCHING_SO, NA_integer_),
+    TEAM_BATTING_HR = if_else(TEAM_BATTING_HR > 0, TEAM_BATTING_HR, NA_integer_),
+    TEAM_PITCHING_HR = if_else(TEAM_PITCHING_HR > 0, TEAM_PITCHING_HR, NA_integer_)
   ) |>
-  filter(TARGET_WINS > 0) 
+  filter(TARGET_WINS > 0) |>
+  drop_columns(c("TEAM_BASERUN_SB_Missing"))
   
-
-# get means
-train_median_val <- colMedians(stp_train_df, na.rm = TRUE)
+# get medians
+train_median_val <- colMedians(train_df_clean, na.rm = TRUE)
 
 # Impute using Means
-for(i in colnames(stp_train_df))
-    stp_train_df[,i][is.na(stp_train_df[,i])] <- as.integer(train_median_val[i])
+for(i in colnames(train_df_clean))
+    train_df_clean[,i][is.na(train_df_clean[,i])] <- as.integer(train_median_val[i])
 
-sum(is.na(stp_train_df))  # Total missing values
-colSums(is.na(stp_train_df))  # Missing values per column
-
-```
-The scatterplots look a bit better after making these adjustments, but we may need to apply a log  transformation to address outliers seen in some of our plots.
-
-```{r model4-distributions}
-
-stp_train_df %>%
-  gather(variable, value, -TARGET_WINS) %>%
-  ggplot(., aes(value, TARGET_WINS)) + 
-  geom_point(fill = "#628B3A", color="#628B3A")  + 
-  geom_smooth(method = "lm", se = FALSE, color = "black") + 
-  facet_wrap(~variable, scales ="free", ncol = 4) +
-  labs(x = element_blank(), y = "Wins")
-
-#plot_qq(stp_train_df, sampled_rows = 1000L)
+sum(is.na(train_df_clean))  # Total missing values
+colSums(is.na(train_df_clean))  # Missing values per column
 
 ```
-
 
 
 ##### Splitting the training dataset
 
-We will split the original training dataset into a training and testing dataset in order to test the strength of our model without testing the model on data that the model has already seen. The training dataset will hold 75% of our original observations, while the test dataset will hold 25%. 
+We split the original training dataset into a training and testing dataset in order to test the strength of our model without testing the model on data that the model has already seen. The training dataset will hold 75% of our original observations, while the test dataset will hold 25%. 
 
 ```{r model4-split-data}
 
-smp_size <- floor(0.75 * nrow(stp_train_df))
+smp_size <- floor(0.75 * nrow(train_df_clean))
 
 ## set the seed to make your partition reproducible
 set.seed(123)
-train_ind <- sample(seq_len(nrow(stp_train_df)), size = smp_size)
+train_ind <- sample(seq_len(nrow(train_df_clean)), size = smp_size)
 
-stp75_train_df <- stp_train_df[train_ind, ]
-stp25_test_df <- stp_train_df[-train_ind, ]
+stp75_train_df <- train_df_clean[train_ind, ]
+stp25_test_df <- train_df_clean[-train_ind, ]
 ```
+
+##### Diagnostic of Full Model
+
+The Residuals vs. Fitted and QQ Plots show a fairly linear pattern, while Scale-Location plot suggest Homoscedasticity. However, the Residuals vs Leverage plot reveals the presence of some outliers. 
+
+```{r model4-full}
+stp_model_full <- lm(TARGET_WINS ~ ., data = stp75_train_df)
+summary(stp_model_full)
+plot(stp_model_full)
+
+# get points of influence
+influence <- influence.measures(stp_model_full)
+influential_points <- influence$infmat
+cooks_d <- influence$infmat[, "cook.d"]
+max_influence_index <- which.max(cooks_d)
+
+```
+The observation with index 2135 is particularly problematic. A closer examination reveals _TEAM_PITCHING_SO_ is almost 75% higher as the next highest value (19278 vs 12758). _TEAM_PITCHING_H_ is also unusually hight for this year.
+
+```{r model4-outlier}
+influential_data_point <- stp75_train_df[max_influence_index, ]
+print(influential_data_point)
+```
+We will drop this row since it has such a high leverage on the model. 
+
+```{r model4-drop-outlier}
+stp75_train_df <- stp75_train_df |>
+  filter(TEAM_PITCHING_SO < 15000)
+
+# confirm outliers
+stp_model_full <- lm(TARGET_WINS ~ ., data = stp75_train_df)
+plot(stp_model_full)
+```
+
+Charting the plot shows another point (202) with high influence. However, inspecting the this point further doesn't reveal any glaring issues, so it is better to leave the point in the dataset and possibly address the outlier through a transformation.
+
+```{r model4-outlier2}
+# get points of influence
+influence <- influence.measures(stp_model_full)
+influential_points <- influence$infmat
+cooks_d <- influence$infmat[, "cook.d"]
+max_influence_index <- which.max(cooks_d)
+influential_data_point <- stp75_train_df[max_influence_index, ]
+print(influential_data_point)
+```
+
 
 ##### Best Subset Selection
 We will use Best Subset Selection to get a sense of the optimal number of predictors in our model. This test will use Mallows’ Cp.
@@ -958,56 +980,108 @@ Based on the _Best Subset Selection_ method, we estimate that our model should h
 ##### Backward Selection Method
 
 ```{r backward-selection}
-stp_model <- lm(TARGET_WINS ~ ., data = stp75_train_df)
+summary(stp_model_full)
+AIC(stp_model_full)
+```
+
+
+_TEAM_BATTING_HR_ has the highest p-value. We removed TEAM_BATTING_HR from our predictors and update the model.
+
+```{r}
+stp_model <- update(stp_model_full, . ~ . - TEAM_BATTING_HR)
 summary(stp_model)
 AIC(stp_model)
 ```
-_TEAM_BATTING_SO_ has the highest p-value. We removed TEAM_BATTING_SO from our predictors and update the model.
+
+_TEAM_BASERUN_CS_ has the highest p-value. We removed TEAM_BASERUN_CS from our predictors and update the model.
 
 ```{r}
-stp_model2 <- update(stp_model, . ~ . - TEAM_BATTING_SO)
-summary(stp_model2)
-AIC(stp_model2)
+stp_model <- update(stp_model, . ~ . - TEAM_BASERUN_CS)
+summary(stp_model)
+AIC(stp_model)
 ```
 
-_TEAM_PITCHING_BB_ has the highest p-value. We removed TEAM_PITCHING_BB from our predictors and update the model.
+_TEAM_PITCHING_H_ has the highest p-value. We removed TEAM_PITCHING_H from our predictors and update the model.
 
 ```{r}
-stp_model_ph <- update(stp_model2, . ~ . - TEAM_PITCHING_BB)
-summary(stp_model_ph)
-AIC(stp_model_ph)
+stp_model <- update(stp_model, . ~ . - TEAM_PITCHING_H)
+summary(stp_model)
+AIC(stp_model)
 ```
 
-_TEAM_PITCHING_H_ has the highest p-value; since this p-value is above 0.05, it may not be statistically significant. We remove TEAM_PITCHING_H from our predictors and update the model.
+Backward selection using P-values arrives at a model with seven variables of statistical significance — six strong ((p-value < 0.001) and one moderate (p-value ~= 0.1). The nine predictors is consistent with our Best Subset Selection test.
 
+Performing a variance inflation factor (VIF) test on the model shows two variables (TEAM_BATTING_BB and TEAM_BATTING_SO) with high correlation. We may choose to drop one or both of these variables to fine tune our model. This will increase our AIC score somewhat but may avoid multicollinearity issues in our model.
+
+```{r model-4-diagnostic-plots}
+library(performance)
+
+vif(stp_model)
+#plot(stp_model)
+
+# Remove "TEAM_BATTING_BB"
+stp_model2 <- update(stp_model, . ~ . - TEAM_BATTING_BB)
+vif(stp_model2)
+compare_performance(stp_model, stp_model2, rank = TRUE)
+```
+
+#### Alternate Model Selection
+
+Another approach to model selection involves a combination of step-wise selection and contextual selection. In this example, we can first drop _TEAM_BATTING_2B_ (2 base hits), _TEAM_BATTING_3B_ (3 base hits), _TEAM_BATTING_HR_ (home runs) before conducting our stepwise selection, as data for these columns is represented in the _TEAM_BATTING_H_ (total hits) column, thus signaling the existence of dependence between hit count variables and total hits. It is not totally clear if _TEAM_PITCHING_HR_ is also included in _TEAM_PITCHING_H_ from the supporting document but we will remove it in the event that a similar relationship exists. __Alternatively__, we could have created a new column (TEAM_BATTING_1B) by subtracting the sum of 2 base hits, 3 base hits, and homeruns from total hits, but this alternatively solution would have a) added complexity into our model and b) added uncertainty due to possible missing values in the home runs columns. 
+
+
+```{r model4-drop-hits-cols}
+stp75s_train_df <- stp75_train_df |> 
+    drop_columns(c("TEAM_BATTING_2B", "TEAM_BATTING_3B", "TEAM_BATTING_HR", "TEAM_PITCHING_HR"))
+
+stp25s_test_df <- stp25_test_df |> 
+    drop_columns(c("TEAM_BATTING_2B", "TEAM_BATTING_3B", "TEAM_BATTING_HR", "TEAM_PITCHING_HR"))
+
+stp_model3 <- lm(TARGET_WINS ~ ., data = stp75s_train_df)
+
+# Backward step-wise regression
+stpb_model3 <- step(stp_model3, direction = "backward")
+```
+
+Performing an automated step-wise backward selection gives us 8 viable predictors. Examining the VIF shows that eight parameters are not strongly correlated with our dependent variable.
 
 ```{r}
-stp_model_no_ph <- update(stp_model_ph, . ~ . - TEAM_PITCHING_H)
-summary(stp_model_no_ph)
-AIC(stp_model_no_ph)
-
+vif(stpb_model3)
 ```
 
-Backward selection using P-values arrives at a model with seven variables of statistical significance — six strong ((p-value < 0.001) and one moderate (p-value ~= 0.1). However, our (AIC) value has increased from `r AIC(stp_model2)` to `r AIC(stp_model3)` suggesting that we may not want to remove TEAM_PITCHING_H from our model. Having 7-8 predictors is consistent with our Best Subset Selection test.
+Looking at the p-values for the remaining 8 predictors show two variables with non-statistical significance (TEAM_BASERUN_CS and TEAM_PITCHING_H). We could remove the one with highest p-value or both of the these variables.
 
-Performing a variance inflation factor (VIF) test on the larger model (8 predictors including TEAM_PITCHING_H)  shows only moderate correlation between the predictors and the dependent variable.
-
-```{r model-4-diagnostic-w_ph plots}
-vif(stp_model_ph)
-plot(stp_model_ph)
+```{r}
+summary(stpb_model3)
+AIC(stpb_model3)
 ```
 
-Performing a variance inflation factor (VIF) test on the smaller model (7 predictors not including TEAM_PITCHING_H) shows even smaller correlation between the predictors and the dependent variable. As a result, we may prefer the simpler model.
+Here, we have removed the TEAM_BASERUN_CS. Our AIC goes up and Adjusted R-squared goes down slightly, but overall the models are somewhat similar. TEAM_PITCHING_H now has a p-value of 0.0855 which is only somewhat higher than out .05 threshold.
 
-```{r model-4-diagnostic-wo_ph plots}
-vif(stp_model_no_ph)
-plot(stp_model_no_ph)
+```{r}
+stpb_model4 <- update(stpb_model3, . ~ . - TEAM_BASERUN_CS)
+summary(stpb_model4)
+AIC(stpb_model4)
 ```
+
+Removing the TEAM_PITCHING_H increases our AIC and decreases the Adjusted R-squared slightly, but overall the models are somewhat similar the auto-generated step-wise selected model.
+
+```{r}
+stpb_model5 <- update(stpb_model4, . ~ . - TEAM_PITCHING_H)
+summary(stpb_model5)
+AIC(stpb_model5)
+```
+
+
+```{r model4-comparison}
+compare_performance(stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, rank = TRUE)
+```
+
 ##### Testing the model
 
 ```{r model4-test}
 
-predictedWins = predict(stp_model_no_ph, stp25_test_df)
+predictedWins = predict(stp_model, stp25_test_df)
 stp25_test_df["PREDICTED_WINS"] = predictedWins
 
 stp25_test_df <- stp25_test_df %>% 
@@ -1028,15 +1102,21 @@ summary(pred)
 
 ```{r model4_log_transform}
 
-stplg_train_df <- stp_train_df %>%
-  #filter(TEAM_PITCHING_SO < 10000) %>%
+stplg75_train_df <- stp75_train_df %>%
   mutate(
     TEAM_PITCHING_SO = log1p(TEAM_PITCHING_SO),
     TEAM_PITCHING_BB = log1p(TEAM_PITCHING_BB),
     TEAM_PITCHING_H = log1p(TEAM_PITCHING_H),
   )
 
-stplg_train_df %>%
+stplg25_test_df <- stp25_test_df %>%
+  mutate(
+    TEAM_PITCHING_SO = log1p(TEAM_PITCHING_SO),
+    TEAM_PITCHING_BB = log1p(TEAM_PITCHING_BB),
+    TEAM_PITCHING_H = log1p(TEAM_PITCHING_H),
+  )
+
+stplg75_train_df %>%
   gather(variable, value, -TARGET_WINS) %>%
   ggplot(., aes(value, TARGET_WINS)) + 
   geom_point(fill = "#628B3A", color="#628B3A")  + 
@@ -1044,24 +1124,11 @@ stplg_train_df %>%
   facet_wrap(~variable, scales ="free", ncol = 4) +
   labs(x = element_blank(), y = "Wins")
 
-#plot_qq(stplg_train_df, sampled_rows = 1000L)
 
 ```
 
-```{r model4lg-split-data}
-
-smp_size <- floor(0.75 * nrow(stplg_train_df))
-
-## set the seed to make your partition reproducible
-set.seed(123)
-train_ind <- sample(seq_len(nrow(stplg_train_df)), size = smp_size)
-
-stplg75_train_df <- stplg_train_df[train_ind, ]
-stplg25_test_df <- stplg_train_df[-train_ind, ]
-```
 
 ##### Best Subset Selection & Cross-Validation
-
 
 ```{r model4lg-best-subset-cv}
 library(leaps)
@@ -1106,38 +1173,35 @@ We get the same number of observations after testing for Best Subset Selection &
 
 stplg_model_full <- lm(TARGET_WINS ~ ., data = stplg75_train_df)
 
-# Backward stepwise regression
+# Backward step-wise regression
 stplg_model <- step(stplg_model_full, direction = "backward")
 ```
+
+
 ```{r}
 summary(stplg_model)
 stplg_model_ph <- stplg_model
 ```
 
 ```{r model-4-diagnostic-ph plots}
-vif(stplg_model)
 plot(stplg_model)
 
 stplg75_train_df <- stplg75_train_df |>
   mutate(
     n = row_number()
   )
-
-influence <- influence.measures(stplg_model)
-influential_points <- influence$infmat
-cooks_d <- influence$infmat[, "cook.d"]
-max_influence_index <- which.max(cooks_d)
-max_influence_index
-
-influential_data_point <- stplg75_train_df[max_influence_index, ]
-print(influential_data_point)
-                                    
+```
+```{r model4lg-vif}
+vif(stplg_model)
 ```
 
+```{r model4-comparison}
+compare_performance(stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, stplg_model, rank = TRUE)
+```
 
 ```{r model4lg-test}
 
-predictedWins = predict(stp_model_no_ph, stplg25_test_df)
+predictedWins = predict(stplg_model, stplg25_test_df)
 stplg25_test_df["PREDICTED_WINS"] = predictedWins
 
 stplg25_test_df <- stplg25_test_df %>% 
@@ -1156,21 +1220,49 @@ summary(pred)
 
 ### Model 6: Lasso Regression 
 
-Lasso subset selection shrinkage approach  
+Lasso subset selection uses a shrinkage approach  to 
 
 ```{r}
 library(glmnet)
-x = model.matrix(TARGET_WINS ~ ., data = stp_train_df)
-y = stp_train_df$TARGET_WINS
+x = model.matrix(TARGET_WINS ~ ., data = stp75_train_df)
+y = stplg75_train_df$TARGET_WINS
 
-fit.lasso = glmnet(x, y, alpha=1)
-plot(fit.lasso, xvar="lambda", label=TRUE)
-coef(cv.lasso)
+fit_lasso = glmnet(x, y, alpha=1)
+plot(fit_lasso, xvar="lambda", label=TRUE)
+cv_lasso = cv.glmnet(x,y,alpha=1)
+#plot(cv.lasso)
+coef(cv_lasso)
 ```
+
+
 ```{r}
-#lasso.tr
+lasso_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_3B + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_PITCHING_HR + TEAM_FIELDING_E + TEAM_FIELDING_DP, data = stp75_train_df)
+
+summary(lasso_model)
+vif(lasso_model)
+
+compare_performance(stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, stplg_model, lasso_model, rank = TRUE)
 ```
 
+
+```{r model5-test}
+
+predictedWins = predict(lasso_model, stp25_test_df)
+stp25_test_df["PREDICTED_WINS"] = predictedWins
+
+stp25_test_df <- stp25_test_df %>% 
+  relocate("PREDICTED_WINS", .after = "TARGET_WINS")  %>% 
+  mutate(
+    PREDICT_ERR = TARGET_WINS - PREDICTED_WINS
+  )  %>% 
+  relocate("PREDICT_ERR", .after = "PREDICTED_WINS")
+
+pred = lm(stp25_test_df$PREDICTED_WINS~stp25_test_df$TARGET_WINS)
+
+plot(stp25_test_df$PREDICTED_WINS, stp25_test_df$TARGET_WINS,xlab="Actual Wins", ylab="Predicted Wins")
+abline(pred)
+summary(pred)
+```
 ### Conclusion:
 
 If interpretability is most important → Use base Stats Model.
