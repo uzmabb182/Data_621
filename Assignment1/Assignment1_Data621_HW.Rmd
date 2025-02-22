@@ -1011,7 +1011,7 @@ AIC(stp_model)
 
 Backward selection using P-values arrives at a model with seven variables of statistical significance — six strong ((p-value < 0.001) and one moderate (p-value ~= 0.1). The nine predictors is consistent with our Best Subset Selection test.
 
-Performing a variance inflation factor (VIF) test on the model shows two variables (TEAM_BATTING_BB and TEAM_BATTING_SO) with high correlation. We may choose to drop one or both of these variables to fine tune our model. This will increase our AIC score somewhat but may avoid multicollinearity issues in our model.
+Performing a variance inflation factor (VIF) test on the model shows two variables (TEAM_BATTING_BB and TEAM_BATTING_SO) with high correlation. We may choose to drop one or both of these variables to fine tune our model. This will increase our AIC score somewhat but may avoid multicolinearity issues in our model.
 
 ```{r model-4-diagnostic-plots}
 library(performance)
@@ -1022,7 +1022,7 @@ vif(stp_model)
 # Remove "TEAM_BATTING_BB"
 stp_model2 <- update(stp_model, . ~ . - TEAM_BATTING_BB)
 vif(stp_model2)
-compare_performance(stp_model, stp_model2, rank = TRUE)
+
 ```
 
 #### Alternate Model Selection
@@ -1072,12 +1072,17 @@ summary(stpb_model5)
 AIC(stpb_model5)
 ```
 
+#### Model 4 Variant Comparison
+
+The function _compare_performance_ allows comparison of various metrics across diffrent models including R2 and R2 (adj.). It also weights AIC and BIC values to help rank the performance of our models. Based on the result of this test, it appears that our original model performed best.
 
 ```{r model4-comparison}
 compare_performance(stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, rank = TRUE)
 ```
 
 ##### Testing the model
+
+In this section, we will use the test dataframe to test the accuracy of our model's predictions. 
 
 ```{r model4-test}
 
@@ -1097,8 +1102,11 @@ plot(stp25_test_df$PREDICTED_WINS, stp25_test_df$TARGET_WINS,xlab="Actual Wins",
 abline(pred)
 summary(pred)
 ```
+The summary and diagnostic plot reveals that our model is statistically significant and somewhat linear.
 
 #### Tuning with Log Transformations
+
+Some of our predictors (TEAM_PITCHING_SO, TEAM_PITCHING_BB, & TEAM_PITCHING_H) showed the presence of outliers. We will transform these variables with a log transformation.
 
 ```{r model4_log_transform}
 
@@ -1126,9 +1134,11 @@ stplg75_train_df %>%
 
 
 ```
-
+Our scatter plots show some improvement in our outliers.
 
 ##### Best Subset Selection & Cross-Validation
+
+We will run Best Subset Selection & Cross-Validation tests again to get a sense of the ideal number of predictors.
 
 ```{r model4lg-best-subset-cv}
 library(leaps)
@@ -1168,6 +1178,9 @@ plot(rmse_cv, pch=5, type="b")
 
 We get the same number of observations after testing for Best Subset Selection & Cross-Validation, with `r which.min(regfit_summary$cp)` and `r which.min(rmse_cv)` observations respectively.
 
+#### Backwards Selection
+
+We will use backward step-wise selection to build our model.
 
 ```{r model4lg-backward-selection}
 
@@ -1176,12 +1189,14 @@ stplg_model_full <- lm(TARGET_WINS ~ ., data = stplg75_train_df)
 # Backward step-wise regression
 stplg_model <- step(stplg_model_full, direction = "backward")
 ```
-
+Looking at the summary for this model shows that all predictors have high statistic significance.
 
 ```{r}
 summary(stplg_model)
 stplg_model_ph <- stplg_model
 ```
+
+The Residuals vs. Fitted and QQ Plots show a fairly linear pattern, while Scale-Location plot suggest Homoscedasticity. The Residuals vs Leverage plot reveals that our outliers have less leverage than in the pre- log transformed model. 
 
 ```{r model-4-diagnostic-ph plots}
 plot(stplg_model)
@@ -1191,13 +1206,22 @@ stplg75_train_df <- stplg75_train_df |>
     n = row_number()
   )
 ```
+A VIF Test shows several variables that are highly correlated, including TEAM_PITCHING_H, TEAM_BATTING_BB, TEAM_PITCHING_SO, TEAM_PITCHING_BB, TEAM_FIELDING_E & TEAM_BATTING_H. We may choose to leave these out. 
+
 ```{r model4lg-vif}
 vif(stplg_model)
 ```
+#### Model Comparison (revisited)
+
+Running our performance test shows that our new model with log transformations is our best performing model based Adjusted R-Squares, as well as Weighted AIC and BIC scores.
 
 ```{r model4-comparison}
 compare_performance(stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, stplg_model, rank = TRUE)
 ```
+
+#### Testing the model (revisited)
+
+In this section, we will use the test dataframe to test the accuracy of our model's predictions
 
 ```{r model4lg-test}
 
@@ -1217,6 +1241,13 @@ plot(stplg25_test_df$PREDICTED_WINS, stplg25_test_df$TARGET_WINS,xlab="Actual Wi
 abline(pred)
 summary(pred)
 ```
+
+_Original Model_
+Adjusted R-squared:  0.3205
+
+_Log Tranformed Model_
+Adjusted R-squared:  0.3171
+
 
 ### Model 6: Lasso Regression 
 
