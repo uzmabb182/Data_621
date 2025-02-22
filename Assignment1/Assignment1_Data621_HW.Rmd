@@ -1075,7 +1075,7 @@ AIC(stpb_model5)
 
 The function _compare_performance_ allows comparison of various metrics across diffrent models including R2 and R2 (adj.). It also weights AIC and BIC values to help rank the performance of our models. Based on the result of this test, it appears that our original model performed best.
 
-```{r model4-comparison}
+```{r model4-comparison-1}
 compare_performance(stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, rank = TRUE)
 ```
 
@@ -1184,11 +1184,41 @@ stplg75_train_df <- stplg75_train_df |>
     n = row_number()
   )
 ```
+
+#### Multicolinearity 
+
 A VIF Test shows several variables that are highly correlated, including TEAM_PITCHING_H, TEAM_BATTING_BB, TEAM_PITCHING_SO, TEAM_PITCHING_BB, TEAM_FIELDING_E & TEAM_BATTING_H. We may choose to leave these out. 
 
 ```{r model4lg-vif}
 vif(stplg_model)
 ```
+##### Normality
+
+```{r check-for-normality}
+
+library(lmtest)
+shapiro.test(residuals(stplg_model))
+# Shapiro-Wilk normality test: look for high p-value
+``` 
+Although the W-statistic of 0.9939 is close to 1, the very small p-value (1.76e-06) indicates that there is strong evidence to suggest that the residuals from your model do not follow a normal distribution.
+
+##### Heteroscedastic 
+
+```{r check-for-homoscedastic}
+bptest(stplg_model)
+# Breusch-Pagan test; look for high p-value
+``` 
+Since the p-value is much smaller than 0.05, you reject the null hypothesis of no heteroscedasticity. This suggests that there is strong evidence of heteroscedasticity in your model.
+
+##### Independence 
+
+```{r check-for-independence}
+durbinWatsonTest(stplg_model)
+# Durbin Watson test: should be close to 2
+``` 
+
+The D-W statistic of 2.011436 suggests that there is no significant autocorrelation in the residuals of your model. The p-value of 0.84 reinforces this conclusion, as it shows that the evidence against the null hypothesis of no autocorrelation is weak.
+
 #### Model Comparison (revisited)
 
 Running our performance test shows that our new model with log transformations is our best performing model based Adjusted R-Squares, as well as Weighted AIC and BIC scores.
@@ -1245,6 +1275,11 @@ base_model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING
 high_impact_model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_HR +
                         TEAM_PITCHING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = stp75_train_df)
 
+improved_model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + 
+                        TEAM_BATTING_2B + TEAM_BATTING_HR:TEAM_BATTING_BB + 
+                        TEAM_PITCHING_SO + TEAM_FIELDING_E, 
+                      data = stp75_train_df)
+
 # Apply log transformation to selected variables
 stp75lf2_train_df <- stp75_train_df %>%
   mutate(
@@ -1262,7 +1297,7 @@ stp25lf2_train_df <- stp25_test_df %>%
 
 log_model2 <- lm(TARGET_WINS ~ log_BATTING_H + log_BATTING_HR + log_PITCHING_SO + TEAM_FIELDING_E, data = stp75lf2_train_df)
 
-compare_performance(base_model2, high_impact_model2, log_model2, stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, stplg_model, lasso_model)
+compare_performance(base_model2, high_impact_model2, log_model2, improved_model2, stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, stplg_model, lasso_model)
 ```
 
 
@@ -1292,6 +1327,11 @@ library(Metrics)  # For MAE and RMSE
 # Stats Model predictions
 predictedWins = predict(base_model2, stp25_test_df)
 stp25_test_df["PREDICTED_WINS"] = predictedWins
+
+# Improved Model predictions
+predictedWins = predict(improved_model2, stp25_test_df)
+stp25_test_df["PREDICTED_WINS_IMP"] = predictedWins
+
 
 # High-Impact Model
 predictedWins = predict(high_impact_model2, stp25_test_df)
@@ -1329,17 +1369,25 @@ eval_predictions <- function(model, predict_col, target_col, model_name) {
   )
   
   evaluation_metrics <<- rbind(evaluation_metrics, model_metrics)
-  
 }
 
 # Evaluate Stats Model predictions
 eval_predictions(base_model2, stp25_test_df$PREDICTED_WINS, stp25_test_df$TARGET_WINS, "Stats")
 
 ```
+
+```{r}
+# Improved Model
+eval_predictions(improved_model2, stp25_test_df$PREDICTED_WINS_IMP, stp25_test_df$TARGET_WINS, "Improved")
+```
+
+
 ```{r}
 # Evaluate High-Impact Model
 eval_predictions(high_impact_model2, stp25_test_df$PREDICTED_WINS_HIM, stp25_test_df$TARGET_WINS, "High-Impact")
 ```
+
+
 ```{r}
 # Evaluate Log-Transformed Model
 eval_predictions(log_model2, stp25lf2_train_df$PREDICTED_WINS_LOG, stp25lf2_train_df$TARGET_WINS, "Log-Tranformed")
@@ -1375,10 +1423,10 @@ print(model_cv)
 summary(stplg_model)
 ```
 
-MAE and RMSE is even lower when using cross-validation. Although our R-squared value decreased from 0.3183 to 0.3034024, this value is still higher than the model with second highest R-squared value of 0.2368 for the Log-Tranformed model. 
+MAE and RMSE is even lower when using cross-validation. Although our R-squared value decreased from 0.3183 to 0.3034024, this value is still higher than the model with second highest R-squared value of 0.2368 for the Log-Tranformed model.
 
 ### Conclusion
-Our previous test suggest that the Log-Transformed Step-wise Model appears to be the most accurate at predicting wins over a team's season. However, with 12 predictors, this model is fairly complex. Given the audience for our report and the manager's level of interest, we should select a simpler model that is still statistically significant and fairly accurate.
+Our previous test suggest that the Log-Transformed Step-wise Model appears to be the most accurate at predicting wins over a team's season. However, with 12 predictors, this model is fairly complex. Given the audience for our report and the need to clearly describe our model to the coach, we should select a simpler model that is still statistically significant and fairly accurate. Therefore, we will select our Improved model.
 
 ### Final Analysis
 
