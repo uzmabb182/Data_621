@@ -1328,8 +1328,6 @@ eval_predictions <- function(model, predict_col, target_col, model_name) {
     RSquared = (cor(target_col, predict_col)^2 )
   )
   
-  print(model_metrics)
-  
   evaluation_metrics <<- rbind(evaluation_metrics, model_metrics)
   
 }
@@ -1373,19 +1371,14 @@ model_cv <- train(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B +
     TEAM_FIELDING_E + TEAM_FIELDING_DP, data = stplg75_train_df, method = "lm", trControl = train_control)
 
 print(model_cv)
+
+summary(stplg_model)
 ```
-MAE and RMSE is even lower when using cross-validation. Although our R-squared value decreased from 0.3183 to 0.3034024, this value is still higher than the next most performant model which had an R-squared value of 0.2368 ().
 
-### Applying Prediction to Our Evalution
+MAE and RMSE is even lower when using cross-validation. Although our R-squared value decreased from 0.3183 to 0.3034024, this value is still higher than the model with second highest R-squared value of 0.2368 for the Log-Tranformed model. 
 
-With our models tested and evaluated, we can no apply our model to our final evaluation dataframe.
-
-```{r final-predictions}
-
-predictedWins = predict(stplg_model, eval_df)
-eval_df["PREDICTED_WINS"] = predictedWins
-
-```
+### Conclusion
+Our previous test suggest that the Log-Transformed Step-wise Model appears to be the most accurate at predicting wins over a team's season. However, with 12 predictors, this model is fairly complex. Given the audience for our report and the manager's level of interest, we should select a simpler model that is still statistically significant and fairly accurate.
 
 ### Final Analysis
 
@@ -1559,3 +1552,15 @@ Most concerning is the R-Squared (R²) value of 0.001, which means that the mode
 This suggests that the model may be overfitting the training data and failing to generalize, or that it lacks critical predictive features. 
 
 To improve performance, we should consider adding more relevant predictors (such as ERA or OBP), removing unimportant or noisy variables, and potentially using alternative mo
+
+
+### Applying Prediction to Our Evalution
+
+With our models tested and evaluated, we can no apply our model to our final evaluation dataframe.
+
+```{r final-predictions}
+
+predictedWins = predict(stplg_model, eval_df)
+eval_df["PREDICTED_WINS"] = predictedWins
+
+```
