@@ -1,6 +1,6 @@
 ---
 title: "Assignment1_Data621"
-author: "Mubashira Qari"
+author: "Mubashira Qari, Marco Castro"
 date: "2025-02-09"
 output:
   html_document:
@@ -10,7 +10,10 @@ output:
 ### Load Libraries
 
 ```{r global_options, include=FALSE}
-
+library(naniar)
+library(visdat)
+library(dplyr)
+library(tidyr)  # tidyr is loaded to use pivot_longer()
 library(tidyverse)
 library(readxl)
 library(ggplot2)
@@ -47,7 +50,6 @@ library(mixtools)
 library(skimr)
 
 
-
 ```
 
 ## Data Exploration
@@ -56,12 +58,16 @@ library(skimr)
 
 ```{r}
 
-eval_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment1/moneyball-evaluation-data%20(1).csv")
-
-train_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment1/moneyball-training-data%20(1).csv")
+eval_data <- read.csv("moneyball-evaluation-data.csv")
+train_data <- read.csv("moneyball-training-data.csv")
 
 head(eval_data)
 head(train_data)
+# drop INDEX fields
+eval_df <- data.frame(eval_data) |>
+  drop_columns("INDEX")
+train_df <- data.frame(train_data) |>
+  drop_columns("INDEX")
 ```
 ### Understanding the TARGET_WINS Field in the Moneyball Dataset:
 
@@ -71,31 +77,9 @@ This is the dependent variable (target variable) in the multiple linear regressi
 
 We are trying to predict TARGET_WINS based on other team performance metrics.
 
-### Viewing Column Names
-
-```{r}
-names(eval_data)
-names(train_data)
-```
 ### Viewing Field Values:
 
 We can see there are fields with null values
-
-```{r}
-glimpse(eval_data)
-glimpse(train_data)
-
-```
-
-### Creating Dataframe
-
-```{r}
-eval_df <- data.frame(eval_data)
-train_df <- data.frame(train_data)
-
-```
-
-
 
 ```{r}
 str(eval_df)
@@ -112,7 +96,7 @@ train_df %>%
   facet_wrap(~variable, scales ="free", ncol = 4) +
   labs(x = element_blank(), y = "Wins")
 ```
-### Interpretation:
+_Interpretation_
 
 Each small plot (facet) shows the relationship between one predictor variable and TARGET_WINS.
 
@@ -130,9 +114,29 @@ If the trend line is flat, there is likely no meaningful relationship between th
 
 Positive Predictors of Wins: TEAM_BATTING_2B, TEAM_BATTING_BB, TEAM_BATTING_H, TEAM_PITCHING_BB (unexpected).
 Negative Predictors of Wins: TEAM_FIELDING_E, TEAM_PITCHING_H, TEAM_PITCHING_SO.
-Weak or No Influence: INDEX, TEAM_BATTING_3B, TEAM_BATTING_HBP, TEAM_BATTING_SO, TEAM_FIELDING_DP, TEAM_PITCHING_HR.
+Weak or No Influence: TEAM_BATTING_3B, TEAM_BATTING_HBP, TEAM_BATTING_SO, TEAM_FIELDING_DP, TEAM_PITCHING_HR.
 
 ### Sorted Correlations
+
+#### Correlation Between All Variables
+
+```{r correlation-heatmap}
+plot_correlation(train_df, type = "all")
+```
+_Interpretration_
+
+The Correlation Heatmap shows that the following variables are very highly correlated with one another
+- TEAM_BATTING_HR and TEAM_PITCHING_HR have a correlation value of 0.97
+- TEAM_FIELDING_E and TEAM_PITCHING_H have a correlation value of 0.67
+- TEAM_FIELDING_E and TEAM_BATTING_BB have a correlation value of -0.66
+- TEAM_BATTING_3B and TEAM_BATTING_HR have a correlation value of -0.64
+- TEAM_FIELDING_E and TEAM_BATTING_HR have a correlation value of -0.59
+- TEAM_FIELDING_E and TEAM_PITCHING_HR have a correlation value of -0.57
+- TEAM_BATTING_H and TEAM_BATTING_2B have a correlation value of -0.57
+- TEAM_FIELDING_E and TEAM_BATTING_3B have a correlation value of 0.51
+- 
+
+#### Correlation Between TARGET_WINS and [x]
 
 ```{r}
 correlation_with_target <- cor(train_df, use = "complete.obs")["TARGET_WINS", ] %>%
@@ -210,6 +214,17 @@ Median: 82 wins
 
 Distribution: The min value of 0 and max of 146 suggest some potential outliers or erroneous data points, since most teams win between 50-110 games in a season.
 
+
+```{r}
+
+boxplot(train_df$TARGET_WINS, main="Distribution of Team Wins", ylab="Wins", col="lightblue")
+
+```
+
+_Actionable Steps:_
+
+- Drop row with zero (0) value.
+
 #### 2. Missing Values
 
 Some variables have a significant number of missing values. In particular:
@@ -240,6 +255,7 @@ Several variables have extreme max values that seem unrealistic. Specifically:
 
 - TEAM_PITCHING_BB (Max = 3,645) <- Very high (typical range: 300 - 700).
 - TEAM_FIELDING_E (Max = 1,898) <- Likely an error since the normal range is ~ 70-200.
+
 
 _Actionable Steps:_
 
@@ -281,23 +297,14 @@ Use Variance Inflation Factor (VIF) to detect multicollinearity and drop redunda
 
 Consider derived metrics like batting average (H/AB), on-base percentage (OBP), or earned run average (ERA) instead of raw counts.
 
-### Conclusion:
+_Conclusion_
 
 The dataset contains inconsistencies, missing values, and extreme outliers that need to be addressed before fitting an MLR model. 
 
 Once cleaned, feature selection and multicollinearity checks will be essential to ensure a robust and interpretable model for predicting team wins.
 
-## Visualizing Training Dataset:
 
-
-```{r}
-
-boxplot(train_df$TARGET_WINS, main="Distribution of Team Wins", ylab="Wins", col="lightblue")
-
-
-```
-
-## Analysis of the Box Plot for TARGET_WINS (Team Wins Distribution)
+### Analysis of the Box Plot for TARGET_WINS (Team Wins Distribution)
 
 This box plot provides valuable insights into the distribution of team wins in the training dataset. 
 
@@ -328,19 +335,6 @@ The box itself (Interquartile Range - IQR) shows the middle 50% of the data, whi
 The box is fairly centered, suggesting a roughly symmetric distribution.
 
 
-
-```{r}
-
-hist(train_df$TARGET_WINS, 
-     main = "Distribution of Team Wins", 
-     xlab = "Wins", 
-     ylab = "Frequency", 
-     col = "steelblue", 
-     border = "black", 
-     breaks = 20)  # number of bins
-```
-### Histogram with Density Curve
-
 ```{r}
 
 hist(train_df$TARGET_WINS, 
@@ -355,19 +349,11 @@ lines(density(train_df$TARGET_WINS, na.rm = TRUE),
       col = "red", 
       lwd = 2)  # Adds a red density curve
 ```
+
 ## Data Preparation
 
 - Analyze Missing Values from Train Datasets.
 
-```{r}
-#install.packages("naniar")     # Specialized for missing data visualization
-#install.packages("visdat")     # Another missing value visualization package
-
-library(naniar)
-library(visdat)
-library(dplyr)
-library(tidyr)  # tidyr is loaded to use pivot_longer()
-```
 
 
 ```{r}
@@ -393,7 +379,17 @@ ggplot(missing_values, aes(y = reorder(Variable, Missing_Count), x = Missing_Cou
 
 There are four main options for handling missing values:
 
-#### 1. Remove Columns with Too Many Missing Values
+#### 1. Remove Rows with Missing Target (TARGET_WINS)
+
+If the TARGET_WINS column has missing values, remove those rows since we can’t predict missing outcomes.
+
+```{r}
+
+train_df <- train_df %>% filter(!is.na(TARGET_WINS))
+
+```
+
+#### 2. Removing Columns with Too Many Missing Values
 
 If a column has too many missing values (e.g., >50% missing), it may be better to remove it.
 
@@ -401,51 +397,34 @@ The _TEAM_BATTING_HBP_ column is mostly empty and not critical.
 
 ```{r}
 
-library(naniar)
-library(visdat)
-library(dplyr)
-library(tidyr)  # tidyr is loaded to use pivot_longer()
-
-train_df <- train_df[, !names(train_df) %in% "INDEX"]
 train_df <- train_df[, !names(train_df) %in% "TEAM_BATTING_HBP"]
-train_df
 
+```
+#### 3. Address Suspicious Values
+
+The variables _TEAM_BATTING_SO_, _TEAM_PITCHING_SO_, _TEAM_BATTING_HR_, and _TEAM_PITCHING_HR_ included several observations with a value of zero. As the rows were the same for both variables, it appears that these may also be missing observations as the likelihood that a team's batters did not have a single strikeout nor did their pitchers pitch a single strikeout over the course of a 162 game season is highly unlikely. We will therefore treat these as missing observations and impute using the median value which is more robust to outliers then using the mean values. We will also drop the single row where the team did not win a single game, as this is also suspicious.
+
+```{r model4-transformations}
+
+# Convert dubious stats to NAs for pitching
+# and drop unnecessary columns
+train_df <- train_df |>
+  mutate(
+    TEAM_BATTING_SO = if_else(TEAM_BATTING_SO > 0, TEAM_BATTING_SO, NA_integer_),
+    TEAM_PITCHING_SO = if_else(TEAM_PITCHING_SO > 0, TEAM_PITCHING_SO, NA_integer_),
+    TEAM_BATTING_HR = if_else(TEAM_BATTING_HR > 0, TEAM_BATTING_HR, NA_integer_),
+    TEAM_PITCHING_HR = if_else(TEAM_PITCHING_HR > 0, TEAM_PITCHING_HR, NA_integer_)
+  ) |>
+  filter(TARGET_WINS > 0) 
 ```
 
 
-#### 2. Remove Rows with Missing Target (TARGET_WINS)
 
-If the TARGET_WINS column has missing values, remove those rows since we can’t predict missing outcomes.
+### Handling Missing Values
 
-```{r}
+Next, we will address the remaining missing values. We will weight several options
 
-train_df <- train_df %>% filter(!is.na(TARGET_WINS))
-train_df
-
-```
-
-#### 3. Create a "Missing Indicator" Column
-
-If a column has many missing values, but we want to remove it, we create a new feature that flags missing values:
-
-```{r}
-train_df <- train_df %>%
-  mutate(TEAM_BASERUN_SB_Missing = ifelse(is.na(TEAM_BASERUN_SB), 1, 0))
-train_df$TEAM_BASERUN_SB_Missing
-```
-
-#### 4. Verifying That Missing Values Are Fixed
-
-```{r}
-
-sum(is.na(train_df))  # Total missing values
-colSums(is.na(train_df))  # Missing values per column
-
-```
-
-### Handling Additional Missing Values
-
-#### Reasons for Removing Missing Values
+#### Option 1: Removing Missing Values
 
 - Missing Values Cause Errors in Regression Models
 
@@ -453,66 +432,153 @@ colSums(is.na(train_df))  # Missing values per column
 
 - Removing missing values ensures that the model runs smoothly without interruptions.
 
-```{r}
-# Remove missing values
-train_df1 <- na.omit(train_df)
-train_df1
-```
+_Pros_
 
-```{r}
-
-sum(is.na(train_df1))  # Total missing values
-colSums(is.na(train_df1))  # Missing values per column
-
-train_df1 %>%
-  gather(variable, value, -TARGET_WINS) %>%
-  ggplot(., aes(value, TARGET_WINS)) + 
-  geom_point(fill = "#628B3A", color="#628B3A")  + 
-  geom_smooth(method = "lm", se = FALSE, color = "black") + 
-  facet_wrap(~variable, scales ="free", ncol = 4) +
-  labs(x = element_blank(), y = "Wins")
-
-#plot_qq(train_df1, sampled_rows = 1000L)
-
-```
+- Convenience. If too many rows have missing values, R removes them automatically, reducing sample size.
 
 
-### Preventing Bias in Model Predictions
+_Cons_
 
-If too many rows have missing values, R removes them automatically, reducing sample size.
+- If missing values are not randomly distributed, removing them may bias the dataset.
 
-If missing values are not randomly distributed, removing them may bias the dataset.
+- Reduced sample size 
+
+_Conclusion_
 
 Instead of na.omit(), imputation methods (like mean/median filling) may be better for handling missing data.
 
-### Alternative Solutions Instead of na.omit()
+Removing rows with missing data is sometimes not the best approach, especially if a large portion of data is lost. We will therefore explore other methods.
 
-Removing rows with missing data is sometimes not the best approach, especially if a large portion of data is lost. Here are alternative methods:
+#### Option 2: Mean
 
-### Mean/Median Imputation (For Numeric Data)
-
-Instead of removing missing values, fill them with the mean or median:
+Instead of removing missing values, fill them with the mean:
 
 ```{r}
 
-train_df$TEAM_BATTING_SO[is.na(train_df$TEAM_BATTING_SO)] <- mean(train_df$TEAM_BATTING_SO, na.rm = TRUE)
-train_df$TEAM_BASERUN_SB[is.na(train_df$TEAM_BASERUN_SB)] <- mean(train_df$TEAM_BASERUN_SB, na.rm = TRUE)
-train_df$TEAM_BASERUN_CS[is.na(train_df$TEAM_BASERUN_CS)] <- mean(train_df$TEAM_BASERUN_CS, na.rm = TRUE)
-train_df$TEAM_PITCHING_SO[is.na(train_df$TEAM_PITCHING_SO)] <- mean(train_df$TEAM_PITCHING_SO, na.rm = TRUE)
-train_df$TEAM_FIELDING_DP[is.na(train_df$TEAM_FIELDING_DP)] <- mean(train_df$TEAM_FIELDING_DP, na.rm = TRUE)
+train_df_mean <- train_df
+mean_val <- colMeans(train_df, na.rm = TRUE)
 
+# Impute using Means
+for(i in colnames(train_df))
+    train_df[,i][is.na(train_df[,i])] <- mean_val[i]
 
 plot_qq(train_df, sampled_rows = 1000L)
 
+# Missing values per column
+colSums(is.na(train_df_mean))
 
 ```
+_Pros_
 
+_Cons_
+Not usually recommended for serious analyses because it reduces the variance and doesn't account for the uncertainty in imputations.
+
+#### Option 3: Median
+
+Instead of removing missing values, fill them with the median:
 
 ```{r}
 
-train_df_clean <- train_df
-sum(is.na(train_df))  # Total missing values
-colSums(is.na(train_df))  # Missing values per column
+library(miscTools)
+
+train_df_median <- train_df
+median_val <- colMedians(train_df, na.rm = TRUE)
+
+# Impute using medians
+for(i in colnames(train_df_clean))
+    train_df_median[,i][is.na(train_df_median[,i])] <- as.integer(train_median_val[i])
+
+plot_qq(train_df_median, sampled_rows = 1000L)
+# Missing values per column
+colSums(is.na(train_df_median))
+```
+
+_Pros_
+
+_Cons_
+
+#### Option 4: Multivariate Imputation by Chained Equations (MICE)
+
+Multivariate Imputation by Chained Equations (MICE) is a type of Multiple Imputation.
+
+```{r mice}
+
+library(mice)
+train_df_mice <- mice(data=train_df, m=30, maxit=10, seed=12345, print=FALSE)
+```
+
+```{r}
+
+train_df_clean <- train_df_mice$data
+sum(is.na(train_df_clean))  # Total missing values
+  
+```
+
+_Pros_
+
+_Cons_
+
+### Splitting the training dataset
+
+We split the original training dataset into a training and testing dataset in order to test the strength of our model without testing the model on data that the model has already seen. The training dataset will hold 75% of our original observations, while the test dataset will hold 25%. 
+
+```{r model4-split-data}
+
+smp_size <- floor(0.75 * nrow(train_df_clean))
+ nrow(train_df_clean)
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(train_df_clean)), size = smp_size)
+
+stp75_train_df <- train_df_clean[train_ind, ]
+stp25_test_df <- train_df_clean[-train_ind, ]
+```
+
+### Outliers
+
+The Residuals vs. Fitted and QQ Plots show a fairly linear pattern, while Scale-Location plot suggest Homoscedasticity. However, the Residuals vs Leverage plot reveals the presence of some outliers. 
+
+```{r model4-full}
+stp_model_full <- lm(TARGET_WINS ~ ., data = stp75_train_df)
+summary(stp_model_full)
+
+# check for outliers using cooks-distance plot
+plot(stp_model_full, which = 4,  id.n = 8)
+
+# get points of influence
+influence <- influence.measures(stp_model_full)
+influential_points <- influence$infmat
+cooks_d <- influence$infmat[, "cook.d"]
+max_influence_index <- which.max(cooks_d)
+
+```
+The observation with index 2135 is particularly problematic. A closer examination reveals _TEAM_PITCHING_SO_ is almost 75% higher as the next highest value (19278 vs 12758). _TEAM_PITCHING_H_ is also unusually high for this year.
+
+```{r model4-outlier}
+influential_data_point <- stp75_train_df[max_influence_index, ]
+print(influential_data_point)
+```
+We will drop this row since it has such a high leverage on the model. 
+
+```{r model4-drop-outlier}
+stp75_train_df <- stp75_train_df |>
+  filter(TEAM_PITCHING_SO < 15000)
+
+# confirm outliers
+stp_model_full <- lm(TARGET_WINS ~ ., data = stp75_train_df)
+plot(stp_model_full, which = 4,  id.n = 8)
+```
+
+Charting the plot shows another point (202) with high influence. However, inspecting the this point further doesn't reveal any glaring issues, so it is better to leave the point in the dataset and possibly address the outlier through a transformation.
+
+```{r model4-outlier2}
+# get points of influence
+influence <- influence.measures(stp_model_full)
+influential_points <- influence$infmat
+cooks_d <- influence$infmat[, "cook.d"]
+max_influence_index <- which.max(cooks_d)
+influential_data_point <- stp75_train_df[max_influence_index, ]
+print(influential_data_point)
 ```
 
 
@@ -523,18 +589,7 @@ colSums(is.na(train_df))  # Missing values per column
 
 - This model includes fundamental offensive, defensive, and pitching stats that logically contribute to wins.
 
-```{r}
-
-base_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = train_df)
-
-# View model summary
-summary(base_model)
-
-
-```
-
 #### Why were these variables selected?
-
 
 TEAM_BATTING_H (Hits): More hits increase the chances of scoring.
 
@@ -550,25 +605,36 @@ TEAM_BASERUN_SB (Stolen Bases): Limited impact on overall wins.
 
 TEAM_PITCHING_BB (Walks Allowed): May not be as predictive when combined with strikeouts.
 
+#### Model Summary Statistics
+
+```{r}
+
+base_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = stp75_train_df)
+
+# View model summary
+summary(base_model)
+
+```
+
 #### Interpreting the Coefficients of the Regression Model
 
-1- Intercept (8.715)
+1- Intercept (8.05)
 
-When all predictor variables (TEAM_BATTING_H, TEAM_BATTING_HR, TEAM_PITCHING_SO, TEAM_FIELDING_E) are zero, a team is expected to have 8.72 wins.
-Significant (p = 0.007) → The intercept is meaningful in this context.
+When all predictor variables (TEAM_BATTING_H, TEAM_BATTING_HR, TEAM_PITCHING_SO, TEAM_FIELDING_E) are zero, a team is expected to have 8.05 wins.
+Significant (p = 0.04) → The intercept is meaningful in this context.
 
-2- TEAM_BATTING_H (Hits) → +0.052 (p < 2e-16 *)
+2- TEAM_BATTING_H (Hits) → 0.05 (p < 2e-16 *)
 
 positive & highly significant
 Interpretation: For every additional hit, the team is expected to win 0.052 more games.
-Example: If a team gets 100 more hits in a season, they would be expected to win ~5 more games (100 × 0.052).
+Example: If a team gets 100 more hits in a season, they would be expected to win ~5 more games (100 × 0.05).
 Conclusion: More hits lead to more wins, which is expected in baseball.
 
-3- TEAM_BATTING_HR (Home Runs) → -0.00187 (p = 0.76 - Not Significant)
+3- TEAM_BATTING_HR (Home Runs) → -0.008 (p = 0.26026 - Not Significant)
 Negative (unexpected) & not significant
 
 Interpretation: More home runs slightly decrease wins, but the effect is very small and not statistically significant.
-Example: Hitting 100 more home runs would decrease wins by 0.187, which doesn’t make sense.
+Example: Hitting 100 more home runs would decrease wins by 008, which doesn’t make sense. We should consider removing this variable.
 
 Possible Issues:
 Multicollinearity: Home runs may be highly correlated with other batting stats (like hits or doubles), causing misleading coefficients.
@@ -579,10 +645,10 @@ Check VIF (Variance Inflation Factor) for multicollinearity.
 Add an interaction term (e.g., TEAM_BATTING_HR * TEAM_BATTING_BB).
 Consider removing this variable if it remains insignificant.
 
-4_ TEAM_PITCHING_SO (Strikeouts by Pitchers) → +0.0010 (p = 0.067 .)
+4_ TEAM_PITCHING_SO (Strikeouts by Pitchers) → +0.0025 (p = 0.005)
 Weakly positive, borderline significant
 
-Interpretation: More strikeouts slightly increase wins, but the effect is very small and only marginally significant (p = 0.067).
+Interpretation: More strikeouts slightly increase wins, but the effect is very small tough statistically significant (p = 0.005).
 Example: If a team strikes out 500 more batters in a season, they would win 0.5 more games.
 
 Conclusion:
@@ -592,10 +658,10 @@ The effect might be hidden by other defensive factors (e.g., walks, home runs al
 Solution:
 Consider adding walks (TEAM_PITCHING_BB) or earned run average (ERA) to capture pitching effectiveness better.
 
-5- TEAM_FIELDING_E (Errors) → -0.0212 (p < 2e-16 *)
+5- TEAM_FIELDING_E (Errors) → -0.023 (p < 2e-16 *)
 Negative & highly significant
 
-Interpretation: For every additional error, a team is expected to lose 0.021 more games.
+Interpretation: For every additional error, a team is expected to lose 0.023 more games.
 Example: A team with 50 more errors in a season would lose ~1 more game (50 × 0.021).
 Conclusion: More errors directly hurt a team’s chances of winning, which makes sense in baseball.
 
@@ -636,8 +702,7 @@ We use the Variance Inflation Factor (VIF) test. A VIF > 5 suggests multicolline
 ```{r}
 
 library(car)
-vif_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = train_df)
-vif(vif_model)
+vif(base_model)
 
 ```
 
@@ -659,7 +724,7 @@ We test if walks amplify the impact of home runs on wins.
 interaction_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + 
                           TEAM_BATTING_HR:TEAM_BATTING_BB + 
                           TEAM_PITCHING_SO + TEAM_FIELDING_E, 
-                        data = train_df)
+                        data = stp75_train_df)
 
 summary(interaction_model)
 
@@ -694,7 +759,7 @@ We want to see how home runs (TEAM_BATTING_HR) and walks (TEAM_BATTING_BB) impac
 ```{r}
 library(ggplot2)
 
-ggplot(train_df, aes(x = TEAM_BATTING_HR, y = TARGET_WINS, color = TEAM_BATTING_BB)) +
+ggplot(stp75_train_df, aes(x = TEAM_BATTING_HR, y = TARGET_WINS, color = TEAM_BATTING_BB)) +
   geom_point(alpha = 0.7) + 
   geom_smooth(method = "lm", se = FALSE, color = "black") +
   scale_color_gradient(low = "blue", high = "red") +
@@ -718,14 +783,14 @@ If a team doesn’t hit home runs, but hits many doubles, it can still score eff
 improved_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + 
                         TEAM_BATTING_2B + TEAM_BATTING_HR:TEAM_BATTING_BB + 
                         TEAM_PITCHING_SO + TEAM_FIELDING_E, 
-                      data = train_df)
+                      data = stp75_train_df)
 
 summary(improved_model)
 
 ```
 #### Interpretation:
 
-The average prediction error is ±13.25 wins (slightly better than before).
+The average prediction error is ±13.42 wins (slightly better than before).
 The model explains 27.9% of the variance in wins (slightly better than 27.2% in the previous model).
 Adjusted for number of predictors (still an improvement from before).
 The model is statistically significant overall.
@@ -766,7 +831,6 @@ plot(improved_model)
 ```
 
 ### Normality Check:
-
 
 ```{r check-for-normality}
 
@@ -821,10 +885,12 @@ library(car)
 
 # Manually selected high-impact variables
 high_impact_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_HR +
-                        TEAM_PITCHING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = train_df)
+                        TEAM_PITCHING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = stp75_train_df)
 
 # View model summary
 summary(high_impact_model)
+
+plot(high_impact_model)
 
 # Check for multicollinearity
 vif(high_impact_model)
@@ -852,7 +918,7 @@ Removes redundant variables that cause multicollinearity.
 ```{r}
 
 # Apply log transformation to selected variables
-train_df <- train_df %>%
+train_df_log <- stp75_train_df %>%
   mutate(
     log_BATTING_H = log1p(TEAM_BATTING_H),
     log_BATTING_HR = log1p(TEAM_BATTING_HR),
@@ -860,11 +926,12 @@ train_df <- train_df %>%
   )
 
 # Fit model with transformed variables
-log_model <- lm(TARGET_WINS ~ log_BATTING_H + log_BATTING_HR + log_PITCHING_SO + TEAM_FIELDING_E, data = train_df)
+log_model <- lm(TARGET_WINS ~ log_BATTING_H + log_BATTING_HR + log_PITCHING_SO + TEAM_FIELDING_E, data = train_df_log)
 
 # View model summary
 summary(log_model)
 
+plot(log_model)
 
 ```
 #### Why log transformation?
@@ -896,9 +963,9 @@ summary(log_model)$adj.r.squared
 
 ```{r}
 
-mse_base <- mean((train_df$TARGET_WINS - predict(base_model, train_df))^2)
-mse_high_impact <- mean((train_df$TARGET_WINS - predict(high_impact_model, train_df))^2)
-mse_log <- mean((train_df$TARGET_WINS - predict(log_model, train_df))^2)
+mse_base <- mean((stp75_train_df$TARGET_WINS - predict(base_model, stp75_train_df))^2)
+mse_high_impact <- mean((stp75_train_df$TARGET_WINS - predict(high_impact_model, stp75_train_df))^2)
+mse_log <- mean((train_df_log$TARGET_WINS - predict(log_model, train_df_log))^2)
 
 print(c(mse_base, mse_high_impact, mse_log))
 
@@ -915,99 +982,6 @@ vif(high_impact_model)
 ### Model 4: Variable Selection Using Backward Selection 
 
 For this model, we are using backward selection to arrive at the smallest number of variables with statistical significance. In this case, we begin by creating a model containing all predictors, then gradually remove the variable with the highest P-value until only the variables with statistical significance remain. 
-
-The remaining variables _TEAM_BATTING_SO_, _TEAM_PITCHING_SO_, _TEAM_BATTING_HR_, and _TEAM_PITCHING_HR_ included a several observations with a value of zero. As the rows were the same for both variables, it appears that these may also be missing observations as the likelihood that a team's batters did not have a single strikeout nor did their pitchers pitch a single strikeout over the course of a 162 game season is highly unlikely. We will therefore treat these as missing observations and impute using the median value which is more robust to outliers then using the mean values. We will also drop the single row where the team did not win a single game, as this is also suspicious.
-
-```{r model4-transformations}
-
-library(miscTools)
-
-# Convert dubious stats to NAs for pitching
-# and drop unnecessary columns
-train_df_clean <- train_df_clean |>
-  mutate(
-    TEAM_BATTING_SO = if_else(TEAM_BATTING_SO > 0, TEAM_BATTING_SO, NA_integer_),
-    TEAM_PITCHING_SO = if_else(TEAM_PITCHING_SO > 0, TEAM_PITCHING_SO, NA_integer_),
-    TEAM_BATTING_HR = if_else(TEAM_BATTING_HR > 0, TEAM_BATTING_HR, NA_integer_),
-    TEAM_PITCHING_HR = if_else(TEAM_PITCHING_HR > 0, TEAM_PITCHING_HR, NA_integer_)
-  ) |>
-  filter(TARGET_WINS > 0) |>
-  drop_columns(c("TEAM_BASERUN_SB_Missing"))
-  
-# get medians
-train_median_val <- colMedians(train_df_clean, na.rm = TRUE)
-
-# Impute using Means
-for(i in colnames(train_df_clean))
-    train_df_clean[,i][is.na(train_df_clean[,i])] <- as.integer(train_median_val[i])
-
-sum(is.na(train_df_clean))  # Total missing values
-colSums(is.na(train_df_clean))  # Missing values per column
-
-```
-
-
-##### Splitting the training dataset
-
-We split the original training dataset into a training and testing dataset in order to test the strength of our model without testing the model on data that the model has already seen. The training dataset will hold 75% of our original observations, while the test dataset will hold 25%. 
-
-```{r model4-split-data}
-
-smp_size <- floor(0.75 * nrow(train_df_clean))
-
-## set the seed to make your partition reproducible
-set.seed(123)
-train_ind <- sample(seq_len(nrow(train_df_clean)), size = smp_size)
-
-stp75_train_df <- train_df_clean[train_ind, ]
-stp25_test_df <- train_df_clean[-train_ind, ]
-```
-
-##### Diagnostic of Full Model
-
-The Residuals vs. Fitted and QQ Plots show a fairly linear pattern, while Scale-Location plot suggest Homoscedasticity. However, the Residuals vs Leverage plot reveals the presence of some outliers. 
-
-```{r model4-full}
-stp_model_full <- lm(TARGET_WINS ~ ., data = stp75_train_df)
-summary(stp_model_full)
-plot(stp_model_full)
-
-# get points of influence
-influence <- influence.measures(stp_model_full)
-influential_points <- influence$infmat
-cooks_d <- influence$infmat[, "cook.d"]
-max_influence_index <- which.max(cooks_d)
-
-```
-The observation with index 2135 is particularly problematic. A closer examination reveals _TEAM_PITCHING_SO_ is almost 75% higher as the next highest value (19278 vs 12758). _TEAM_PITCHING_H_ is also unusually hight for this year.
-
-```{r model4-outlier}
-influential_data_point <- stp75_train_df[max_influence_index, ]
-print(influential_data_point)
-```
-We will drop this row since it has such a high leverage on the model. 
-
-```{r model4-drop-outlier}
-stp75_train_df <- stp75_train_df |>
-  filter(TEAM_PITCHING_SO < 15000)
-
-# confirm outliers
-stp_model_full <- lm(TARGET_WINS ~ ., data = stp75_train_df)
-plot(stp_model_full)
-```
-
-Charting the plot shows another point (202) with high influence. However, inspecting the this point further doesn't reveal any glaring issues, so it is better to leave the point in the dataset and possibly address the outlier through a transformation.
-
-```{r model4-outlier2}
-# get points of influence
-influence <- influence.measures(stp_model_full)
-influential_points <- influence$infmat
-cooks_d <- influence$infmat[, "cook.d"]
-max_influence_index <- which.max(cooks_d)
-influential_data_point <- stp75_train_df[max_influence_index, ]
-print(influential_data_point)
-```
-
 
 ##### Best Subset Selection
 We will use Best Subset Selection to get a sense of the optimal number of predictors in our model. This test will use Mallows’ Cp.
@@ -1088,7 +1062,7 @@ summary(stp_model)
 AIC(stp_model)
 ```
 
-Backward selection using P-values arrives at a model with seven variables of statistical significance — six strong ((p-value < 0.001) and one moderate (p-value ~= 0.1). The nine predictors is consistent with our Best Subset Selection test.
+Backward selection using P-values arrives at a model with eight variables with high statistical significance  ((p-value < 0.001) and three with moderate (p-value ~= 0.1) statistical significance. Arriving at 11 predictors is consistent with our Best Subset Selection test.
 
 Performing a variance inflation factor (VIF) test on the model shows two variables (TEAM_BATTING_BB and TEAM_BATTING_SO) with high correlation. We may choose to drop one or both of these variables to fine tune our model. This will increase our AIC score somewhat but may avoid multicolinearity issues in our model.
 
@@ -1159,8 +1133,31 @@ The function _compare_performance_ allows comparison of various metrics across d
 compare_performance(stp_model, stp_model2, stpb_model3, stpb_model4, stpb_model5, rank = TRUE)
 ```
 
+#### Tuning with Transformations
 
-#### Tuning with Log Transformations
+```{r}
+library(MASS)
+stpbxcx_model <- boxcox(stp_model)
+plot(stpbxcx_model)
+```
+
+
+```{r model4_log_transform}
+
+stplogy75_train_df <- stp75_train_df %>%
+  mutate(
+    TARGET_WINS = log1p(TARGET_WINS)
+  )
+
+stp_logy_model <- lm(TARGET_WINS ~., data = stplogy75_train_df)
+
+# Backward step-wise regression
+stpb_logy_model <- step(stp_logy_model, direction = "backward")
+
+plot(stpb_logy_model)
+```
+
+#### Tuning with Transformations
 
 Some of our predictors (TEAM_PITCHING_SO, TEAM_PITCHING_BB, & TEAM_PITCHING_H) showed the presence of outliers. We will transform these variables with a log transformation.
 
@@ -1274,7 +1271,7 @@ vif(stplg_model)
 ```
 ##### Normality
 
-```{r check-for-normality}
+```{r check-for-normality2}
 
 library(lmtest)
 shapiro.test(residuals(stplg_model))
@@ -1284,7 +1281,7 @@ Although the W-statistic of 0.9939 is close to 1, the very small p-value (1.76e-
 
 ##### Heteroscedastic 
 
-```{r check-for-homoscedastic}
+```{r check-for-homoscedastic2}
 bptest(stplg_model)
 # Breusch-Pagan test; look for high p-value
 ``` 
@@ -1292,7 +1289,7 @@ Since the p-value is much smaller than 0.05, you reject the null hypothesis of n
 
 ##### Independence 
 
-```{r check-for-independence}
+```{r check-for-independence2}
 durbinWatsonTest(stplg_model)
 # Durbin Watson test: should be close to 2
 ``` 
