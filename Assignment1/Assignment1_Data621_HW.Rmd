@@ -12,6 +12,7 @@ output:
 ```{r global_options, include=FALSE}
 library(tidyverse)
 library(ggplot2)
+library(skimr)
 # 
 require(car)
 require(DataExplorer)
@@ -1280,7 +1281,7 @@ stpb_logy_model <- step(stp_logy_model, direction = "backward")
 ##### Testing Our Assumptions
 ###### Linearity
 
-```{r check-for-multicolinearity-m4bc}
+```{r check-for-multicolinearity-m4logy}
 plot(stp_logy_model, which=1)
 ```
 
@@ -1288,7 +1289,7 @@ Our Residuals vs. Fitted plot suggests a somewhat linear model but there is visi
 
 ###### Normality
 
-```{r check-for-normality-m4bc}
+```{r check-for-normality-m4logy}
 
 plot(stp_logy_model, which = 2)
 
@@ -1302,7 +1303,7 @@ A Shapiro Wilk's Test statistic had a value of 0.980, also suggesting normality.
 
 ###### Heteroscedasticity
 
-```{r check-for-homoscedasticity-m4bc echo: false}
+```{r check-for-homoscedasticity-m4logy echo: false}
 
 plot(stp_logy_model, which = 3)
 plot(stp_logy_model, which = 4)
@@ -1316,7 +1317,7 @@ The Breusch-Page test statistic BP (383.07) indicates a substantial relationship
 
 ###### Independence
 
-```{r check-for-independence-m4bc}
+```{r check-for-independence-m4logy}
 
 acf(residuals(stp_logy_model))
 durbinWatsonTest(stp_logy_model)
@@ -1400,7 +1401,7 @@ vif(stp_logx_model)
 
 ###### Linearity
 
-```{r check-for-multicolinearity-m4bc}
+```{r check-for-multicolinearity-m4logx}
 plot(stp_logx_model, which=1)
 ```
 
@@ -1408,7 +1409,7 @@ Our Residuals vs. Fitted plot suggest a fairly linear model.
 
 ###### Normality
 
-```{r check-for-normality-m4bc}
+```{r check-for-normality-m4logx}
 
 plot(stp_logx_model, which = 2)
 
@@ -1422,7 +1423,7 @@ A Shapiro Wilk's Test statistic had a value of 0.9943, also suggesting normality
 
 ###### Heteroscedasticity
 
-```{r check-for-homoscedasticity-m4bc echo: false}
+```{r check-for-homoscedasticity-m4logx echo: false}
 
 plot(stp_logx_model, which = 3)
 plot(stp_logx_model, which = 4)
@@ -1436,7 +1437,7 @@ The Breusch-Page test statistic BP (302.21) and the small p-value (2.2e-16) sugg
 
 ###### Independence
 
-```{r check-for-independence-m4bc}
+```{r check-for-independence-m4logx}
 
 acf(residuals(stp_logx_model))
 durbinWatsonTest(stp_logx_model)
@@ -1485,7 +1486,7 @@ Our VIF test shows no strong correlation between predictors.
 
 ###### Linearity
 
-```{r check-for-multicolinearity-m4bc}
+```{r check-for-multicolinearity-lasso}
 plot(lasso_model, which=1)
 ```
 
@@ -1493,7 +1494,7 @@ Our Residuals vs. Fitted plot suggest a fairly linear model.
 
 ###### Normality
 
-```{r check-for-normality-m4bc}
+```{r check-for-normality-lasso}
 
 plot(lasso_model, which = 2)
 
@@ -1507,7 +1508,7 @@ A Shapiro Wilk's Test statistic had a value of 0.9964, also suggesting normality
 
 ###### Heteroscedasticity
 
-```{r check-for-homoscedasticity-m4bc echo: false}
+```{r check-for-homoscedasticity-lasso echo: false}
 
 plot(lasso_model, which = 3)
 plot(lasso_model, which = 4)
@@ -1521,7 +1522,7 @@ The Breusch-Page test statistic BP (209.89) and the small p-value (2.2e-16) sugg
 
 ###### Independence
 
-```{r check-for-independence-m4bc}
+```{r check-for-independence-lasso}
 
 acf(residuals(lasso_model))
 durbinWatsonTest(lasso_model)
@@ -1535,7 +1536,7 @@ Our Autocorrelation Function shows that there are lags above the blue dashed lin
 
 Here we are comparing the all models using our training subset (75% of observations).
 
-```{r lasso-compare}
+```{r lasso-compare-1}
 
 #stp_model_inv - is throwing errors due to difference in scales
 compare_performance(base_model, high_impact_model, log_model, back_select_model, stp_model_sm, stp_logy_model, stp_logx_model, lasso_model, rank = TRUE)
@@ -1546,7 +1547,7 @@ The "compare_performance" function compares various test results including Adjus
 
 * Note that we were unable to compare the performance as the scales differ our Step-wise model with transformed independent variables (stp_logx_model)  performs best on the tests above.
 
-```{r lasso-compare}
+```{r lasso-compare-2}
 
 #stp_model_inv - is throwing errors due to difference in scales
 compare_performance(base_model, high_impact_model, log_model, back_select_model, stp_model_sm, stp_logx_model, lasso_model)
@@ -1837,9 +1838,7 @@ Convert to numeric to avoid errors in correlation or calculations.
 #### Step 4: Compute Accuracy Metrics
 
 ```{r}
-# Load necessary libraries
-library(Metrics)  # For MAE and RMSE
-library(ggplot2)  # For visualizations
+
 
 # Compute MAE, RMSE, and R²
 mae <- mae(merged_df$TARGET_WINS, merged_df$PREDICTED_WINS)  
