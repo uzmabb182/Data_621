@@ -1531,28 +1531,6 @@ durbinWatsonTest(lasso_model)
 Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.03 and an autocorrelation value of -0.0177. Furthermore, as our p-value (0.504) is greater than 0.05, we do not have enough evidence to reject the null hypothesis that there is no autocorrelation. In other words, the test results suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
 
 
-### Comparing All Models
-
-Here we are comparing the all models using our training subset (75% of observations).
-
-```{r lasso-compare-1}
-
-#stp_model_inv - is throwing errors due to difference in scales
-compare_performance(base_model, high_impact_model, log_model, back_select_model, stp_model_sm, stp_logy_model, stp_logx_model, lasso_model, rank = TRUE)
-
-```
-
-The "compare_performance" function compares various test results including Adjusted R-Squared, AIC, and BIC. Based on these results, "compare_performance" suggests that our Log Transformed Dependent variable (stp_logy_model_) performed the best. However, this model had the most obvious violations of regression assumptions. Thus we will discard it moving forward. Re-running "compare_performance" without this model shows that 
-
-* Note that we were unable to compare the performance as the scales differ our Step-wise model with transformed independent variables (stp_logx_model)  performs best on the tests above.
-
-```{r lasso-compare-2}
-
-#stp_model_inv - is throwing errors due to difference in scales
-compare_performance(base_model, high_impact_model, log_model, back_select_model, stp_model_sm, stp_logx_model, lasso_model)
-
-```
-
 
 ### Puja's Models
 
@@ -1567,7 +1545,7 @@ summary(model2)
 
 # Model 3: Applying Log Transformation to Key Predictors
 stplg75_train_df_2 <- stp75_train_df %>% mutate(log_TEAM_BATTING_H = log(TEAM_BATTING_H + 1), log_TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1))
-model3 <- lm(TARGET_WINS ~ log_TEAM_BATTING_H + log_TEAM_BATTING_HR, data = train_data_log)
+model3 <- lm(TARGET_WINS ~ log_TEAM_BATTING_H + log_TEAM_BATTING_HR, data = stplg75_train_df_2)
 summary(model3)
 
 # Model 4: Incorporating Pitching and Defensive Metrics
@@ -1582,35 +1560,9 @@ summary(model5)
 model6 <- lm(TARGET_WINS ~ (TEAM_BATTING_H + TEAM_BATTING_BB) / TEAM_BATTING_SO + (TEAM_PITCHING_SO - TEAM_PITCHING_BB), data = stp75_train_df)
 summary(model6)
 ```
-```{r}
-# Model Selection Criteria
-models <- list(model1, model2, model3, model4, model5, model6)
-model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5", "Model 6")
-
-for (i in 1:length(models)) {
-  cat("\n", model_names[i], "\n")
-  print(AIC(models[[i]]))  # Akaike Information Criterion
-  print(BIC(models[[i]]))  # Bayesian Information Criterion
-}
-```
 
 
-```{r}
 
-TODO: these should also be compared to the old models
-  
-# Model Evaluation
-model_eval <- function(model, data) {
-  predictions <- predict(model, data)
-  mse <- mse(data$TARGET_WINS, predictions)
-  r2 <- summary(model)$r.squared
-  return(list(MSE = mse, R2 = r2))
-}
-
-eval_results <- lapply(models, model_eval, data = stplg75_train_df_2)
-names(eval_results) <- model_names
-eval_results
-```
 
 
 ### Model Building Summary
@@ -1627,9 +1579,62 @@ If statistical significance is most important → Log-Transformed Step-wise Mode
 
 ## Model Selection
 
-#### Testing the Model
+### Testing the Model
 
 In this section, we will use the test dataframe to test the accuracy of our model's predictions
+
+#### Comparing All Models
+
+The "compare_performance" function compares various test results including Adjusted R-Squared, AIC, and BIC. Based on these results, "compare_performance" suggests that our Log Transformed Dependent variable (stp_logy_model_) performed the best. However, this model had the most obvious violations of regression assumptions. Thus we will discard it moving forward. Re-running "compare_performance" without this model shows that 
+
+* Note that we were unable to compare the performance as the scales differ our Step-wise model with transformed independent variables (stp_logx_model)  performs best on the tests above.
+
+```{r compare-all-models}
+
+#stp_model_inv - is throwing errors due to difference in scales
+# Compare models using compare_performance
+model_comparison <- compare_performance(base_model, high_impact_model, log_model, back_select_model, stp_model_sm, stp_logx_model, lasso_model, model1, model2, model3, model4, model5, model6)
+
+print(model_comparison)
+
+plot(model_comparison)
+```
+
+
+
+
+
+
+```{r}
+#TODO: merge this with below so that they can all be evaluated at once
+
+# Model Selection Criteria
+models <- list(model1, model2, model3, model4, model5, model6)
+model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5", "Model 6")
+
+for (i in 1:length(models)) {
+  cat("\n", model_names[i], "\n")
+  print(AIC(models[[i]]))  # Akaike Information Criterion
+  print(BIC(models[[i]]))  # Bayesian Information Criterion
+}
+```
+
+```{r}
+
+#TODO: merge this with below so that they can all be evaluated at once
+  
+# Model Evaluation
+model_eval <- function(model, data) {
+  predictions <- predict(model, data)
+  mse <- mse(data$TARGET_WINS, predictions)
+  r2 <- summary(model)$r.squared
+  return(list(MSE = mse, R2 = r2))
+}
+
+eval_results <- lapply(models, model_eval, data = stplg75_train_df_2)
+names(eval_results) <- model_names
+eval_results
+```
 
 ```{r model4lg-test}
 
@@ -1733,21 +1738,25 @@ print(evaluation_metrics)
 ```
 A quick examination of these shows the Log-Transformed Step-wise Model has the lowest MAE and RMSE as well as the highest R-squared, suggesting that this model is somewhat more accurate than the other four evaluated. For confirmation we will perform a 5-fold cross-validation below:
 
+### Final Model Selection
+
+```{r}
+# this is a placeholder. we can change this once we decide
+final_model <- stp_logx_model
+final_df <- stplg75_train_df
+```
+
+### Cross-Validation
+
 ```{r model4lg-cross-validation}
 
-selected_model <- stp_logx_model
-formula <- formula(selected_model$finalModel) 
+train_control <- trainControl(method = "cv", number = 5)  # 5-fold cross-validation
 
-train_control <- trainControl(method = "cv", number = 5)  # 10-fold cross-validation
-
-model_cv <- train(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + 
-    TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
-    TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_BB + TEAM_PITCHING_SO + 
-    TEAM_FIELDING_E + TEAM_FIELDING_DP, data = stplg75_train_df, method = "lm", trControl = train_control)
+model_cv <- train(formula(selected_model), data = final_df, method = "lm", trControl = train_control)
 
 print(model_cv)
 
-summary(stp_logx_model)
+summary(final_model)
 ```
 
 MAE and RMSE is even lower when using cross-validation. Although our R-squared value decreased from 0.3183 to 0.3034024, this value is still higher than the model with second highest R-squared value of 0.2368 for the Log-Tranformed model.
@@ -1761,7 +1770,6 @@ Making Predictions Using the Evaluation Dataset:
 
 TODO: imputation/transformations should match whatever we end up deciding
 QUES FOR THE GROUP: Is this the best place for data prep for the eval dataframe? also which are the correct prep steps? do we need to impute the prep set? 
-
 
 
 ```{r}
@@ -1780,13 +1788,10 @@ With our models tested and evaluated, we can no apply our model to our final eva
 ```{r final-predictions}
 
 # TODO: Apply the model we decide works best
-predictedWins = predict(selected_model, eval_df)
+predictedWins = predict(final_model, eval_df)
 eval_df["PREDICTED_WINS"] = predictedWins
 
 ```
-
-## Interpretation of Predicted TARGET_WINS Values
-
 
 ### Evaluating the Accuracy of Predictions Against Actual TARGET_WINS
 
