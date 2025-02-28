@@ -1,6 +1,6 @@
 ---
 title: "Assignment1_Data621"
-author: "Mubashira Qari, Marco Castro"
+author: "Mubashira Qari, Marco Castro, Puja Roy"
 date: "2025-02-09"
 output:
   html_document:
@@ -36,8 +36,8 @@ First, we load in our data
 
 ```{r}
 
-eval_data <- read.csv("moneyball-evaluation-data.csv")
-train_data <- read.csv("moneyball-training-data.csv")
+eval_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment1/moneyball-evaluation-data.csv")
+train_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment1/moneyball-training-data.csv")
 
 head(eval, n=3)
 head(train, n=3)
@@ -1866,6 +1866,58 @@ Most concerning is the R-Squared (R²) value of 0.001, which means that the mode
 This suggests that the model may be overfitting the training data and failing to generalize, or that it lacks critical predictive features. 
 
 To improve performance, we should consider adding more relevant predictors (such as ERA or OBP), removing unimportant or noisy variables, and potentially using alternative mo
+
+```{r}
+# Model 1: Basic Multiple Linear Regression with Key Predictors
+model1 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = train_data)
+summary(model1)
+
+# Model 2: Adding Interaction Terms
+model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H * TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = train_data)
+summary(model2)
+
+# Model 3: Applying Log Transformation to Key Predictors
+train_data <- train_data %>% mutate(log_TEAM_BATTING_H = log(TEAM_BATTING_H + 1), log_TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1))
+model3 <- lm(TARGET_WINS ~ log_TEAM_BATTING_H + log_TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = train_data)
+summary(model3)
+
+# Model 4: Incorporating Pitching and Defensive Metrics
+model4 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING_SO + TEAM_PITCHING_BB + TEAM_FIELDING_E, data = train_data)
+summary(model4)
+
+# Model 5: Including Caught Stealing and Doubles
+model5 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_2B + TEAM_BASERUN_CS + TEAM_FIELDING_E, data = train_data)
+summary(model5)
+
+# Model 6: Weighted Batting and Pitching Metrics
+model6 <- lm(TARGET_WINS ~ (TEAM_BATTING_H + TEAM_BATTING_BB) / TEAM_BATTING_SO + (TEAM_PITCHING_SO - TEAM_PITCHING_BB), data = train_data)
+summary(model6)
+```
+```{r}
+# Model Selection Criteria
+models <- list(model1, model2, model3, model4, model5, model6)
+model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5", "Model 6")
+
+for (i in 1:length(models)) {
+  cat("\n", model_names[i], "\n")
+  print(AIC(models[[i]]))  # Akaike Information Criterion
+  print(BIC(models[[i]]))  # Bayesian Information Criterion
+}
+```
+
+```{r}
+# Model Evaluation
+model_eval <- function(model, data) {
+  predictions <- predict(model, data)
+  mse <- mse(data$TARGET_WINS, predictions)
+  r2 <- summary(model)$r.squared
+  return(list(MSE = mse, R2 = r2))
+}
+
+eval_results <- lapply(models, model_eval, data = train_data)
+names(eval_results) <- model_names
+eval_results
+```
 
 
 ### Applying Prediction to Our Evalution
