@@ -548,7 +548,10 @@ roc_curve <- roc(response = classification_df$class, predictor = classification_
 print(roc_curve)
 
 ```
-### Plot ROC Curve
+### Plot ROC Curve (Receiver Operating Characteristic) Curve
+
+The ROC (Receiver Operating Characteristic) Curve is a graphical representation used to evaluate the performance of a binary classification model. 
+It shows the trade-off between True Positive Rate (Sensitivity/Recall) and False Positive Rate (1 - Specificity) at different probability thresholds.
 
 ```{r}
 
