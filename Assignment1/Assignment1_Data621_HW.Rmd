@@ -28,7 +28,7 @@ require(Metrics)
 
 ## Data Exploration
 
-In this section, we perform our exploratory analysis to understand our dataset and identify potential issues such as missing values and outliers
+In this section, we perform our exploratory analysis to understand our dataset and identify potential issues such as missing values and outliers.
 
 ### Loading Datasets
 
@@ -79,7 +79,6 @@ train_df %>%
 ```
 _Interpretation_
 
-
 The slope of the regression line in each facet is used to determine the strength of relationship between the independent variable represent on the x-axis vs the dependent variable y (TARGET_WINS). The steeper the slope, the stronger the relationship is between the two variables. The direction of the slope tells whether the relationship is positive or negative: 
 - if the line is sloped to the right, it is a positive relationship meaning we can expect an increase in y as x increases
 - if the line is sloped to the left, it is a negative relationship meaning we can expect an decrease in y as x increases
@@ -93,9 +92,53 @@ _Negative Predictors of Wins:_ TEAM_FIELDING_E, TEAM_PITCHING_H, TEAM_PITCHING_S
 
 _Weak or No Influence:_ TEAM_BATTING_3B, TEAM_BATTING_HBP, TEAM_BATTING_SO, TEAM_FIELDING_DP, TEAM_PITCHING_HR.
 
-### Sorted Correlations
+### Added-Variable Plots
 
-#### Correlation Between All Variables
+An added variable plot (also known as a partial residual plot) is used to visualize the relationship between a predictor and the response variable, while accounting for the effects of other variables in the model. It's particularly useful in multiple regression to understand the relationship of each predictor while controlling for the others.
+
+```{r}
+# Create Added Variable Plots for the model
+avPlots(lm(TARGET_WINS ~., train_df), ask = FALSE)  # ask = FALSE suppresses interactive prompts
+```
+
+_Interepretation_
+
+### Correlation
+
+Correlation indicates the strength and direction of a relationship between two variables. This is indicated using a scale from 1 to -1, where 1 represents a perfect positive correlation, -1 indicates a perfect negative correlation, and 0 represents no relationship. For positive correlation, as the X value increases, the Y value should increase by the valu e of our positive slope. For negative correlation, as the X value increases, the value of Y decreases.
+
+_Considerations_
+- Strong positive correlation (> 0.5)	-> keep the variable in regression.
+- Strong negative correlation (< -0.5) -> Keep (inverse relationship).
+- Weak correlation (~0)	-> Consider removing.
+
+#### Correlation Between TARGET_WINS and [x]
+
+```{r}
+correlation_with_target <- cor(train_df, use = "complete.obs")["TARGET_WINS", ] %>%
+  sort(decreasing = TRUE)  # Sort from highest to lowest correlation
+print(correlation_with_target)
+
+library(ggplot2)
+
+correlation_data <- data.frame(Variable = names(correlation_with_target), Correlation = correlation_with_target)
+
+ggplot(correlation_data, aes(x = reorder(Variable, Correlation), y = Correlation, fill = Correlation > 0)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +  # Flip for better readability
+  labs(title = "Correlation with Target Wins", x = "Variables", y = "Correlation") +
+  scale_fill_manual(values = c("red", "blue")) +
+  theme_minimal()
+
+```
+
+
+
+
+
+### Multicollinearity
+
+One of our assumptions for regression analysis is independence of our predictors. This means that the independent variables should not be strongly correlated with one another. When two or more independent variables are correlated, this leads to a problem known as multicollinearity. The heatmap below shows the correlation between each of the variables in our dataset.
 
 ```{r correlation-heatmap}
 plot_correlation(train_df, type = "all")
@@ -111,69 +154,25 @@ The Correlation Heatmap shows that the following variables are very highly corre
 - TEAM_FIELDING_E and TEAM_PITCHING_HR have a correlation value of -0.57
 - TEAM_BATTING_H and TEAM_BATTING_2B have a correlation value of -0.57
 - TEAM_FIELDING_E and TEAM_BATTING_3B have a correlation value of 0.51
-- 
-
-#### Correlation Between TARGET_WINS and [x]
-
-```{r}
-correlation_with_target <- cor(train_df, use = "complete.obs")["TARGET_WINS", ] %>%
-  sort(decreasing = TRUE)  # Sort from highest to lowest correlation
-print(correlation_with_target)
-```
-
-
-
-```{r}
-library(ggplot2)
-
-correlation_data <- data.frame(Variable = names(correlation_with_target), Correlation = correlation_with_target)
-
-ggplot(correlation_data, aes(x = reorder(Variable, Correlation), y = Correlation, fill = Correlation > 0)) +
-  geom_bar(stat = "identity") +
-  coord_flip() +  # Flip for better readability
-  labs(title = "Correlation with Target Wins", x = "Variables", y = "Correlation") +
-  scale_fill_manual(values = c("red", "blue")) +
-  theme_minimal()
-
-```
-### Checking Correlations and Finding	Action:
-
-Strong positive correlation (> 0.5)	-> keep the variable in regression.
-
-Strong negative correlation (< -0.5) -> Keep (inverse relationship).
-
-Weak correlation (~0)	-> Consider removing.
-
-Two highly correlated variables (> 0.85) -> Drop one to avoid multicollinearity.
 
 ### Summary of Datasets
 
+The _skim_ function is helpful in identifying missing variables. It also gives us summary statistics for the mean, standard deviation, interquartiles, and even a histogram.
 ```{r}
 skim(eval_df)
 skim(train_df)
 ```
 
-
-
-```{r}
-summary(train_df)
-```
+Missing from skim is the median which is shown below:
 
 ```{r}
-summary(eval_df)
-```
-
-
-
-### Calculate mean, median, and standard deviation for key numerical columns
-
-```{r}
-
 train_df %>%
-  summarise(across(where(is.numeric), list(mean = mean, median = median, sd = sd), na.rm = TRUE))
+  summarise(across(where(is.numeric), list(median = median), na.rm = TRUE))
+```
 
-``` 
-The summarise(across()) function above is calculating the mean, median, ans standard deviation for all the numerical variables.
+
+
+
 
 ### Analysis of the training Dataset Before Fitting a Multiple Linear Regression Model:
 
