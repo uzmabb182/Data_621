@@ -1,6 +1,6 @@
 ---
 title: "Assignment1_Data621"
-author: "Mubashira Qari, Marco Castro"
+author: "Mubashira Qari, Marco Castro, Puja Roy, Zach Rose"
 date: "2025-02-09"
 output:
   html_document:
@@ -36,8 +36,8 @@ First, we load in our data
 
 ```{r}
 
-eval_data <- read.csv("moneyball-evaluation-data.csv")
-train_data <- read.csv("moneyball-training-data.csv")
+eval_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment1/moneyball-evaluation-data.csv")
+train_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment1/moneyball-training-data.csv")
 
 head(eval, n=3)
 head(train, n=3)
@@ -569,8 +569,7 @@ plot(stp_model_full, which = 4,  id.n = 8)
 
 As the Cooks Distance (Di) value is less than 0.5 for all of the remaining outliers appear, they are not significantly influential and can be left in our dataset.
 
-## Building Three Multiple Linear Regression Models with Manual Variable Selection
-
+## Building Models 
 
 ### Model 1: Base Baseball Stats Model
 
@@ -1531,16 +1530,59 @@ durbinWatsonTest(lasso_model)
 Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.03 and an autocorrelation value of -0.0177. Furthermore, as our p-value (0.504) is greater than 0.05, we do not have enough evidence to reject the null hypothesis that there is no autocorrelation. In other words, the test results suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
 
 
-### Comparing All Models
 
-Here we are comparing the all models using our training subset (75% of observations).
+### Puja's Models
 
-```{r lasso-compare-1}
+```{r}
+# Model 1: Basic Multiple Linear Regression with Key Predictors
+model1 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = stp75_train_df)
+summary(model1)
 
-#stp_model_inv - is throwing errors due to difference in scales
-compare_performance(base_model, high_impact_model, log_model, back_select_model, stp_model_sm, stp_logy_model, stp_logx_model, lasso_model, rank = TRUE)
+# Model 2: Adding Interaction Terms
+model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H * TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = stp75_train_df)
+summary(model2)
 
+# Model 3: Applying Log Transformation to Key Predictors
+stplg75_train_df_2 <- stp75_train_df %>% mutate(log_TEAM_BATTING_H = log(TEAM_BATTING_H + 1), log_TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1))
+model3 <- lm(TARGET_WINS ~ log_TEAM_BATTING_H + log_TEAM_BATTING_HR, data = stplg75_train_df_2)
+summary(model3)
+
+# Model 4: Incorporating Pitching and Defensive Metrics
+model4 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING_SO + TEAM_PITCHING_BB + TEAM_FIELDING_E, data = stp75_train_df)
+summary(model4)
+
+# Model 5: Including Caught Stealing and Doubles
+model5 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_2B + TEAM_BASERUN_CS + TEAM_FIELDING_E, data = stp75_train_df)
+summary(model5)
+
+# Model 6: Weighted Batting and Pitching Metrics
+model6 <- lm(TARGET_WINS ~ (TEAM_BATTING_H + TEAM_BATTING_BB) / TEAM_BATTING_SO + (TEAM_PITCHING_SO - TEAM_PITCHING_BB), data = stp75_train_df)
+summary(model6)
 ```
+
+
+
+
+
+### Model Building Summary
+
+TODO: update based on updated  models
+
+If interpretability is most important → Use base Stats Model.
+
+If statistical optimization is preferred → Use High-Impact Model.
+
+If non-linearity is a concern → Use Log-Transformed Model.
+
+If statistical significance is most important → Log-Transformed Step-wise Model 
+
+## Model Selection
+
+### Testing the Model
+
+In this section, we will use the test dataframe to test the accuracy of our model's predictions
+
+#### Comparing All Models
 
 The "compare_performance" function compares various test results including Adjusted R-Squared, AIC, and BIC. Based on these results, "compare_performance" suggests that our Log Transformed Dependent variable (stp_logy_model_) performed the best. However, this model had the most obvious violations of regression assumptions. Thus we will discard it moving forward. Re-running "compare_performance" without this model shows that 
 
@@ -1554,9 +1596,68 @@ compare_performance(base_model, high_impact_model, log_model, back_select_model,
 ```
 
 
+### Puja's Models
 
-### Conclusion:
+```{r}
+# Model 1: Basic Multiple Linear Regression with Key Predictors
+model1 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = stp75_train_df)
+summary(model1)
 
+# Model 2: Adding Interaction Terms
+model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H * TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = stp75_train_df)
+summary(model2)
+
+# Model 3: Applying Log Transformation to Key Predictors
+stplg75_train_df_2 <- stp75_train_df %>% mutate(log_TEAM_BATTING_H = log(TEAM_BATTING_H + 1), log_TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1))
+model3 <- lm(TARGET_WINS ~ log_TEAM_BATTING_H + log_TEAM_BATTING_HR, data = train_data_log)
+summary(model3)
+
+# Model 4: Incorporating Pitching and Defensive Metrics
+model4 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING_SO + TEAM_PITCHING_BB + TEAM_FIELDING_E, data = stp75_train_df)
+summary(model4)
+
+# Model 5: Including Caught Stealing and Doubles
+model5 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_2B + TEAM_BASERUN_CS + TEAM_FIELDING_E, data = stp75_train_df)
+summary(model5)
+
+# Model 6: Weighted Batting and Pitching Metrics
+model6 <- lm(TARGET_WINS ~ (TEAM_BATTING_H + TEAM_BATTING_BB) / TEAM_BATTING_SO + (TEAM_PITCHING_SO - TEAM_PITCHING_BB), data = stp75_train_df)
+summary(model6)
+```
+```{r}
+# Model Selection Criteria
+models <- list(model1, model2, model3, model4, model5, model6)
+model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5", "Model 6")
+
+for (i in 1:length(models)) {
+  cat("\n", model_names[i], "\n")
+  print(AIC(models[[i]]))  # Akaike Information Criterion
+  print(BIC(models[[i]]))  # Bayesian Information Criterion
+}
+```
+
+
+```{r}
+
+#TODO: these should also be compared to the old models
+  
+# Model Evaluation
+model_eval <- function(model, data) {
+  predictions <- predict(model, data)
+  mse <- mse(data$TARGET_WINS, predictions)
+  r2 <- summary(model)$r.squared
+  return(list(MSE = mse, R2 = r2))
+}
+
+eval_results <- lapply(models, model_eval, data = stplg75_train_df_2)
+names(eval_results) <- model_names
+eval_results
+```
+
+
+### Model Building Summary
+
+TODO: update based on updated  models
 
 If interpretability is most important → Use base Stats Model.
 
@@ -1566,9 +1667,171 @@ If non-linearity is a concern → Use Log-Transformed Model.
 
 If statistical significance is most important → Log-Transformed Step-wise Model 
 
+##
+
+Elastic Net Regression Model is being tested to balance LASSO and Ridge Regression, helpful when predictors are highly correlated. Adding Random Forest Regression as well as a non-parametric alternative, giving us the ability to capture complex nonlinear relationships and interactions between variables that linear models may miss. 
+
+```{r}
+#Zachs Models (Elastic Net)
+
+set.seed(000) 
+
+smp_size <- floor(0.75 * nrow(train_df))
+train_ind <- sample(seq_len(nrow(train_df)), size = smp_size)
+
+stp75_train_df <- train_df[train_ind, ]  # 75% training data
+stp25_test_df <- train_df[-train_ind, ]  # 25% testing data
+
+x_train <- model.matrix(TARGET_WINS ~ ., data = stp75_train_df)[, -1]
+y_train <- stp75_train_df$TARGET_WINS
+
+x_test <- model.matrix(TARGET_WINS ~ ., data = stp25_test_df)[, -1]
+y_test <- stp25_test_df$TARGET_WINS
+
+# Define the tuning grid
+elastic_net_grid <- expand.grid(alpha = seq(0, 1, by = 0.1), lambda = 10^seq(-3, 3, length = 100))
+
+# Perform cross-validation to find the best hyperparameters
+cv_model <- train(x = x_train, y = y_train,
+                  method = "glmnet",
+                  trControl = trainControl(method = "cv", number = 5),
+                  tuneGrid = elastic_net_grid)
+
+# Best model
+best_alpha <- cv_model$bestTune$alpha
+best_lambda <- cv_model$bestTune$lambda
+
+# Fit final Elastic Net model
+elastic_net_model <- glmnet(x_train, y_train, alpha = best_alpha, lambda = best_lambda)
+
+# Predictions
+elastic_net_predictions <- predict(elastic_net_model, newx = x_test, s = best_lambda)
+
+# Model Evaluation
+elastic_net_mae <- mae(y_test, elastic_net_predictions)
+elastic_net_rmse <- rmse(y_test, elastic_net_predictions)
+elastic_net_r2 <- cor(y_test, elastic_net_predictions)^2
+
+cat("Elastic Net Regression Performance:\n")
+cat("MAE:", elastic_net_mae, "\n")
+cat("RMSE:", elastic_net_rmse, "\n")
+cat("R²:", elastic_net_r2, "\n")
+
+```
+
+
+```{r}
+#Zachs Models (Random Forest Regression)
+library(randomForest)
+set.seed(000) 
+random_forest_model <- randomForest(TARGET_WINS ~ ., data = stp75_train_df, ntree = 500, importance = TRUE)
+
+# Predictions
+random_forest_predictions <- predict(random_forest_model, newdata = stp25_test_df)
+
+# Model Evaluation
+random_forest_mae <- mae(y_test, random_forest_predictions)
+random_forest_rmse <- rmse(y_test, random_forest_predictions)
+random_forest_r2 <- cor(y_test, random_forest_predictions)^2
+
+cat("\nRandom Forest Regression Performance:\n")
+cat("MAE:", random_forest_mae, "\n")
+cat("RMSE:", random_forest_rmse, "\n")
+cat("R²:", random_forest_r2, "\n")
+```
+```{r}
+elastic_net_results <- data.frame(
+  model_name = "Elastic Net", 
+  MAE = as.numeric(elastic_net_mae), 
+  RMSE = as.numeric(elastic_net_rmse), 
+  RSquared = as.numeric(elastic_net_r2),
+  stringsAsFactors = FALSE  
+)
+
+colnames(elastic_net_results) <- colnames(evaluation_metrics)
+
+# Append to evaluation_metrics
+evaluation_metrics <- rbind(evaluation_metrics, elastic_net_results)
+str(evaluation_metrics)
+
+random_forest_results <- data.frame(
+  model_name = "Random Forest", 
+  MAE = as.numeric(random_forest_mae), 
+  RMSE = as.numeric(random_forest_rmse), 
+  RSquared = as.numeric(random_forest_r2),  
+  stringsAsFactors = FALSE
+)
+
+# Append Random Forest results
+evaluation_metrics <- rbind(evaluation_metrics, random_forest_results)
+
+print(evaluation_metrics)
+
+```
+
+```{r}
+evaluation_metrics <- evaluation_metrics[order(evaluation_metrics$MAE), ]
+print(evaluation_metrics)
+```
+
+```{r}
+model_performance <- compare_performance(base_model, high_impact_model, log_model, 
+                                         back_select_model, stp_model_sm, stp_logx_model, 
+                                         lasso_model, rank = TRUE)
+
+# Computes Elastic Net performance
+elastic_net_predictions <- predict(elastic_net_model, newx = x_test, s = best_lambda)
+elastic_net_mae <- mae(y_test, elastic_net_predictions)
+elastic_net_rmse <- rmse(y_test, elastic_net_predictions)
+elastic_net_r2 <- cor(y_test, elastic_net_predictions)^2
+
+# Computes Random Forest performance
+random_forest_predictions <- predict(random_forest_model, newdata = stp25_test_df)
+random_forest_mae <- mae(y_test, random_forest_predictions)
+random_forest_rmse <- rmse(y_test, random_forest_predictions)
+random_forest_r2 <- cor(y_test, random_forest_predictions)^2
+
+# Stores all results in a data frame
+model_metrics <- data.frame(
+  model_name = c("Elastic Net", "Random Forest"),
+  MAE = c(elastic_net_mae, random_forest_mae),
+  RMSE = c(elastic_net_rmse, random_forest_rmse),
+  RSquared = c(elastic_net_r2, random_forest_r2)
+)
+
+print(model_metrics)
+
+```
+```{r}
+colnames(performance_df)
+colnames(model_metrics)
+
+common_cols <- intersect(colnames(performance_df), colnames(model_metrics))
+
+performance_df <- performance_df[, common_cols, drop = FALSE]
+model_metrics <- model_metrics[, common_cols, drop = FALSE]
+
+full_model_comparison <- rbind(performance_df, model_metrics)
+print(full_model_comparison)
+
+extra_models <- data.frame(
+  model_name = c("Elastic Net", "Random Forest"),
+  RSquared = c(elastic_net_r2, random_forest_r2), 
+  RMSE = c(elastic_net_rmse, random_forest_rmse) 
+)
+
+final_model_comparison <- rbind(performance_df, model_metrics)
+
+final_model_comparison <- final_model_comparison[order(final_model_comparison$RMSE), ]
+
+print(final_model_comparison)
+
+```
+
+
 ## Model Selection
 
-#### Testing the model
+#### Testing the Model
 
 In this section, we will use the test dataframe to test the accuracy of our model's predictions
 
@@ -1601,6 +1864,13 @@ stplg25_test_df["PREDICTED_WINS_STP"] = predictedWins
 #predictedWins = predict(stp_mode_inv, train_df_log)
 #train_df_log["PREDICTED_WINS_INV"] = predictedWins
 
+# Elastic Net Model predictions
+stp25_test_df$PREDICTED_WINS_ELASTIC <- predict(elastic_net_model, newx = x_test, s = best_lambda)
+
+# Random Forest Model predictions
+stp25_test_df$PREDICTED_WINS_RF <- predict(random_forest_model, newdata = stp25_test_df)
+
+
 ```
 
 ```{r MAE test}
@@ -1614,19 +1884,24 @@ evaluation_metrics <- data.frame(
   
 eval_predictions <- function(model, predict_col, target_col, model_name) {
   
-  pred = lm(predict_col ~ target_col)
-  plot(predict_col, target_col, xlab="Actual Wins", ylab="Predicted Wins")
-  abline(pred)
+  # Fit regression for visualization
+  pred = lm(predict_col ~ target_col)  
+  plot(predict_col, target_col, xlab = "Actual Wins", ylab = "Predicted Wins", main = model_name)
+  abline(pred, col = "red", lwd = 2)
   
-  plot(model$residuals)
+  # Residual plot
+  residuals = target_col - predict_col
+  plot(residuals, main = paste(model_name, "Residual Plot"), ylab = "Residuals", xlab = "Index")
   
+  # Compute model metrics
   model_metrics = data.frame(
     model_name = model_name,
     MAE = mae(target_col, predict_col),
     RMSE = rmse(target_col, predict_col),
-    RSquared = (cor(target_col, predict_col)^2 )
+    RSquared = cor(target_col, predict_col)^2
   )
   
+  # Append results to global evaluation metrics
   evaluation_metrics <<- rbind(evaluation_metrics, model_metrics)
 }
 
@@ -1657,6 +1932,24 @@ eval_predictions(log_model, train_df_log$PREDICTED_WINS_LOG, train_df_log$TARGET
 # Evaluate Log-Transformed Step-wise Model
 eval_predictions(stp_logx_model, stplg25_test_df$PREDICTED_WINS_STP, stplg25_test_df$TARGET_WINS, "LT Step-wise")
 ```
+```{r}
+tryCatch({
+  eval_predictions(elastic_net_model, stp25_test_df$PREDICTED_WINS_ELASTIC, stp25_test_df$TARGET_WINS, "Elastic Net")
+}, error = function(e) {
+  message("Error caught in eval_predictions for Elastic Net: ", e$message)
+})
+```
+```{r}
+eval_predictions(random_forest_model, stp25_test_df$PREDICTED_WINS_RF, stp25_test_df$TARGET_WINS, "Random Forest")
+
+```
+
+
+
+```{r}
+print(evaluation_metrics)
+```
+
 
 ```{r}
 # TODO: backward transform
@@ -1675,7 +1968,9 @@ print(evaluation_metrics)
 A quick examination of these shows the Log-Transformed Step-wise Model has the lowest MAE and RMSE as well as the highest R-squared, suggesting that this model is somewhat more accurate than the other four evaluated. For confirmation we will perform a 5-fold cross-validation below:
 
 ```{r model4lg-cross-validation}
-library(caret)
+
+selected_model <- stp_logx_model
+formula <- formula(selected_model$finalModel) 
 
 train_control <- trainControl(method = "cv", number = 5)  # 10-fold cross-validation
 
@@ -1691,181 +1986,26 @@ summary(stp_logx_model)
 
 MAE and RMSE is even lower when using cross-validation. Although our R-squared value decreased from 0.3183 to 0.3034024, this value is still higher than the model with second highest R-squared value of 0.2368 for the Log-Tranformed model.
 
-### Conclusion
+#### Summary
 Our previous test suggest that the Log-Transformed Step-wise Model appears to be the most accurate at predicting wins over a team's season. However, with 12 predictors, this model is fairly complex. Given the audience for our report and the need to clearly describe our model to the coach, we should select a simpler model that is still statistically significant and fairly accurate. Therefore, we will select our Improved model.
-
-### Final Analysis
-
-The Improved Model is the best choice for predicting TARGET_WINS because it has the highest R² (27.89%), the lowest residual standard error (13.25), and avoids severe multicollinearity issues. 
-
-Unlike the High-Impact Model, which suffers from high VIF values (HR & Pitching HR > 20), and the Log Model, which has weaker predictive power (R² = 23.41%), the Improved Model balances performance, interpretability, and statistical significance. 
-
-Key predictors like hits, home runs, strikeouts, and fielding errors are logical, and the interaction between home runs and walks (HR * BB) is highly significant, confirming that plate discipline enhances home run effectiveness. 
-
-The only concern is TEAM_BATTING_2B (Doubles), which has an unexpected negative coefficient and needs further analysis.
-
-### Assumptions of Multiple Linear Regression:
-
-Additionally, the Improved Model satisfies all key assumptions of multiple linear regression—it demonstrates linearity, independence of errors, normality of residuals, and no severe multicollinearity (all VIF values < 5). 
-
-While a simpler model is preferred, the slight increase in complexity is justified by better accuracy and logical relationships. 
-
-
-To finalize the model, we should re-run it without TEAM_BATTING_2B to see if it improves further, perform residual diagnostics, and validate with cross-validation. Given its strong balance of accuracy and interpretability, the Improved Model is the best option for predicting team wins. 
-
 
 Making Predictions Using the Evaluation Dataset:
 
-### Data Preparation:
+#### Preparing the Evalulation Dataset  
 
-- Analyze Missing Values from Train Datasets.
+TODO: imputation/transformations should match whatever we end up deciding
+QUES FOR THE GROUP: Is this the best place for data prep for the eval dataframe? also which are the correct prep steps? do we need to impute the prep set? 
+
 
 
 ```{r}
 
-missing_values <- eval_df %>%
-  summarise(across(everything(), ~ sum(is.na(.)))) %>%
-  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Missing_Count")
+mean_val <- colMeans(eval_df, na.rm = TRUE)
 
-print(missing_values)
-
-
+# Impute using Means
+#for(i in colnames(eval_df))
+#    eval_df[,i][is.na(eval_df[,i])] <- mean_val[i]
 ```
-
-### Removing Mostly NA and INDEX Column:
-
-```{r}
-
-eval_df <- eval_df[, !names(eval_df) %in% "INDEX"]
-eval_df <- eval_df[, !names(eval_df) %in% "TEAM_BATTING_HBP"]
-eval_df
-```
-### Mean/Median Imputation (For Numeric Data)
-
-Instead of removing missing values, fill them with the mean or median:
-
-```{r}
-
-eval_df$TEAM_BATTING_SO[is.na(eval_df$TEAM_BATTING_SO)] <- mean(eval_df$TEAM_BATTING_SO, na.rm = TRUE)
-eval_df$TEAM_BASERUN_SB[is.na(eval_df$TEAM_BASERUN_SB)] <- mean(eval_df$TEAM_BASERUN_SB, na.rm = TRUE)
-eval_df$TEAM_BASERUN_CS[is.na(eval_df$TEAM_BASERUN_CS)] <- mean(eval_df$TEAM_BASERUN_CS, na.rm = TRUE)
-eval_df$TEAM_FIELDING_DP[is.na(eval_df$TEAM_FIELDING_DP)] <- mean(eval_df$TEAM_FIELDING_DP, na.rm = TRUE)
-eval_df$TEAM_PITCHING_SO[is.na(eval_df$TEAM_PITCHING_SO)] <- mean(eval_df$TEAM_PITCHING_SO, na.rm = TRUE)
-```
-
-#### 4. Verifying That Missing Values Are Fixed
-
-```{r}
-
-sum(is.na(eval_df))  # Total missing values
-colSums(is.na(eval_df))  # Missing values per column
-
-```
-
-```{r}
-
-skim(eval_df)
-```
-
-## Make Predictions Using the Improved_Model:
-
-```{r}
-
-# Generate predictions using the trained Improved Model
-eval_df$PREDICTED_WINS <- predict(improved_model, newdata = eval_df)
-
-# View a sample of predictions
-head(eval_df$PREDICTED_WINS)
-
-```
-## Interpretation of Predicted TARGET_WINS Values
-
-The predicted values represent the expected number of wins for teams based on their batting, pitching, and fielding statistics using the Improved Model.
-
-For example:
-
-A team with a predicted 69.15 wins is expected to win around 69 games in a full season.
-A team with a predicted 82.52 wins is expected to perform better, likely finishing with around 82-83 wins.
-The variation in predictions suggests that some teams are stronger than others based on key performance metrics (hits, home runs, walks, strikeouts, fielding errors, etc.).
-
-### Evaluating the Accuracy of Predictions Against Actual TARGET_WINS
-
-Now that we have predicted TARGET_WINS, we need to compare these predictions with the actual values in the TARGET_WINS column to assess model accuracy.
-
-#### Step 1: Compute Error Metrics
-
-```{r}
-# Check structure of the dataset
-str(eval_df)
-
-# Check if ACTUAL_WINS and PREDICTED_WINS are numeric
-is.numeric(eval_df$ACTUAL_WINS)
-is.numeric(eval_df$PREDICTED_WINS)
-
-```
-#### Step 2: Add an INDEX Column to Each Dataset
-
-```{r}
-# Add a row index to both datasets
-train_df$INDEX <- seq_len(nrow(train_df))  
-eval_df$INDEX <- seq_len(nrow(eval_df))
-
-```
-
-
-
-#### Step 3: Align and Merge the Datasets
-
-```{r}
-# First, check if both datasets have a common identifier (like INDEX)
-head(train_df$INDEX)
-head(eval_df$INDEX)
-
-# Merge train_df and eval_df using INDEX (if applicable)
-merged_df <- merge(train_df[, c("INDEX", "TARGET_WINS")], 
-                   eval_df[, c("INDEX", "PREDICTED_WINS")], 
-                   by = "INDEX", all = FALSE)
-
-# Now check if both columns have equal length
-nrow(merged_df)  
-
-
-```
-Ensure data consistency before calculating accuracy metrics.
-Convert to numeric to avoid errors in correlation or calculations.
-
-#### Step 4: Compute Accuracy Metrics
-
-```{r}
-
-
-# Compute MAE, RMSE, and R²
-mae <- mae(merged_df$TARGET_WINS, merged_df$PREDICTED_WINS)  
-rmse <- rmse(merged_df$TARGET_WINS, merged_df$PREDICTED_WINS)  
-r_squared <- cor(merged_df$TARGET_WINS, merged_df$PREDICTED_WINS)^2  
-
-# Print results
-cat("Model Accuracy Metrics:\n")
-cat("Mean Absolute Error (MAE):", round(mae, 2), "\n")
-cat("Root Mean Squared Error (RMSE):", round(rmse, 2), "\n")
-cat("R-Squared (R²):", round(r_squared, 4), "\n")
-
-```
-
-### Interpretation of Model Accuracy Metrics
-
-The evaluation results indicate that our Improved Model is not performing well in predicting TARGET_WINS.
-
-The Mean Absolute Error (MAE) of 13.87 suggests that, on average, predictions deviate by about 14 wins per team, which is quite high. 
-
-Additionally, the Root Mean Squared Error (RMSE) of 17.38 implies that some predictions have even larger errors, highlighting potential inconsistencies or missing key predictors. 
-
-Most concerning is the R-Squared (R²) value of 0.001, which means that the model explains almost none of the variation in team wins—essentially, the predictions are no better than random guesses. 
-
-This suggests that the model may be overfitting the training data and failing to generalize, or that it lacks critical predictive features. 
-
-To improve performance, we should consider adding more relevant predictors (such as ERA or OBP), removing unimportant or noisy variables, and potentially using alternative mo
-
 
 ### Applying Prediction to Our Evalution
 
@@ -1873,7 +2013,20 @@ With our models tested and evaluated, we can no apply our model to our final eva
 
 ```{r final-predictions}
 
-predictedWins = predict(stp_logx_model, eval_df)
+# TODO: Apply the model we decide works best
+predictedWins = predict(selected_model, eval_df)
 eval_df["PREDICTED_WINS"] = predictedWins
 
 ```
+
+## Interpretation of Predicted TARGET_WINS Values
+
+
+### Evaluating the Accuracy of Predictions Against Actual TARGET_WINS
+
+
+### Interpretation of Model Accuracy Metrics
+
+
+#### Final Analysis
+
