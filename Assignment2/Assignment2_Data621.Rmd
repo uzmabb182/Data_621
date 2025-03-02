@@ -110,7 +110,7 @@ print(conf_matrix)
 
 -   In our results: TP = 27, TN = 119, FP = 5, FN = 30
 
-Accuracy= (27+119+5+30)/27+119= 146/181=0.8066(80.66%)
+Accuracy= (27+119)/(27+119+5+30)= 146/181=0.8066(80.66%)
 This means 80.66% of the predictions were correct.
 
 ```{r}
@@ -444,6 +444,8 @@ Adding better features can help the model make more informed decisions.
 
 ### Generating ROC Curve and Compute AUC
 
+The ROC Curve is a graphical representation that evaluates the performance of a binary classification model at different probability thresholds.
+
 The ROC curve shows the trade-off between sensitivity and specificity at different probability thresholds.
 The AUC (Area Under Curve) measures model performance:
 AUC = 1 → Perfect Model
@@ -478,38 +480,13 @@ plot(roc_curve, col = "blue", main = "ROC Curve")
 ```
 ```{r}
 
-#install.packages("pROC", dependencies = TRUE)
-
-#update.packages(ask = FALSE)
-
-
 # Load the required library
 library(pROC)
-# Calculate AUC Score
-auc_value <- auc(roc_curve)
+# Compute ROC curve using pROC
+roc_curve <- roc(response = classification_df$class, predictor = classification_df$scored.probability)
 
-# Print AUC Score
-print(paste("AUC Score:", auc_value))
-
-```
-### Function to Generate ROC Curve and Compute AUC
-
-```{r}
-generate_roc_curve <- function(data) {
-  roc_curve <- roc(data$class, data$scored.probability)
-  
-  # Plot ROC curve
-  plot(roc_curve, col = "blue", main = "ROC Curve")
-  auc_value <- auc(roc_curve)
-  
-  return(list("ROC Plot" = roc_curve, "AUC" = auc_value))
-}
-sum(is.na(classification_df$scored.probability))
-classification_df <- na.omit(classification_df)  # Remove rows with NA values
-# Compute ROC and AUC
-roc_results <- generate_roc_curve(classification_df)
-print(paste("AUC:", roc_results$AUC))
-
+# Print ROC details
+print(roc_curve)
 
 
 ```
@@ -577,20 +554,7 @@ plot(roc_curve, col = "blue", main = "ROC Curve using pROC")
 
 ```
 
-### Compute and Print AUC Score Using pROC
 
-```{r}
-# Load the required library
-library(pROC)
-
-# Compute AUC Score
-auc_value <- as.numeric(auc(roc_curve))  # Convert to numeric to avoid type issues
-
-# Print AUC Score
-print(paste("AUC Score:", auc_value))
-
-
-```
 ### Interpretation of AUC Score:
 
 AUC > 0.9 → Excellent Model
@@ -598,38 +562,6 @@ AUC 0.8 - 0.9 → Good Model
 AUC 0.7 - 0.8 → Fair Model
 AUC ≈ 0.5 → Random Guessing (Bad Model)
 
-### Creating Graphical Outputs for Evaluating Classification Models
-
-### Generate ROC Curve with AUC (Receiver Operating Characteristic Curve)
-
-The ROC Curve is a graphical representation that evaluates the performance of a binary classification model at different probability thresholds.
-
-X-axis (Specificity) shows True Negative Rate (1 - False Positive Rate).
-Y-axis (Sensitivity) shows True Positive Rate (Recall).
-The blue curve represents how the model distinguishes between positive and negative classes at different thresholds.
-The red dashed line represents a random classifier (AUC = 0.5), meaning no predictive power.
-
-```{r}
-# Compute ROC curve
-roc_curve <- roc(response = classification_df$class, predictor = classification_df$scored.probability)
-
-# Plot ROC Curve
-plot(roc_curve, col = "blue", main = "ROC Curve for Logistic Regression")
-abline(a = 0, b = 1, col = "red", lty = 2) # Diagonal reference line
-
-# Compute and print AUC Score
-auc_value <- auc(roc_curve)
-print(paste("AUC Score:", auc_value))
-
-```
-The ROC Curve Shape (Blue Line)
-The blue ROC curve shows that your model performs better than random guessing (diagonal line).
-The curve bends toward the top-left corner, meaning the model is good at distinguishing between positive and negative cases.
-The Red Diagonal Line (Baseline)
-The red dashed line (45-degree line) represents a classifier that randomly predicts classes (AUC = 0.5).
-Your ROC curve is well above this line, which indicates a strong classification ability.
-
-"AUC Score: 0.850311262026033"
 
 ### Interpretation:
 
