@@ -612,6 +612,48 @@ ROC Curve	Shows model performance at different thresholds.
 AUC Score: 0.85	Model correctly classifies 85.03% of cases.
 
 
+### Fit Logistic Regression Model
+
+```{r}
+
+# Convert class to factor (for classification)
+classification_df$class <- as.factor(classification_df$class)
+
+# Fit Logistic Regression Model
+model <- glm(class ~ ., data = classification_df, family = binomial)
+
+# Generate Predicted Probabilities
+classification_df$predicted_prob <- predict(model, classification_df, type = "response")
+
+# Convert probabilities to binary predictions (threshold = 0.5)
+classification_df$predicted_class <- ifelse(classification_df$predicted_prob > 0.5, 1, 0)
+
+```
+
+### Generate and Plot the ROC Curve
+
+```{r}
+# Compute ROC Curve
+roc_curve <- roc(classification_df$class, classification_df$predicted_prob)
+
+# Plot ROC Curve
+plot(roc_curve, col = "blue", main = "ROC Curve for Logistic Regression")
+
+# Compute AUC Score
+auc_value <- auc(roc_curve)
+print(paste("AUC Score:", auc_value))
+
+```
+### Generate and Plot the Precision-Recall Curve
+
+```{r}
+# Compute Precision-Recall Data
+pr_curve <- pr.curve(scores.class0 = classification_df$predicted_prob, weights.class0 = as.numeric(classification_df$class), curve = TRUE)
+
+# Plot Precision-Recall Curve
+plot(pr_curve, col = "red", main = "Precision-Recall Curve")
+
+```
 ### Generate a Confusion Matrix Heatmap
 
 ```{r}
@@ -636,5 +678,7 @@ ggplot(conf_df, aes(x = Actual, y = Predicted, fill = Count)) +
 
 
 ```
-
-
+### Summary:
+ROC Curve (AUC Score)	Measures how well the model separates classes.
+Precision-Recall Curve	Evaluates performance on imbalanced datasets.
+Confusion Matrix Heatmap	Visualizes classification errors and correct predictions.
