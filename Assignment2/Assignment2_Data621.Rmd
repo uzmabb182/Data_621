@@ -553,7 +553,44 @@ print(roc_curve)
 plot(roc_curve, col = "blue", main = "ROC Curve using pROC")
 
 ```
+```{r}
 
+# Load required library
+library(pROC)
+
+# Define function to generate ROC Curve and compute AUC Score
+generate_roc_curve <- function(data, actual_col, prob_col) {
+  # Ensure actual class column is a factor (required for pROC)
+  data[[actual_col]] <- as.factor(data[[actual_col]])
+
+  # Ensure probability column is numeric
+  data[[prob_col]] <- as.numeric(data[[prob_col]])
+
+  # Compute the ROC curve
+  roc_curve <- roc(response = data[[actual_col]], predictor = data[[prob_col]], 
+                   percent = FALSE, ci = TRUE, smooth = TRUE)
+
+  # Plot the ROC Curve
+  plot(roc_curve, col = "blue", main = "ROC Curve", print.thres = seq(0, 1, 0.01))
+
+  # Compute AUC Score
+  auc_value <- auc(roc_curve)
+
+  # Print AUC Score
+  print(paste("AUC Score:", auc_value))
+
+  # Return ROC curve and AUC as a list
+  return(list("ROC Curve" = roc_curve, "AUC Score" = auc_value))
+}
+
+
+# Remove missing values
+classification_df <- na.omit(classification_df)
+
+# Run the function with the dataset
+roc_results <- generate_roc_curve(classification_df, "class", "scored.probability")
+
+```
 
 ### Interpretation of AUC Score:
 
@@ -600,4 +637,5 @@ ggplot(conf_df, aes(x = Actual, y = Predicted, fill = Count)) +
 
 
 ```
+
 
