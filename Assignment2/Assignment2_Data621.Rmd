@@ -9,7 +9,8 @@ output: html_document
 
 ```{r global_options, include=FALSE}
 # Load required packages
-
+#install.packages("htmltools", dependencies = TRUE)
+library(htmltools)
 library(caret)
 library(pROC)
 library(tidyverse)
@@ -51,6 +52,8 @@ print(class_counts)
 print(class_percentages)
 
 ```
+
+
 Class 0 (majority) → 124 samples
 Class 1 (minority) → 57 samples
 
@@ -553,30 +556,27 @@ print(roc_curve)
 plot(roc_curve, col = "blue", main = "ROC Curve using pROC")
 
 ```
-```{r}
 
-# Load required library
+```{r}
 library(pROC)
 
-# Define function to generate ROC Curve and compute AUC Score
+# Function to generate a clear ROC curve
 generate_roc_curve <- function(data, actual_col, prob_col) {
-  # Ensure actual class column is a factor (required for pROC)
+  # Ensure correct data types
   data[[actual_col]] <- as.factor(data[[actual_col]])
-
-  # Ensure probability column is numeric
   data[[prob_col]] <- as.numeric(data[[prob_col]])
 
   # Compute the ROC curve
   roc_curve <- roc(response = data[[actual_col]], predictor = data[[prob_col]], 
-                   percent = FALSE, ci = TRUE, smooth = TRUE)
+                   percent = FALSE, ci = TRUE, smooth = FALSE)  # No smoothing
 
-  # Plot the ROC Curve
-  plot(roc_curve, col = "blue", main = "ROC Curve", print.thres = seq(0, 1, 0.01))
-
-  # Compute AUC Score
+  # FIX: Reduce number of threshold labels & adjust text size
+  plot(roc_curve, col = "blue", main = "ROC Curve with Optimized Thresholds", 
+       print.thres = seq(0, 1, 0.2),  # Show labels only at 0, 0.2, 0.4, 0.6, 0.8, 1
+       cex = 0.7)  # Reduce text size
+  
+  # Compute and print AUC Score
   auc_value <- auc(roc_curve)
-
-  # Print AUC Score
   print(paste("AUC Score:", auc_value))
 
   # Return ROC curve and AUC as a list
@@ -584,14 +584,10 @@ generate_roc_curve <- function(data, actual_col, prob_col) {
 }
 
 
-# Remove missing values
-classification_df <- na.omit(classification_df)
-
-# Run the function with the dataset
+# Run the function
 roc_results <- generate_roc_curve(classification_df, "class", "scored.probability")
 
 ```
-
 ### Interpretation of AUC Score:
 
 AUC > 0.9 → Excellent Model
