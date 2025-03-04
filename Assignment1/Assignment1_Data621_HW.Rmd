@@ -1530,41 +1530,6 @@ durbinWatsonTest(lasso_model)
 
 Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.03 and an autocorrelation value of -0.0177. Furthermore, as our p-value (0.504) is greater than 0.05, we do not have enough evidence to reject the null hypothesis that there is no autocorrelation. In other words, the test results suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
 
-
-
-### Puja's Models
-
-```{r}
-# Model 1: Basic Multiple Linear Regression with Key Predictors
-model1 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = stp75_train_df)
-summary(model1)
-
-# Model 2: Adding Interaction Terms
-model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H * TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = stp75_train_df)
-summary(model2)
-
-# Model 3: Applying Log Transformation to Key Predictors
-stplg75_train_df_2 <- stp75_train_df %>% mutate(log_TEAM_BATTING_H = log(TEAM_BATTING_H + 1), log_TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1))
-model3 <- lm(TARGET_WINS ~ log_TEAM_BATTING_H + log_TEAM_BATTING_HR, data = stplg75_train_df_2)
-summary(model3)
-
-# Model 4: Incorporating Pitching and Defensive Metrics
-model4 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING_SO + TEAM_PITCHING_BB + TEAM_FIELDING_E, data = stp75_train_df)
-summary(model4)
-
-# Model 5: Including Caught Stealing and Doubles
-model5 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_2B + TEAM_BASERUN_CS + TEAM_FIELDING_E, data = stp75_train_df)
-summary(model5)
-
-# Model 6: Weighted Batting and Pitching Metrics
-model6 <- lm(TARGET_WINS ~ (TEAM_BATTING_H + TEAM_BATTING_BB) / TEAM_BATTING_SO + (TEAM_PITCHING_SO - TEAM_PITCHING_BB), data = stp75_train_df)
-summary(model6)
-```
-
-
-
-
-
 ### Model Building Summary
 
 TODO: update based on updated  models
@@ -1600,32 +1565,52 @@ compare_performance(base_model, high_impact_model, log_model, back_select_model,
 ### Puja's Models
 
 ```{r}
+# Splitting data into training (75%) and testing (25%)
+set.seed(123)
+train_index <- createDataPartition(train_data$TARGET_WINS, p = 0.75, list = FALSE)
+stp75_train_df <- train_data[train_index, ]
+stp25_test_df <- train_data[-train_index, ]
+
+# Initial data exploration
+str(stp75_train_df)
+summarize(stp75_train_df)
+
 # Model 1: Basic Multiple Linear Regression with Key Predictors
-model1 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = stp75_train_df)
+# Selected based on key offensive and defensive metrics impacting wins
+target_vars1 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_BATTING_BB", "TEAM_BASERUN_SB", "TEAM_FIELDING_E")
+model1 <- lm(TARGET_WINS ~ ., data = stp75_train_df[, c("TARGET_WINS", target_vars1)])
 summary(model1)
 
 # Model 2: Adding Interaction Terms
+# Exploring interaction between hits and home runs as a factor in wins
+target_vars2 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_BATTING_BB", "TEAM_BASERUN_SB", "TEAM_FIELDING_E")
 model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H * TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = stp75_train_df)
 summary(model2)
 
 # Model 3: Applying Log Transformation to Key Predictors
-stplg75_train_df_2 <- stp75_train_df %>% mutate(log_TEAM_BATTING_H = log(TEAM_BATTING_H + 1), log_TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1))
-model3 <- lm(TARGET_WINS ~ log_TEAM_BATTING_H + log_TEAM_BATTING_HR, data = train_data_log)
+# Transformation applied to account for skewed distributions in key predictors
+stp75_train_df <- stp75_train_df %>% mutate(log_TEAM_BATTING_H = log(TEAM_BATTING_H + 1), log_TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1))
+target_vars3 <- c("log_TEAM_BATTING_H", "log_TEAM_BATTING_HR", "TEAM_BATTING_BB", "TEAM_BASERUN_SB", "TEAM_FIELDING_E")
+model3 <- lm(TARGET_WINS ~ ., data = stp75_train_df[, c("TARGET_WINS", target_vars3)])
 summary(model3)
 
 # Model 4: Incorporating Pitching and Defensive Metrics
-model4 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING_SO + TEAM_PITCHING_BB + TEAM_FIELDING_E, data = stp75_train_df)
+# Introducing pitching metrics to assess their impact on win prediction
+target_vars4 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_PITCHING_SO", "TEAM_PITCHING_BB", "TEAM_FIELDING_E")
+model4 <- lm(TARGET_WINS ~ ., data = stp75_train_df[, c("TARGET_WINS", target_vars4)])
 summary(model4)
 
 # Model 5: Including Caught Stealing and Doubles
-model5 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_2B + TEAM_BASERUN_CS + TEAM_FIELDING_E, data = stp75_train_df)
+# Analyzing the impact of baserunning decisions on team wins
+target_vars5 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_BATTING_2B", "TEAM_BASERUN_CS", "TEAM_FIELDING_E")
+model5 <- lm(TARGET_WINS ~ ., data = stp75_train_df[, c("TARGET_WINS", target_vars5)])
 summary(model5)
 
 # Model 6: Weighted Batting and Pitching Metrics
+# Creating composite metric for batting and pitching efficiency
 model6 <- lm(TARGET_WINS ~ (TEAM_BATTING_H + TEAM_BATTING_BB) / TEAM_BATTING_SO + (TEAM_PITCHING_SO - TEAM_PITCHING_BB), data = stp75_train_df)
 summary(model6)
-```
-```{r}
+
 # Model Selection Criteria
 models <- list(model1, model2, model3, model4, model5, model6)
 model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5", "Model 6")
@@ -1635,7 +1620,38 @@ for (i in 1:length(models)) {
   print(AIC(models[[i]]))  # Akaike Information Criterion
   print(BIC(models[[i]]))  # Bayesian Information Criterion
 }
+
+# Model Evaluation
+model_eval <- function(model, data) {
+  predictions <- predict(model, data)
+  mse <- mse(data$TARGET_WINS, predictions)
+  r2 <- summary(model)$r.squared
+  return(list(MSE = mse, R2 = r2))
+}
+
+eval_results <- lapply(models, model_eval, data = stp75_train_df)
+names(eval_results) <- model_names
+eval_results
+
+# Testing Assumptions of Linear Regression
+par(mfrow = c(2, 2))
+for (i in 1:length(models)) {
+  plot(models[[i]], main = paste("Assumption Checks -", model_names[i]))
+}
+
+# Applying the same log transformation to the evaluation dataset
+eval_df <- eval_df %>%
+  mutate(log_TEAM_BATTING_H = log(TEAM_BATTING_H + 1),
+         log_TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1))
+
+# Using the best model (assumed Model 3 for now) to make predictions
+predictedWins <- predict(model3, eval_df, na.action = na.pass)
+eval_df["PREDICTED_WINS"] <- predictedWins
+
+# Display the first few rows of predictions
+head(eval_df)
 ```
+
 
 
 ```{r}
