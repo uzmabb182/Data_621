@@ -1,19 +1,16 @@
 ---
 title: "Assignment1_Data621"
-author: "Mubashira Qari, Marco Castro, Puja Roy, Zach Rose"
+author: "Mubashira Qari, Marco Castro, Puja Roy, Zach Rose, Erick Hadi"
 date: "2025-02-09"
 output:
   html_document:
     df_print: paged
 ---
 
-### Load Libraries
-
 ```{r global_options, include=FALSE}
 library(tidyverse)
 library(ggplot2)
 library(skimr)
-# 
 require(car)
 require(DataExplorer)
 require(miscTools)
@@ -26,15 +23,7 @@ require(glmnet)
 require(Metrics) 
 ```
 
-## Data Exploration
-
-In this section, we perform our exploratory analysis to understand our dataset and identify potential issues such as missing values and outliers
-
-### Loading Datasets
-
-First, we load in our data
-
-```{r}
+```{r load-data, echo=FALSE}
 
 eval_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment1/moneyball-evaluation-data.csv")
 train_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment1/moneyball-training-data.csv")
@@ -48,6 +37,11 @@ eval_df <- data.frame(eval_data) |>
 train_df <- data.frame(train_data) |>
   drop_columns("INDEX")
 ```
+
+## Data Exploration
+
+In this section, we perform our exploratory analysis to understand our dataset and identify potential issues such as missing values and outliers
+
 ### Understanding the TARGET_WINS Field in the Moneyball Dataset:
 
 The TARGET_WINS field represents the number of games a team won in a given baseball season. 
@@ -1542,24 +1536,7 @@ If non-linearity is a concern → Use Log-Transformed Model.
 
 If statistical significance is most important → Log-Transformed Step-wise Model 
 
-## Model Selection
 
-### Testing the Model
-
-In this section, we will use the test dataframe to test the accuracy of our model's predictions
-
-#### Comparing All Models
-
-The "compare_performance" function compares various test results including Adjusted R-Squared, AIC, and BIC. Based on these results, "compare_performance" suggests that our Log Transformed Dependent variable (stp_logy_model_) performed the best. However, this model had the most obvious violations of regression assumptions. Thus we will discard it moving forward. Re-running "compare_performance" without this model shows that 
-
-* Note that we were unable to compare the performance as the scales differ our Step-wise model with transformed independent variables (stp_logx_model)  performs best on the tests above.
-
-```{r lasso-compare-2}
-
-#stp_model_inv - is throwing errors due to difference in scales
-compare_performance(base_model, high_impact_model, log_model, back_select_model, stp_model_sm, stp_logx_model, lasso_model)
-
-```
 
 
 ### Puja's Models
@@ -1654,37 +1631,8 @@ head(eval_df)
 
 
 
-```{r}
 
-#TODO: these should also be compared to the old models
-  
-# Model Evaluation
-model_eval <- function(model, data) {
-  predictions <- predict(model, data)
-  mse <- mse(data$TARGET_WINS, predictions)
-  r2 <- summary(model)$r.squared
-  return(list(MSE = mse, R2 = r2))
-}
-
-eval_results <- lapply(models, model_eval, data = stplg75_train_df_2)
-names(eval_results) <- model_names
-eval_results
-```
-
-
-### Model Building Summary
-
-TODO: update based on updated  models
-
-If interpretability is most important → Use base Stats Model.
-
-If statistical optimization is preferred → Use High-Impact Model.
-
-If non-linearity is a concern → Use Log-Transformed Model.
-
-If statistical significance is most important → Log-Transformed Step-wise Model 
-
-##
+### Elastic Net Regression Model
 
 Elastic Net Regression Model is being tested to balance LASSO and Ridge Regression, helpful when predictors are highly correlated. Adding Random Forest Regression as well as a non-parametric alternative, giving us the ability to capture complex nonlinear relationships and interactions between variables that linear models may miss. 
 
@@ -1736,6 +1684,7 @@ cat("R²:", elastic_net_r2, "\n")
 
 ```
 
+### Random Forest Regression Model
 
 ```{r}
 #Zachs Models (Random Forest Regression)
@@ -1956,6 +1905,7 @@ tryCatch({
   message("Error caught in eval_predictions for Elastic Net: ", e$message)
 })
 ```
+
 ```{r}
 eval_predictions(random_forest_model, stp25_test_df$PREDICTED_WINS_RF, stp25_test_df$TARGET_WINS, "Random Forest")
 
@@ -1965,6 +1915,37 @@ eval_predictions(random_forest_model, stp25_test_df$PREDICTED_WINS_RF, stp25_tes
 
 ```{r}
 print(evaluation_metrics)
+```
+
+#### Comparing All Models
+
+The "compare_performance" function compares various test results including Adjusted R-Squared, AIC, and BIC. Based on these results, "compare_performance" suggests that our Log Transformed Dependent variable (stp_logy_model_) performed the best. However, this model had the most obvious violations of regression assumptions. Thus we will discard it moving forward. Re-running "compare_performance" without this model shows that 
+
+* Note that we were unable to compare the performance as the scales differ our Step-wise model with transformed independent variables (stp_logx_model)  performs best on the tests above.
+
+```{r lasso-compare-2}
+
+#stp_model_inv - is throwing errors due to difference in scales
+compare_performance(base_model, high_impact_model, log_model, back_select_model, stp_model_sm, stp_logx_model, lasso_model)
+
+```
+
+
+```{r}
+
+#TODO: these should also be compared to the old models
+  
+# Model Evaluation
+model_eval <- function(model, data) {
+  predictions <- predict(model, data)
+  mse <- mse(data$TARGET_WINS, predictions)
+  r2 <- summary(model)$r.squared
+  return(list(MSE = mse, R2 = r2))
+}
+
+eval_results <- lapply(models, model_eval, data = stplg75_train_df_2)
+names(eval_results) <- model_names
+eval_results
 ```
 
 
