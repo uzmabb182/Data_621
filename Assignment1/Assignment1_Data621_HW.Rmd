@@ -1482,17 +1482,11 @@ evaluation_metrics <- data.frame(
   AIC = numeric(0),
   BIC = numeric(0)       
 )
-  
+
+evalution_plots <- list()
+i <- 1
+
 eval_predictions <- function(model, predict_col, target_col, model_name) {
-  
-  # Fit regression for visualization
-  pred = lm(predict_col ~ target_col)  
-  plot(predict_col, target_col, xlab = "Actual Wins", ylab = "Predicted Wins", main = model_name)
-  abline(pred, col = "red", lwd = 2)
-  
-  # Residual plot
-  residuals = target_col - predict_col
-  plot(residuals, main = paste(model_name, "Residual Plot"), ylab = "Residuals", xlab = "Index")
   
   # Compute model metrics
   model_metrics = data.frame(
@@ -1506,6 +1500,22 @@ eval_predictions <- function(model, predict_col, target_col, model_name) {
   
   # Append results to global evaluation metrics
   evaluation_metrics <<- rbind(evaluation_metrics, model_metrics)
+  
+  # Fit regression for visualization
+  pred = lm(predict_col ~ target_col)  
+  plot(predict_col, target_col, xlab = "Actual Wins", ylab = "Predicted Wins", main = model_name)
+  abline(pred, col = "red", lwd = 2)
+  
+  # Residual plot
+  residuals = target_col - predict_col
+  plot_data <- data.frame(Index = 1:length(residuals), Residuals = residuals)
+  
+  evalution_plots[[i]] <<- ggplot(plot_data, aes(x = Index, y = Residuals)) +
+    geom_point() +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    labs(title = paste(model_name, "Residual Plot"), x = "Index", y = "Residuals") +
+    theme_minimal()
+  i <<- i + 1
 }
 
 # Evaluate Stats Model predictions
@@ -1516,6 +1526,8 @@ eval_predictions(base_model, stp25_test_df$PREDICTED_WINS, stp25_test_df$TARGET_
 ```{r}
 # Improved Model
 eval_predictions(improved_model, stp25_test_df$PREDICTED_WINS_IMP, stp25_test_df$TARGET_WINS, "Improved")
+
+
 ```
 
 
@@ -1645,6 +1657,17 @@ performance_df <- compare_performance(base_model, high_impact_model, pj_model1, 
 
 print(performance_df)
 
+library(patchwork)
+
+# Loop to print the plots in batches of 4
+for (i in seq(1, length(evalution_plots), by = 4)) {
+  
+  # Create a subset of the plots for the current batch
+  plot_batch <- evalution_plots[i:min(i + 4 - 1, length(evalution_plots))]
+  
+  # Display the current batch of plots
+  print(wrap_plots(plot_batch, ncol = 2, axis_titles='collect'))  
+}
 
 ```
 ```{r}
@@ -1705,7 +1728,7 @@ With our models tested and evaluated, we can no apply our model to our final eva
 
 ```
 
-## Interpretation of Predicted TARGET_WINS Values
+### Interpretation of Predicted TARGET_WINS Values
 
 
 ### Evaluating the Accuracy of Predictions Against Actual TARGET_WINS
