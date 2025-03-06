@@ -40,7 +40,7 @@ train_df <- data.frame(train_data) |>
   drop_columns("INDEX")
 ```
 
-## Data Exploration
+## Section 1: Data Exploration
 
 In this section, we perform our exploratory analysis to understand our dataset and identify potential issues such as missing values and outliers
 
@@ -207,7 +207,7 @@ We will take a look at only potential outliers that have a significant leverage 
 
 
 
-## Data Preparation
+## Section 3: Data Preparation
 
 Before fitting our model, we will consider the following data cleaning steps:
 
@@ -397,7 +397,7 @@ As the Cooks Distance (Di) value is less than 0.5 for all of the remaining outli
 ---
 
 
-## Building Models 
+## Section 3: Building Models 
 
 In this section we will build several models which we will compare and evaluate before selecting a final model.
 
@@ -1404,7 +1404,7 @@ cat("R²:", random_forest_r2, "\n")
 
 
 
-## Model Selection
+## Section 4: Model Selection
 
 #### Testing the Model
 
