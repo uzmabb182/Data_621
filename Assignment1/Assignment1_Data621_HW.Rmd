@@ -173,20 +173,25 @@ ggplot(correlation_data, aes(x = reorder(Variable, Correlation), y = Correlation
 
 Testing the correlation between all variables shows how the change in one variable affects the change in another. In this case, a high correlation value between two independent variables, regardless of direction, suggests multicollinearity between the variables meaning that they are not independent from one another and thus breaks our assumption of independence. 
 
-```{r correlation-heatmap}
-plot_correlation(train_df, type = "all")
+```{r correlation-before-imputation}
+cor_matrix <- cor(train_df, use = "complete.obs")
+cor_df <- as.data.frame(as.table(cor_matrix))
+cor_df <- cor_df[cor_df$Var1 != cor_df$Var2, ]
+cor_df <- cor_df[order(cor_df$Freq, decreasing = TRUE), ]
 ```
 
+The correlation matrix shows that the following variables are very highly correlated with one another:
 
-The Correlation Heatmap shows that the following variables are very highly correlated with one another:
-- TEAM_BATTING_HR and TEAM_PITCHING_HR have a correlation value of 0.97
-- TEAM_FIELDING_E and TEAM_PITCHING_H have a correlation value of 0.67
-- TEAM_FIELDING_E and TEAM_BATTING_BB have a correlation value of -0.66
-- TEAM_BATTING_3B and TEAM_BATTING_HR have a correlation value of -0.64
-- TEAM_FIELDING_E and TEAM_BATTING_HR have a correlation value of -0.59
-- TEAM_FIELDING_E and TEAM_PITCHING_HR have a correlation value of -0.57
-- TEAM_BATTING_H and TEAM_BATTING_2B have a correlation value of -0.57
-- TEAM_FIELDING_E and TEAM_BATTING_3B have a correlation value of 0.51
+_Top 3 Positive Correlation_
+```{r}
+head(cor_df, 3)
+```
+
+_Top 3 Negative Correlation_
+```{r}
+head(cor_df[order(cor_df$Freq), ], 3)
+```
+
 
 
 ### Potential Outliers & Data Issues
@@ -520,7 +525,7 @@ vif(back_select_model)
 
 ###### Linearity
 
-```{r check-for-linearity-m4}
+```{r}
 plot(back_select_model, which=1)
 ```
 
@@ -528,7 +533,7 @@ Our diagnostic plots show a fairly linear model.
 
 ###### Normality
 
-```{r check-for-normality-m4}
+```{r}
 
 plot(back_select_model, which=2)
 shapiro.test(residuals(back_select_model))
@@ -538,7 +543,7 @@ Our QQ plot suggests normality thought there is obvious skewing on the tails, pa
 
 ###### Heteroscedasticity:
 
-```{r check-for-homoscedasticity-m4 echo: false}
+```{r echo=FALSE}
 
 plot(back_select_model, which=3)
 plot(back_select_model, which=4)
@@ -552,7 +557,7 @@ The Breusch-Page test statistic BP (238.69) and the small p-value (2.2e-16) sugg
 
 ##### Independence:
 
-```{r check-for-independence-m4}
+```{r}
 
 acf(residuals(back_select_model))
 durbinWatsonTest(back_select_model)
@@ -621,7 +626,7 @@ vif(base_model)
 ```
 
 ###### Linearity 
-```{r check-for-Linearity-m1i}
+```{r}
 plot(base_model, which=1)
 ```
 
@@ -630,7 +635,7 @@ Our diagnostic plots show a fairly linear model.
 
 ###### Normality Check:
 
-```{r check-for-normality-m1i}
+```{r}
 
 plot(base_model, which=2)
 shapiro.test(residuals(base_model))
@@ -640,7 +645,7 @@ Our QQ plot suggests normality thought there is obvious skewing on the tails, pa
 
 ###### Heterocedasticity:
 
-```{r check-for-Heterocedasticity-m1i echo: false}
+```{r  echo=FALSE}
 
 plot(base_model, which=3)
 bptest(base_model)
@@ -651,7 +656,7 @@ Test Statistic (BP = 188.29) suggests evidence of heteroscedasticity. Additional
 ###### Independence:
 
 
-```{r check-for-independence-m1i}
+```{r}
 
 acf(residuals(base_model))
 durbinWatsonTest(base_model)
@@ -756,7 +761,7 @@ vif(improved_model, type='predictor')
 
 
 ##### Linearity 
-```{r check-for-Linearity-m1i}
+```{r}
 plot(improved_model, which=1)
 ```
 
@@ -764,7 +769,7 @@ plot(improved_model, which=1)
 Our diagnostic plots show a fairly linear model. 
 ##### Normality Check:
 
-```{r check-for-normality-m1i}
+```{r}
 
 plot(improved_model, which=2)
 shapiro.test(residuals(improved_model))
@@ -778,7 +783,7 @@ However, the p-value (0.0033) is less than < 0.05 suggesting that residuals do n
 
 ##### Heterocedasticity:
 
-```{r check-for-Heterocedasticity-m1i echo: false}
+```{r echo=FALSE}
 
 plot(improved_model, which=3)
 bptest(improved_model)
@@ -789,7 +794,7 @@ Test Statistic (BP = 200.46) suggest higher evidence of heteroscedasticity. Addi
 ##### Independence:
 
 
-```{r check-for-independence-m1i}
+```{r}
 
 acf(residuals(improved_model))
 durbinWatsonTest(improved_model)
@@ -945,7 +950,7 @@ vif(log_model1)
 
 ###### Linearity
 
-```{r check-for-linearity-m4}
+```{r}
 plot(log_model1, which=1)
 ```
 
@@ -953,7 +958,7 @@ Our diagnostic plots show a fairly linear model.
 
 ###### Normality
 
-```{r check-for-normality-m4}
+```{r}
 
 plot(log_model1, which=2)
 shapiro.test(residuals(log_model1))
@@ -963,7 +968,7 @@ Our QQ plot suggests normality thought there is obvious skewing on the tails, pa
 
 ###### Heteroscedasticity:
 
-```{r check-for-homoscedasticity-m4 echo: false}
+```{r echo=FALSE}
 
 plot(log_model1, which=3)
 plot(log_model1, which=4)
@@ -977,7 +982,7 @@ The Breusch-Page test statistic BP (152.45) and the small p-value (2.2e-16) sugg
 
 ###### Independence:
 
-```{r check-for-independence-m4}
+```{r }
 
 acf(residuals(log_model1))
 durbinWatsonTest(log_model1)
@@ -1025,7 +1030,7 @@ stpb_logy_model <- step(stp_logy_model, direction = "backward")
 ##### Diagnosing our Model
 ###### Linearity
 
-```{r check-for-multicolinearity-m4logy}
+```{r}
 plot(stp_logy_model, which=1)
 ```
 
@@ -1033,7 +1038,7 @@ Our Residuals vs. Fitted plot suggests a somewhat linear model but there is visi
 
 ###### Normality
 
-```{r check-for-normality-m4logy}
+```{r }
 
 plot(stp_logy_model, which = 2)
 
@@ -1047,7 +1052,7 @@ A Shapiro Wilk's Test statistic had a value of 0.980, also suggesting normality.
 
 ###### Heteroscedasticity
 
-```{r check-for-homoscedasticity-m4logy echo: false}
+```{r  echo=FALSE}
 
 plot(stp_logy_model, which = 3)
 plot(stp_logy_model, which = 4)
@@ -1061,7 +1066,7 @@ The Breusch-Page test statistic BP (383.07) indicates a substantial relationship
 
 ###### Independence
 
-```{r check-for-independence-m4logy}
+```{r }
 
 acf(residuals(stp_logy_model))
 durbinWatsonTest(stp_logy_model)
@@ -1113,7 +1118,7 @@ vif(stp_logx_model)
 
 ###### Linearity
 
-```{r check-for-multicolinearity-m4logx}
+```{r }
 plot(stp_logx_model, which=1)
 ```
 
@@ -1121,7 +1126,7 @@ Our Residuals vs. Fitted plot suggest a fairly linear model.
 
 ###### Normality
 
-```{r check-for-normality-m4logx}
+```{r }
 
 plot(stp_logx_model, which = 2)
 
@@ -1135,7 +1140,7 @@ A Shapiro Wilk's Test statistic had a value of 0.9943, also suggesting normality
 
 ###### Heteroscedasticity
 
-```{r check-for-homoscedasticity-m4logx echo: false}
+```{r  echo=FALSE}
 
 plot(stp_logx_model, which = 3)
 plot(stp_logx_model, which = 4)
@@ -1149,7 +1154,7 @@ The Breusch-Page test statistic BP (302.21) and the small p-value (2.2e-16) sugg
 
 ###### Independence
 
-```{r check-for-independence-m4logx}
+```{r }
 
 acf(residuals(stp_logx_model))
 durbinWatsonTest(stp_logx_model)
@@ -1195,7 +1200,7 @@ AIC(back_select_model)
 ##### Diagnosing our Model
 ###### Linearity
 
-```{r check-for-multicolinearity-m4bc}
+```{r }
 plot(stp_model_inv, which=1)
 ```
 
@@ -1203,7 +1208,7 @@ Our Residuals vs. Fitted plot suggest a fairly linear model.
 
 ###### Normality
 
-```{r check-for-normality-m4bc}
+```{r }
 
 plot(stp_model_inv, which = 2)
 
@@ -1217,7 +1222,7 @@ A Shapiro Wilk's Test statistic had a value of 0.996, also suggesting normality.
 
 ###### Heteroscedasticity
 
-```{r check-for-homoscedasticity-m4bc echo: false}
+```{r  echo=FALSE}
 
 plot(stp_model_inv, which = 3)
 plot(stp_model_inv, which = 4)
@@ -1231,7 +1236,7 @@ The Breusch-Page test statistic BP (176.76) and the small p-value (2.2e-16) sugg
 
 ###### Independence
 
-```{r check-for-independence-m4bc}
+```{r }
 
 acf(residuals(stp_model_inv))
 durbinWatsonTest(stp_model_inv)
@@ -1284,7 +1289,7 @@ Our VIF test shows no strong correlation between predictors.
 
 ###### Linearity
 
-```{r check-for-multicolinearity-lasso}
+```{r}
 plot(lasso_model, which=1)
 ```
 
@@ -1292,7 +1297,7 @@ Our Residuals vs. Fitted plot suggest a fairly linear model.
 
 ###### Normality
 
-```{r check-for-normality-lasso}
+```{r}
 
 plot(lasso_model, which = 2)
 
@@ -1306,7 +1311,7 @@ A Shapiro Wilk's Test statistic had a value of 0.9964, also suggesting normality
 
 ###### Heteroscedasticity
 
-```{r check-for-homoscedasticity-lasso echo: false}
+```{r echo=FALSE}
 
 plot(lasso_model, which = 3)
 plot(lasso_model, which = 4)
@@ -1320,7 +1325,7 @@ The Breusch-Page test statistic BP (209.89) and the small p-value (2.2e-16) sugg
 
 ###### Independence
 
-```{r check-for-independence-lasso}
+```{r}
 
 acf(residuals(lasso_model))
 durbinWatsonTest(lasso_model)
@@ -1453,6 +1458,11 @@ test_df_log["PREDICTED_WINS_LOG2"] = predictedWins
 predictedWins = predict(stp_logx_model, test_df_log)
 test_df_log["PREDICTED_WINS_STP"] = predictedWins
 
+# Lasso
+predictedWins = predict(lasso_model, stp25_test_df)
+test_df_log["PREDICTED_WINS_LASSO"] = predictedWins
+
+
 # Elastic Net Model predictions
 stp25_test_df$PREDICTED_WINS_ELASTIC <- predict(elastic_net_model, newx = x_test, s = best_lambda)
 
@@ -1549,7 +1559,7 @@ eval_predictions(log_model1, test_df_log$PREDICTED_WINS_LOG1, test_df_log$TARGET
 ```
 
 ```{r}
-# Evaluate Log-Transformed Model
+# Evaluate Log-Transformed Model2
 eval_predictions(log_model2, test_df_log$PREDICTED_WINS_LOG2, test_df_log$TARGET_WINS, "Log-Tranformed 2")
 ```
 
@@ -1558,6 +1568,13 @@ eval_predictions(log_model2, test_df_log$PREDICTED_WINS_LOG2, test_df_log$TARGET
 # Evaluate Log-Transformed Step-wise Model
 eval_predictions(stp_logx_model, test_df_log$PREDICTED_WINS_STP, test_df_log$TARGET_WINS, "LT Step-wise")
 ```
+
+```{r}
+# Evaluate LASSO
+eval_predictions(log_model1, test_df_log$PREDICTED_WINS_LASSO, test_df_log$TARGET_WINS, "Lasso")
+```
+
+
 ```{r}
 tryCatch({
   eval_predictions(elastic_net_model, stp25_test_df$PREDICTED_WINS_ELASTIC, stp25_test_df$TARGET_WINS, "Elastic Net")
@@ -1628,9 +1645,18 @@ performance_df <- compare_performance(base_model, high_impact_model, pj_model1, 
 
 print(performance_df)
 
+
 ```
 ```{r}
 colnames(performance_df)
+model_metrics <- data.frame(
+  model_name = character(0), 
+  MAE = numeric(0),     
+  RMSE = numeric(0),    
+  RSquared = numeric(0),
+  AIC = numeric(0),
+  BIC = numeric(0)       
+)
 colnames(model_metrics)
 
 common_cols <- intersect(colnames(performance_df), colnames(model_metrics))
