@@ -5,6 +5,7 @@ date: "2025-02-09"
 output:
   html_document:
     df_print: paged
+  pdf_document: default
 ---
 
 ```{r global_options, include=FALSE}
@@ -1403,7 +1404,6 @@ cat("R²:", random_forest_r2, "\n")
 ```
 
 
-
 ## Section 4: Model Selection
 
 #### Testing the Model
@@ -1414,57 +1414,62 @@ In this section, we will use the test dataframe to test the accuracy of our mode
 
 # Do we need to clean eval dataset first?
 
+# Apply predictions for each model
 # Stats Model predictions
 predictedWins = predict(base_model, stp25_test_df)
-stp25_test_df["PREDICTED_WINS"] = predictedWins
+stp25_test_df$PREDICTED_WINS = predictedWins
 
 # Improved Model predictions
 predictedWins = predict(improved_model, stp25_test_df)
-stp25_test_df["PREDICTED_WINS_IMP"] = predictedWins
+stp25_test_df$PREDICTED_WINS_IMP = predictedWins
 
-# High-Impact Model
+# High-Impact Model predictions
 predictedWins = predict(high_impact_model, stp25_test_df)
-stp25_test_df["PREDICTED_WINS_HIM"] = predictedWins
+stp25_test_df$PREDICTED_WINS_HIM = predictedWins
 
-# PJ1 
+# PJ1 predictions
 predictedWins = predict(pj_model1, stp25_test_df)
-stp25_test_df["PREDICTED_WINS_PJ1"] = predictedWins
+stp25_test_df$PREDICTED_WINS_PJ1 = predictedWins
 
-# PJ2 
+# PJ2 predictions
 predictedWins = predict(pj_model2, stp25_test_df)
-stp25_test_df["PREDICTED_WINS_PJ2"] = predictedWins
+stp25_test_df$PREDICTED_WINS_PJ2 = predictedWins
 
-# PJ4 
+# PJ4 predictions
 predictedWins = predict(pj_model4, stp25_test_df)
-stp25_test_df["PREDICTED_WINS_PJ4"] = predictedWins
+stp25_test_df$PREDICTED_WINS_PJ4 = predictedWins
 
-# PJ5 
+# PJ5 predictions
 predictedWins = predict(pj_model5, stp25_test_df)
-stp25_test_df["PREDICTED_WINS_PJ5"] = predictedWins
+stp25_test_df$PREDICTED_WINS_PJ5 = predictedWins
 
-# PJ6 
+# PJ6 predictions
 predictedWins = predict(pj_model6, stp25_test_df)
-stp25_test_df["PREDICTED_WINS_PJ6"] = predictedWins
+stp25_test_df$PREDICTED_WINS_PJ6 = predictedWins
 
-# Log-Transformed Model
+# Log-Transformed Model predictions
 predictedWins = predict(log_model1, test_df_log)
-test_df_log["PREDICTED_WINS_LOG1"] = predictedWins
+test_df_log$PREDICTED_WINS_LOG1 = predictedWins
 
-# Log-Transformed Model
+# Log-Transformed Model predictions
 predictedWins = predict(log_model2, test_df_log)
-test_df_log["PREDICTED_WINS_LOG2"] = predictedWins
+test_df_log$PREDICTED_WINS_LOG2 = predictedWins
 
-# Log-Transformed Step-wise Model
+# Log-Transformed Step-wise Model predictions
 predictedWins = predict(stp_logx_model, test_df_log)
-test_df_log["PREDICTED_WINS_STP"] = predictedWins
+test_df_log$PREDICTED_WINS_STP = predictedWins
 
-# Lasso
+# Lasso Model predictions
 predictedWins = predict(lasso_model, stp25_test_df)
-test_df_log["PREDICTED_WINS_LASSO"] = predictedWins
+test_df_log$PREDICTED_WINS_LASSO = predictedWins
 
 
-# Elastic Net Model predictions
-stp25_test_df$PREDICTED_WINS_ELASTIC <- predict(elastic_net_model, newx = x_test, s = best_lambda)
+# Convert Elastic Net predictions to numeric vector
+predictedWins <- as.numeric(predict(elastic_net_model, newx = x_test, s = best_lambda)[, 1])
+
+# Store the predictions in the dataframe
+stp25_test_df$PREDICTED_WINS_ELASTIC <- predictedWins
+
 
 # Random Forest Model predictions
 stp25_test_df$PREDICTED_WINS_RF <- predict(random_forest_model, newdata = stp25_test_df)
@@ -1472,8 +1477,8 @@ stp25_test_df$PREDICTED_WINS_RF <- predict(random_forest_model, newdata = stp25_
 
 ```
 
-```{r MAE test}
-# Create a df to store our results
+```{r}
+#df to store results
 evaluation_metrics <- data.frame(
   model_name = character(0), 
   MAE = numeric(0),     
@@ -1486,15 +1491,15 @@ evaluation_metrics <- data.frame(
 evalution_plots <- list()
 i <- 1
 
-eval_predictions <- function(model, predict_col, target_col, model_name) {
+eval_predictions <- function(model, predicted_col, target_col, model_name) {
   
-  # Fit regression for visualization
-  pred = lm(predict_col ~ target_col)  
-  #plot(predict_col, target_col, xlab = "Actual Wins", ylab = "Predicted Wins", main = model_name)
-  #abline(pred, col = "red", lwd = 2)
-  
+  # Ensure predict_col and target_col are valid vectors
+  if (is.null(predicted_col) || is.null(target_col)) {
+    stop("Error: The prediction or target column is NULL.")
+  }
+
   # Residual plot
-  residuals = target_col - predict_col
+  residuals = target_col - predicted_col
   plot_data <- data.frame(Index = 1:length(residuals), Residuals = residuals)
   
   evalution_plots[[i]] <<- ggplot(plot_data, aes(x = Index, y = Residuals)) +
@@ -1507,139 +1512,34 @@ eval_predictions <- function(model, predict_col, target_col, model_name) {
   # Compute model metrics
   model_metrics = data.frame(
     model_name = model_name,
-    MAE = mae(target_col, predict_col),
-    RMSE = rmse(target_col, predict_col),
-    RSquared = cor(target_col, predict_col)^2,
-    AIC = AIC(model),
-    BIC = BIC(model)
+    MAE = mae(target_col, predicted_col),
+    RMSE = rmse(target_col, predicted_col),
+    RSquared = cor(target_col, predicted_col)^2,
+    AIC = tryCatch(AIC(model), error = function(e) NA),  # Handle AIC for unsupported models
+    BIC = tryCatch(BIC(model), error = function(e) NA)   # Handle BIC for unsupported models
   )
   
   # Append results to global evaluation metrics
   evaluation_metrics <<- rbind(evaluation_metrics, model_metrics)
 }
 
-# Evaluate Stats Model predictions
+# call eval_predictions for each model
 eval_predictions(base_model, stp25_test_df$PREDICTED_WINS, stp25_test_df$TARGET_WINS, "Stats")
-
-```
-
-```{r}
-# Improved Model
 eval_predictions(improved_model, stp25_test_df$PREDICTED_WINS_IMP, stp25_test_df$TARGET_WINS, "Improved")
-
-
-```
-
-
-```{r}
-# Evaluate High-Impact Model
 eval_predictions(high_impact_model, stp25_test_df$PREDICTED_WINS_HIM, stp25_test_df$TARGET_WINS, "High-Impact")
-```
-
-```{r}
-# PJ1
-eval_predictions(pj_model1, stp25_test_df$PREDICTED_WINS_PJ1, stp25_test_df$TARGET_WINS, "Model 1")
-```
-
-
-```{r}
-# PJ2
-eval_predictions(pj_model2, stp25_test_df$PREDICTED_WINS_PJ2, stp25_test_df$TARGET_WINS, "Model 2")
-```
-
-
-```{r}
-# PJ2
-eval_predictions(pj_model4, stp25_test_df$PREDICTED_WINS_PJ4, stp25_test_df$TARGET_WINS, "Model 4")
-```
-
-
-```{r}
-# PJ2
-eval_predictions(pj_model5, stp25_test_df$PREDICTED_WINS_PJ5, stp25_test_df$TARGET_WINS, "Model 5")
-```
-
-
-```{r}
-# PJ2
-eval_predictions(pj_model6, stp25_test_df$PREDICTED_WINS_PJ6, stp25_test_df$TARGET_WINS, "Model 6")
-```
-
-```{r}
-# Evaluate Log-Transformed Model
+eval_predictions(pj_model1, stp25_test_df$PREDICTED_WINS_PJ1, stp25_test_df$TARGET_WINS, "PJ1")
+eval_predictions(pj_model2, stp25_test_df$PREDICTED_WINS_PJ2, stp25_test_df$TARGET_WINS, "PJ2")
+eval_predictions(pj_model4, stp25_test_df$PREDICTED_WINS_PJ4, stp25_test_df$TARGET_WINS, "PJ4")
+eval_predictions(pj_model5, stp25_test_df$PREDICTED_WINS_PJ5, stp25_test_df$TARGET_WINS, "PJ5")
+eval_predictions(pj_model6, stp25_test_df$PREDICTED_WINS_PJ6, stp25_test_df$TARGET_WINS, "PJ6")
 eval_predictions(log_model1, test_df_log$PREDICTED_WINS_LOG1, test_df_log$TARGET_WINS, "Log-Tranformed 1")
-```
-
-```{r}
-# Evaluate Log-Transformed Model2
 eval_predictions(log_model2, test_df_log$PREDICTED_WINS_LOG2, test_df_log$TARGET_WINS, "Log-Tranformed 2")
-```
-
-```{r}
-
-# Evaluate Log-Transformed Step-wise Model
 eval_predictions(stp_logx_model, test_df_log$PREDICTED_WINS_STP, test_df_log$TARGET_WINS, "LT Step-wise")
-```
-
-```{r}
-# Evaluate LASSO
-eval_predictions(log_model1, test_df_log$PREDICTED_WINS_LASSO, test_df_log$TARGET_WINS, "Lasso")
-```
-
-
-```{r}
-tryCatch({
-  eval_predictions(elastic_net_model, stp25_test_df$PREDICTED_WINS_ELASTIC, stp25_test_df$TARGET_WINS, "Elastic Net")
-}, error = function(e) {
-  message("Error caught in eval_predictions for Elastic Net: ", e$message)
-})
-
-elastic_net_results <- data.frame(
-  model_name = "Elastic Net", 
-  MAE = as.numeric(elastic_net_mae), 
-  RMSE = as.numeric(elastic_net_rmse), 
-  RSquared = as.numeric(elastic_net_r2),
-  AIC = 0, 
-  BIC = 0,
-  stringsAsFactors = FALSE  
-)
-
-colnames(elastic_net_results) <- colnames(evaluation_metrics)
-
-# Append to evaluation_metrics
-evaluation_metrics <- rbind(evaluation_metrics, elastic_net_results)
-  
-  # Append results to global evaluation metrics
-  #evaluation_metrics <<- rbind(evaluation_metrics, model_metrics)
-```
-
-```{r}
-tryCatch({
-  eval_predictions(random_forest_model, stp25_test_df$PREDICTED_WINS_RF, stp25_test_df$TARGET_WINS, "Random Forest")
-
-}, error = function(e) {
-  message("Error caught in eval_predictions for Elastic Net: ", e$message)
-})
-
-random_forest_results <- data.frame(
-  model_name = "Random Forest", 
-  MAE = as.numeric(random_forest_mae), 
-  RMSE = as.numeric(random_forest_rmse), 
-  RSquared = as.numeric(random_forest_r2),
-  AIC = 0, 
-  BIC = 0,
-  stringsAsFactors = FALSE  
-)
-
-colnames(random_forest_results) <- colnames(evaluation_metrics)
-
-# Append to evaluation_metrics
-evaluation_metrics <- rbind(evaluation_metrics, random_forest_results)
-str(evaluation_metrics)
+eval_predictions(lasso_model, test_df_log$PREDICTED_WINS_LASSO, test_df_log$TARGET_WINS, "Lasso")
+eval_predictions(elastic_net_model, stp25_test_df$PREDICTED_WINS_ELASTIC, stp25_test_df$TARGET_WINS, "Elastic Net")
+eval_predictions(random_forest_model, stp25_test_df$PREDICTED_WINS_RF, stp25_test_df$TARGET_WINS, "Random Forest")
 
 ```
-
-
 
 ```{r}
 evaluation_metrics <- evaluation_metrics[order(evaluation_metrics$MAE), ]
@@ -1652,11 +1552,10 @@ print(evaluation_metrics)
 
 
 ```{r}
+library(patchwork)
 performance_df <- compare_performance(base_model, high_impact_model, pj_model1, pj_model2, pj_model4, pj_model5, pj_model6, log_model1, log_model2, back_select_model, stp_logx_model, lasso_model,  rank = TRUE)
 
 print(performance_df)
-
-library(patchwork)
 
 # Loop to print the plots in batches of 4
 for (i in seq(1, length(evalution_plots), by = 4)) {
@@ -1704,15 +1603,43 @@ print(final_model_comparison)
 ```
 
 ```{r}
-# TODO: backward transform
-# Evaluate Box-Cox Transformed Step-wise Model
-#eval_predictions(stp_model_inv, train_df_log$PREDICTED_WINS_INV, train_df_log$TARGET_WINS, "Box-Cox")
+# Backward transform (inverse Box-Cox) for Box-Cox transformed model
+# Assuming 'best_lambda' is the value of lambda used for Box-Cox transformation
+
+# If 'best_lambda' is zero, use exponential transformation
+if (best_lambda == 0) {
+  predictedWins_inv <- exp(predictedWins)  # Exponential transformation if lambda = 0
+} else {
+  predictedWins_inv <- ((predictedWins * best_lambda) + 1)^(1 / best_lambda)  
+}
+
+# Store the back-transformed predictions in the dataframe
+stp25_test_df$PREDICTED_WINS_INV <- predictedWins_inv
+
+# Evaluate the back-transformed predictions
+eval_predictions(base_model, stp25_test_df$PREDICTED_WINS_INV, stp25_test_df$TARGET_WINS, "Base Model (Back-Transformed)")
+
+
 ```
 
 #### Preparing the Evalulation Dataset  
 
 TODO: imputation/transformations should match whatever we end up deciding
 QUES FOR THE GROUP: Is this the best place for data prep for the eval dataframe? also which are the correct prep steps? do we need to impute the prep set? 
+
+```{r}
+numeric_cols <- sapply(stp25_test_df, is.numeric)
+
+# Impute missing values for numeric columns only
+stp25_test_df[numeric_cols][is.na(stp25_test_df[numeric_cols])] <- 
+  lapply(stp25_test_df[numeric_cols], function(x) mean(x, na.rm = TRUE))
+
+# Ensure any transformations match the ones used during training 
+stp25_test_df$log_TEAM_BATTING_H <- log(stp25_test_df$TEAM_BATTING_H + 1) 
+
+str(stp25_test_df)
+```
+
 
 
 ### Applying Prediction to Our Evalution
@@ -1721,20 +1648,65 @@ With our models tested and evaluated, we can no apply our model to our final eva
 
 ```{r final-predictions}
 
-# TODO: Apply the model we decide works best
-#predictedWins = predict(selected_model, eval_df)
-#eval_df["PREDICTED_WINS"] = predictedWins
+# Apply the Lasso model to the final evaluation dataframe
+predictedWins <- predict(lasso_model, stp25_test_df)
+stp25_test_df$PREDICTED_WINS <- predictedWins
+```
+
+```{r}
+lasso_metrics <- evaluation_metrics %>%
+  filter(model_name == "Lasso Model") %>%
+  distinct(model_name, .keep_all = TRUE)
+
+print(lasso_metrics)
+
+cat("Lasso Model Metrics:\n")
+cat("MAE: ", lasso_metrics$MAE, "\n")
+cat("RMSE: ", lasso_metrics$RMSE, "\n")
+cat("R-squared: ", lasso_metrics$RSquared, "\n")
+cat("AIC: ", lasso_metrics$AIC, "\n")
+cat("BIC: ", lasso_metrics$BIC, "\n")
+
+```
+```{r}
+# Predicted vs Actual plot for the Lasso Model
+ggplot(stp25_test_df, aes(x = TARGET_WINS, y = PREDICTED_WINS)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Predicted vs Actual TARGET_WINS - Lasso Model",
+       x = "Actual TARGET_WINS",
+       y = "Predicted TARGET_WINS") +
+  theme_minimal()
+
+```
+```{r}
+# Visualize MAE, RMSE, and R-squared for the Lasso model
+cat("Lasso Model Performance Summary:\n")
+cat("MAE:", lasso_metrics$MAE, "\n")
+cat("RMSE:", lasso_metrics$RMSE, "\n")
+cat("R-squared:", lasso_metrics$RSquared, "\n")
+
+# Interpretation
+cat("\nInterpretation:\n")
+cat("The Lasso model achieved an MAE of", lasso_metrics$MAE, 
+    "which suggests the model has a low average error in predicting TARGET_WINS. The RMSE value of", 
+    lasso_metrics$RMSE, "supports this conclusion. The R-squared value of", lasso_metrics$RSquared, 
+    "indicates that the Lasso model explains a substantial portion of the variance in the TARGET_WINS.\n")
 
 ```
 
 ### Interpretation of Predicted TARGET_WINS Values
 
+The plot featured above displays predicted wins versus actual values of target wins using a LASSO model. The red dashed line represents a perfect prediciton, where the predicted target_wins values would exactly match the actual values. The scatterted points around this line indicate that while the model is reasonably accurate, there are deviations. This can be expected with real world data, and the predictions generally cluster around the actual values. The dispersion in the middle of the plot tells us that the model is better at predicting middle range of values than extremes. 
 
 ### Evaluating the Accuracy of Predictions Against Actual TARGET_WINS
 
-
 ### Interpretation of Model Accuracy Metrics
 
+The LASSO model's performance metrics provide insights into its accuracy. The Mean Absolute Error (MAE) of 10.03081 indicates that on average, the model's predictions are off by about 10 wins, which is reasonable given the real world context. The RMSE value of 12.94165 supports this as well, displaying that while the model performs relatively well on most predictions, it tends to be a bit further off when the errors are larger. This is expected due to RMSE penalizing larger errors heavier. The R-squared value of 0.2369009 shows that the model explains about 23.7% of the variance in TARGET_WINS, which is a decent amount. However, this also suggests that there is considerable unexplained variance, implying that the model does not capture all the factors that influence TARGET_WINS. Despite this, the model still offers useful predictive power, especially when combined with other techniques or additional data.
 
 #### Final Analysis
+
+The Lasso model was selected for its balance between predictive performance and simplicity. Lasso is particularly well-suited for this problem because it performs automatic feature selection through its regularization term, which helps prevent overfitting while identifying the most influential features. This is crucial when working with many predictors, some of which may not be directly relevant to TARGET_WINS. Although the model's R-squared value suggests that it does not capture all of the variation in the target variable, the moderate MAE and RMSE indicate that it provides a reliable baseline prediction. Moreover, the interpretability of Lasso makes it an ideal choice for understanding the relationship between predictors and the outcome. By selecting Lasso, we chose a model that offers good performance while being simple and interpretable, making it easier to refine or extend in future iterations. In conclusion, while the Lasso model could be improved with additional data or feature engineering, it is a reasonable, interpretable, and effective model for predicting TARGET_WINS based on the available predictors.
+
 
