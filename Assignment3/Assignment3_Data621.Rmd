@@ -68,7 +68,6 @@ The n_missing column shows that there are no missing values (0) for any variable
 The complete_rate column confirms this, as all variables have a completeness rate of 1, meaning every row has a value for these variables.
 
 2. Descriptive Statistics
-Each row represents a variable, and the columns provide various summary statistics:
 
 Mean (mean): The average value of each variable.
 Standard Deviation (sd): Measures the spread of values.
@@ -117,7 +116,7 @@ zn, indus, tax, rad, lstat, and medv show skewness, so applying a log transforma
 age can be categorized into bins (e.g., young, middle-aged, old) since it ranges from 2.9 to 94.1.
 dis has a wide range, so normalization might be needed.
 
-### Distribution Chart
+### Variable Data Distribution Chart
 
 ```{r}
 # Load necessary libraries
@@ -139,7 +138,16 @@ plot_list <- lapply(names(predictors), function(var) {
 grid.arrange(grobs = plot_list, ncol = 4)
 
 ```
+### Interpretation of the Distributions
 
+Highly Skewed Variables (Right-Skewed)
+zn, indus, rad, tax → Log transformation may help normalize these.
+
+Bimodal/Clustered Distributions
+dis, age, ptratio → Suggests distinct groups within the dataset.
+
+Normal-Looking Distributions
+rm, lstat, medv → These may not require transformation.
 
 ### Correlation Heatmap b/w Variables
 
@@ -163,7 +171,7 @@ corrplot(crime_corr, method="color", type="upper",
 
 
 ```
-
+### Investigating the Relationship of lstat and medv with target
 
 ```{r}
 ggplot(crime_training_df, aes(x=lstat, y=target)) + geom_point() + geom_smooth()
@@ -175,9 +183,11 @@ ggplot(crime_training_df, aes(x=medv, y=target)) + geom_point() + geom_smooth()
 Predictors with strong correlations may cause multicollinearity.
 
 Example: tax and rad (0.91) → If both are included in a regression model, they might distort predictions.
+
 Including both in the model confuses the algorithm → The model struggles to decide whether crime is caused by:
 Highway accessibility (rad)
 Property tax rate (tax)
+
 Results in inflated standard errors → Making coefficient estimates unreliable.
 
 Solution: Use only one of them or apply VIF (Variance Inflation Factor) analysis
@@ -201,13 +211,22 @@ summary(model)
 ```{r}
 vif(model)
 ```
+### Interpretation:
+
+All VIF values are below 5, meaning there is no serious multicollinearity issue in the model.
+Both lstat and medv have very small p-values (< 0.001), meaning they are both statistically significant predictors of crime.
+lstat has a lower p-value (3.86e-08) than medv (0.00012), meaning lstat has a stronger relationship with crime compared to medv.
+Both should be kept in the model unless multicollinearity causes problems.
+
+### Features Highly Related to Crime:
+
 The results below will show which features are most related to crime.
 
 ```{r}
 cor(crime_training_df$target, crime_training_df %>% select(-chas, -target)) 
 
 ```
-
+### Visualizing Correlation with Crime Rate
 
 ```{r}
 # Load necessary libraries
