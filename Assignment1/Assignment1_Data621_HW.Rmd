@@ -43,7 +43,7 @@ train_df <- data.frame(train_data) |>
 
 ## Section 1: Data Exploration
 
-In this section, we perform our exploratory analysis to understand our dataset and identify potential issues such as missing values and outliers
+In this section, we perform exploratory analysis to understand our dataset and identify potential issues such as missing values and outliers
 
 ### Shape of Data
 Our evaluation dataframe consists of 16 variables (excluding an INDEX field) all consisting of integer values. A cursory look demonstrates the presence of null values in some of our fields. Note that the TARGET_WINS field — the number of games a team won in a given baseball season — wil be used as the dependent variable in our analysis. 
@@ -103,8 +103,8 @@ Some variables have a significant number of missing values. In particular:
 - TEAM_FIELDING_DP (286 missing values)
 
 Additionally, four variables have values of zero (0) reported that appear suspicious. In particular:
-- TEAM_BATTING_SO & TEAM_PITHCING_SO have the same rows entered as zero suggesting that data may not have been available for these entries.
-- TEAM_BATTING_HR & TEAM_PITHCING_HR have the same rows entered as zero suggesting that data may not have been available for these entries.
+- TEAM_BATTING_SO & TEAM_PITCHING_SO have the same rows entered as zero suggesting that data may not have been available for these entries.
+- TEAM_BATTING_HR & TEAM_PITCHING_HR have the same rows entered as zero suggesting that data may not have been available for these entries.
 
 _Actionable Steps:_
 - Removing TEAM_BATTING_HBP since most of it's values are missing.
@@ -197,7 +197,7 @@ head(cor_df[order(cor_df$Freq), ], 3)
 
 ### Potential Outliers & Data Issues
 
-We observed the following the following values that seem suspicious:
+We observed the following values that seem suspicious:
 
 - TEAM_PITCHING_H (Max = 30,132) <- Likely an error since typical values range from 1,200 - 1,700.
 - TEAM_PITCHING_SO (Max = 19,278) <- Suspiciously high (typical range: 500 - 1,500).
@@ -258,7 +258,7 @@ Regression Imputation uses predictive models to predict missing values based on 
 
 ##### Imputing
 
-Upon further analysis, we noticed a pattern between 4 parameters with missing values: TEAM_BATTING_SO, TEAM_PITCHING_SO, TEAM_BATTING_HR, and TEAM_PITCHING_HR suggesting that these missing values may be MAR. However, no pattern was evident for the other three parameters with missing values (TEAM_BASERUN_CS,	TEAM_FIELDING_DP, TEAM_BASERUN_SB) suggesting that we they may be MCAR. As such, we should apply two separate techniques for the missing values suitable for their specific classification.Specifically, we will apply:
+Upon further analysis, we noticed a pattern between 4 parameters with missing values: TEAM_BATTING_SO, TEAM_PITCHING_SO, TEAM_BATTING_HR, and TEAM_PITCHING_HR suggesting that these missing values may be MAR. However, no pattern was evident for the other three parameters with missing values (TEAM_BASERUN_CS,	TEAM_FIELDING_DP, TEAM_BASERUN_SB) suggesting that they may be MCAR. As such, we should apply two separate techniques for the missing values suitable for their specific classification. Specifically, we will apply:
 
 - Median imputation to TEAM_BASERUN_CS,	TEAM_FIELDING_DP, TEAM_BASERUN_SB as it is a more robust form of imputation for MCAR values than mean imputation which is more affected by outliers
 - MICE imputation to TEAM_BATTING_SO, TEAM_PITCHING_SO, TEAM_BATTING_HR, and TEAM_PITCHING_HR as it as more robust method for MAR values.
@@ -1412,8 +1412,6 @@ In this section, we will use the test dataframe to test the accuracy of our mode
 
 ```{r model4lg-test}
 
-# Do we need to clean eval dataset first?
-
 # Apply predictions for each model
 # Stats Model predictions
 predictedWins = predict(base_model, stp25_test_df)
@@ -1546,9 +1544,8 @@ evaluation_metrics <- evaluation_metrics[order(evaluation_metrics$MAE), ]
 print(evaluation_metrics)
 ```
 
+
 #### Comparing All Models
-
-
 
 
 ```{r}
@@ -1637,25 +1634,26 @@ stp25_test_df[numeric_cols][is.na(stp25_test_df[numeric_cols])] <-
 # Ensure any transformations match the ones used during training 
 stp25_test_df$log_TEAM_BATTING_H <- log(stp25_test_df$TEAM_BATTING_H + 1) 
 
-str(stp25_test_df)
 ```
+
 
 
 
 ### Applying Prediction to Our Evalution
 
-With our models tested and evaluated, we can no apply our model to our final evaluation dataframe.
+With our models tested and evaluated, we can now apply our model to our final evaluation dataframe.
 
-```{r final-predictions}
+```{r test-predictions}
 
 # Apply the Lasso model to the final evaluation dataframe
 predictedWins <- predict(lasso_model, stp25_test_df)
 stp25_test_df$PREDICTED_WINS <- predictedWins
 ```
 
+
 ```{r}
 lasso_metrics <- evaluation_metrics %>%
-  filter(model_name == "Lasso Model") %>%
+  filter(model_name == "Lasso") %>%
   distinct(model_name, .keep_all = TRUE)
 
 print(lasso_metrics)
@@ -1679,13 +1677,8 @@ ggplot(stp25_test_df, aes(x = TARGET_WINS, y = PREDICTED_WINS)) +
   theme_minimal()
 
 ```
-```{r}
-# Visualize MAE, RMSE, and R-squared for the Lasso model
-cat("Lasso Model Performance Summary:\n")
-cat("MAE:", lasso_metrics$MAE, "\n")
-cat("RMSE:", lasso_metrics$RMSE, "\n")
-cat("R-squared:", lasso_metrics$RSquared, "\n")
 
+```{r}
 # Interpretation
 cat("\nInterpretation:\n")
 cat("The Lasso model achieved an MAE of", lasso_metrics$MAE, 
@@ -1695,13 +1688,14 @@ cat("The Lasso model achieved an MAE of", lasso_metrics$MAE,
 
 ```
 
+
 ### Interpretation of Predicted TARGET_WINS Values
 
-The plot featured above displays predicted wins versus actual values of target wins using a LASSO model. The red dashed line represents a perfect prediciton, where the predicted target_wins values would exactly match the actual values. The scatterted points around this line indicate that while the model is reasonably accurate, there are deviations. This can be expected with real world data, and the predictions generally cluster around the actual values. The dispersion in the middle of the plot tells us that the model is better at predicting middle range of values than extremes. 
+The plot featured above displays predicted wins versus actual values of target wins using a LASSO model. The red dashed line represents a perfect prediction, where the predicted target_wins values would exactly match the actual values. The scattered points around this line indicate that while the model is reasonably accurate, there are deviations. This can be expected with real world data, and the predictions generally cluster around the actual values. The dispersion in the middle of the plot tells us that the model is better at predicting middle range of values than extremes. 
 
 ### Evaluating the Accuracy of Predictions Against Actual TARGET_WINS
 
-### Interpretation of Model Accuracy Metrics
+#### Interpretation of Model Accuracy Metrics
 
 The LASSO model's performance metrics provide insights into its accuracy. The Mean Absolute Error (MAE) of 10.03081 indicates that on average, the model's predictions are off by about 10 wins, which is reasonable given the real world context. The RMSE value of 12.94165 supports this as well, displaying that while the model performs relatively well on most predictions, it tends to be a bit further off when the errors are larger. This is expected due to RMSE penalizing larger errors heavier. The R-squared value of 0.2369009 shows that the model explains about 23.7% of the variance in TARGET_WINS, which is a decent amount. However, this also suggests that there is considerable unexplained variance, implying that the model does not capture all the factors that influence TARGET_WINS. Despite this, the model still offers useful predictive power, especially when combined with other techniques or additional data.
 
@@ -1709,4 +1703,46 @@ The LASSO model's performance metrics provide insights into its accuracy. The Me
 
 The Lasso model was selected for its balance between predictive performance and simplicity. Lasso is particularly well-suited for this problem because it performs automatic feature selection through its regularization term, which helps prevent overfitting while identifying the most influential features. This is crucial when working with many predictors, some of which may not be directly relevant to TARGET_WINS. Although the model's R-squared value suggests that it does not capture all of the variation in the target variable, the moderate MAE and RMSE indicate that it provides a reliable baseline prediction. Moreover, the interpretability of Lasso makes it an ideal choice for understanding the relationship between predictors and the outcome. By selecting Lasso, we chose a model that offers good performance while being simple and interpretable, making it easier to refine or extend in future iterations. In conclusion, while the Lasso model could be improved with additional data or feature engineering, it is a reasonable, interpretable, and effective model for predicting TARGET_WINS based on the available predictors.
 
+### Applying selcted model (Lasso) to the final evaluation data
 
+#### Preparing final evaluation dataset
+
+```{r}
+na_per_column <- colSums(is.na(eval_df))
+print(na_per_column)
+```
+
+```{r}
+eval_df <- eval_df[, !names(eval_df) %in% "TEAM_BATTING_HBP"]
+numeric_cols_eval <- sapply(eval_df, is.numeric)
+
+str(eval_df)
+numeric_cols_eval
+```
+
+```{r}
+# Impute missing values for numeric columns only
+eval_df[numeric_cols_eval] <- 
+  lapply(eval_df[numeric_cols_eval], function(x) {
+    x[is.na(x)] <- mean(x, na.rm = TRUE)
+    return(x)
+  })
+
+# Ensure any transformations match the ones used during training 
+eval_df$log_TEAM_BATTING_H <- log(eval_df$TEAM_BATTING_H + 1) 
+```
+
+#### Predicting Wins using Lasso
+
+```{r final-predictions}
+
+# Apply the Lasso model to the final evaluation dataframe
+predictedWinsEval <- round(predict(lasso_model, eval_df))
+eval_df$PREDICTED_WINS <- predictedWinsEval
+
+glimpse(eval_df)
+```
+
+```{r}
+write.csv(eval_df, "predictions.csv", row.names = F)
+```
