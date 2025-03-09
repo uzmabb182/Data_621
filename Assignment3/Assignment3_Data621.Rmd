@@ -56,7 +56,10 @@ crime_evaluation_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Dat
 head(crime_evaluation_df)
 
 
+
 ```
+### Exploratory Data Analysis
+
 ```{r}
 #dim(crime_training_df)
 skim(crime_training_df)
