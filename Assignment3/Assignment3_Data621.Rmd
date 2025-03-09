@@ -1,0 +1,241 @@
+---
+title: "Assignment3_Data621"
+author: "Mubashira Qari"
+date: "2025-03-09"
+output: html_document
+---
+
+### Load Libraries
+
+```{r global_options, include=FALSE}
+# Load required packages
+#install.packages("htmltools", dependencies = TRUE)
+library(htmltools)
+library(caret)
+library(pROC)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(skimr)
+require(DataExplorer)
+require(miscTools)
+#require(MASS)
+require(performance)
+require(lmtest)
+require(mice)
+require(glmnet)
+require(Metrics) 
+```
+
+### Loading Datasets
+
+### Variables in the Dataset:
+• zn: proportion of residential land zoned for large lots (over 25000 square feet) (predictor variable)  
+• indus: proportion of non-retail business acres per suburb (predictor variable)  
+• chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) (predictor variable)  
+• nox: nitrogen oxides concentration (parts per 10 million) (predictor variable)  
+• rm: average number of rooms per dwelling (predictor variable)  
+• age: proportion of owner-occupied units built prior to 1940 (predictor variable)  
+• dis: weighted mean of distances to five Boston employment centers (predictor variable)  
+• rad: index of accessibility to radial highways (predictor variable)  
+• tax: full-value property-tax rate per $10,000 (predictor variable)  
+• ptratio: pupil-teacher ratio by town (predictor variable)  
+• lstat: lower status of the population (percent) (predictor variable)  
+• medv: median value of owner-occupied homes in $1000s (predictor variable)  
+• target: whether the crime rate is above the median crime rate (1) or not (0) (response variable)  
+
+###  load the dataset and understand its structure.
+
+```{r}
+
+crime_training_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-training-data_modified.csv")
+
+crime_evaluation_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-evaluation-data_modified.csv")
+
+head(crime_evaluation_df)
+
+
+```
+```{r}
+#dim(crime_training_df)
+skim(crime_training_df)
+
+```
+
+1. Missing Values & Completeness Rate
+The n_missing column shows that there are no missing values (0) for any variable, meaning we don’t need to perform imputation.
+The complete_rate column confirms this, as all variables have a completeness rate of 1, meaning every row has a value for these variables.
+
+2. Descriptive Statistics
+Each row represents a variable, and the columns provide various summary statistics:
+
+Mean (mean): The average value of each variable.
+Standard Deviation (sd): Measures the spread of values.
+Minimum (p0): The lowest observed value (0th percentile).
+First Quartile (p25): The 25th percentile, where 25% of the values are below this number.
+Median (p50): The 50th percentile (the middle value).
+Third Quartile (p75): The 75th percentile, where 75% of the values are below this number.
+
+Key Observations:
+
+Crime Rate Target (target)
+It’s a binary variable with a mean of 0.4914, meaning that about 49.14% of neighborhoods have a crime rate above the median.
+The median (p50) is 0, indicating that more than half of the data points fall in the low-crime category (target = 0).
+
+Median Home Value (medv)
+Mean = 22.59 ($22,590 in $1000s), Median = 21.2.
+The range (p0 = 5, p75 = 25) suggests that most homes are valued between $5,000 and $25,000 (in $1000s).
+The standard deviation (9.23) indicates a relatively high spread in home values.
+
+Lower Status Population (lstat)
+Mean = 12.63%, Median = 11.93%.
+A positively skewed distribution (p0 = 1.73, p75 = 16.93), meaning some areas have much higher lower-status populations than others.
+
+Property Tax Rate (tax)
+High variance (Mean = 409.5, SD = 167.9).
+Large difference between the 25th percentile (281) and 75th percentile (666), suggesting significant variability in tax rates among neighborhoods.
+
+Average Number of Rooms (rm)
+Mean = 6.29, Median = 6.21, with a relatively small spread (SD = 0.70).
+Indicates most homes have around 6 rooms.
+
+Distance to Employment Centers (dis)
+Median = 3.19, but the 25th percentile is quite low (2.10), meaning some neighborhoods are much closer to employment centers than others.
+Higher standard deviation (2.1) suggests some neighborhoods are much more remote.
+
+Industrial Land Proportion (indus)
+Mean = 11.10, Median = 9.69, and right-skewed distribution (p0 = 0.46, p75 = 18.1).
+Some areas have much higher proportions of industrial land, potentially influencing crime.
+
+Highway Accessibility (rad)
+Highly right-skewed: The median is 5, but the 75th percentile is 24, meaning some neighborhoods have much greater access to highways than others.
+This might be an important predictor for crime.
+
+Potential Data Transformations
+zn, indus, tax, rad, lstat, and medv show skewness, so applying a log transformation might improve normality.
+age can be categorized into bins (e.g., young, middle-aged, old) since it ranges from 2.9 to 94.1.
+dis has a wide range, so normalization might be needed.
+
+### Distribution Chart
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(gridExtra)  # For arranging multiple plots
+
+# Select only predictor variables (excluding 'target')
+predictors <- crime_training_df %>% select(-target)
+
+# Create histograms for each predictor variable
+plot_list <- lapply(names(predictors), function(var) {
+  ggplot(crime_training_df, aes_string(x = var)) +
+    geom_histogram(fill = "lightblue", color = "black", bins = 30) +
+    theme_minimal() +
+    ggtitle(var)
+})
+
+# Arrange plots in a grid layout
+grid.arrange(grobs = plot_list, ncol = 4)
+
+```
+
+
+### Correlation Heatmap b/w Variables
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(corrplot)
+
+# Compute correlation matrix (excluding categorical variables like 'chas' and 'target')
+crime_corr <- cor(crime_training_df %>% select(-chas, -target))
+
+# Generate heatmap with color legend
+corrplot(crime_corr, method="color", type="upper", 
+         tl.col="black", tl.srt=45, 
+         col=colorRampPalette(c("blue", "white", "red"))(200), # Color gradient from blue to red
+         addCoef.col = "black", # Show correlation values
+         number.cex = 0.7, # Adjust coefficient text size
+         mar = c(1,1,1,1), # Adjust margins
+         cl.lim = c(-1, 1) # Ensure legend covers -1 to 1
+)
+
+
+```
+
+
+```{r}
+ggplot(crime_training_df, aes(x=lstat, y=target)) + geom_point() + geom_smooth()
+ggplot(crime_training_df, aes(x=medv, y=target)) + geom_point() + geom_smooth()
+
+```
+### Interpretation of the Variables Correlation:
+
+Predictors with strong correlations may cause multicollinearity.
+
+Example: tax and rad (0.91) → If both are included in a regression model, they might distort predictions.
+Including both in the model confuses the algorithm → The model struggles to decide whether crime is caused by:
+Highway accessibility (rad)
+Property tax rate (tax)
+Results in inflated standard errors → Making coefficient estimates unreliable.
+
+Solution: Use only one of them or apply VIF (Variance Inflation Factor) analysis
+
+medv and lstat are highly correlated (-0.74).
+If medv predicts crime, lstat might not add much extra value.
+We should check which one performs better in logistic regression.
+
+Non-linearity in medv (home value).
+medv is not linearly related to crime (from previous scatter plots).
+Solution: Use a quadratic term (medv^2) to better capture trends.
+
+###  logistic regression model including both tax and rad
+
+Let's say we run a logistic regression model including both tax and rad:
+```{r}
+model <- glm(target ~ tax + rad + lstat + medv, data=crime_training_df, family=binomial)
+summary(model)
+
+```
+```{r}
+vif(model)
+```
+The results below will show which features are most related to crime.
+
+```{r}
+cor(crime_training_df$target, crime_training_df %>% select(-chas, -target)) 
+
+```
+
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(corrr) # For correlation calculations
+
+# Compute correlation of numeric predictors with `target`
+correlations <- crime_training_df %>% 
+  select(-chas) %>%  # Exclude categorical variable 'chas'
+  mutate(target = as.numeric(target)) %>% # Ensure target is numeric
+  correlate() %>% 
+  focus(target) %>%  # Focus only on correlations with `target`
+  arrange(desc(target)) # Sort in descending order
+
+# Convert to dataframe for plotting
+correlations_df <- as.data.frame(correlations)
+
+# Plot correlation values as a bar chart
+ggplot(correlations_df, aes(x = reorder(term, target), y = target, fill = target)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +  # Flip for better readability
+  theme_minimal() +
+  labs(title = "Correlation of Each Variable with Crime Rate (target)",
+       x = "Predictor Variable",
+       y = "Correlation with Crime Rate") +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) # Color gradient
+
+
+```
+
