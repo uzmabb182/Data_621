@@ -1699,9 +1699,6 @@ The plot featured above displays predicted wins versus actual values of target w
 
 The LASSO model's performance metrics provide insights into its accuracy. The Mean Absolute Error (MAE) of 10.03081 indicates that on average, the model's predictions are off by about 10 wins, which is reasonable given the real world context. The RMSE value of 12.94165 supports this as well, displaying that while the model performs relatively well on most predictions, it tends to be a bit further off when the errors are larger. This is expected due to RMSE penalizing larger errors heavier. The R-squared value of 0.2369009 shows that the model explains about 23.7% of the variance in TARGET_WINS, which is a decent amount. However, this also suggests that there is considerable unexplained variance, implying that the model does not capture all the factors that influence TARGET_WINS. Despite this, the model still offers useful predictive power, especially when combined with other techniques or additional data.
 
-#### Final Analysis
-
-The Lasso model was selected for its balance between predictive performance and simplicity. Lasso is particularly well-suited for this problem because it performs automatic feature selection through its regularization term, which helps prevent overfitting while identifying the most influential features. This is crucial when working with many predictors, some of which may not be directly relevant to TARGET_WINS. Although the model's R-squared value suggests that it does not capture all of the variation in the target variable, the moderate MAE and RMSE indicate that it provides a reliable baseline prediction. Moreover, the interpretability of Lasso makes it an ideal choice for understanding the relationship between predictors and the outcome. By selecting Lasso, we chose a model that offers good performance while being simple and interpretable, making it easier to refine or extend in future iterations. In conclusion, while the Lasso model could be improved with additional data or feature engineering, it is a reasonable, interpretable, and effective model for predicting TARGET_WINS based on the available predictors.
 
 ### Applying selcted model (Lasso) to the final evaluation data
 
@@ -1741,8 +1738,29 @@ predictedWinsEval <- round(predict(lasso_model, eval_df))
 eval_df$PREDICTED_WINS <- predictedWinsEval
 
 glimpse(eval_df)
+
+summary(eval_df$PREDICTED_WINS) 
+mean(eval_df$PREDICTED_WINS)    
+sd(eval_df$PREDICTED_WINS)  
+
+```
+
+```{r}
+plot(density(eval_df$PREDICTED_WINS), main = "Density of Predicted Wins", 
+     xlab = "Predicted Wins", col = "blue")  
 ```
 
 ```{r}
 write.csv(eval_df, "predictions.csv", row.names = F)
 ```
+
+#### Final Analysis 
+
+After applying the Lasso model onto the evaluation dataset, we were able to predict the wins. The minimum was 26 whereas the max was 112. The average value was 80 with a standard deviation of 10. Above is the density plot of the values.
+
+The Lasso model was selected for its balance between predictive performance and simplicity. Lasso is particularly well-suited for this problem because it performs automatic feature selection through its regularization term, which helps prevent overfitting while identifying the most influential features. This is crucial when working with many predictors, some of which may not be directly relevant to TARGET_WINS. Although the model's R-squared value suggests that it does not capture all of the variation in the target variable, the moderate MAE and RMSE indicate that it provides a reliable baseline prediction. Moreover, the interpretability of Lasso makes it an ideal choice for understanding the relationship between predictors and the outcome. By selecting Lasso, we chose a model that offers good performance while being simple and interpretable, making it easier to refine or extend in future iterations. 
+
+In conclusion, while the Lasso model could be improved with additional data or feature engineering, it is a reasonable, interpretable, and effective model for predicting TARGET_WINS based on the available predictors. 
+
+
+
