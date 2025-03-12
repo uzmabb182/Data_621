@@ -1,6 +1,6 @@
 ---
 title: "Assignment2"
-author: "MQ MC"
+author: "MQ MC Puja Roy"
 date: "2025-02-23"
 output: html_document
 ---
@@ -126,7 +126,10 @@ calcPrecision <- function(df, actual, predicted) {
 
 ### Sensitivity
 
-Sensitivity tells you how well the model is at identifying positive cases. 
+Sensitivity tells you how well the model is at identifying positive cases.  
+
+Sensitivity is true positives properly predicted as positive divided by true positive cases (class = 1). "Class" here is the real diagnosis (for example, having diabetes) and "scored.class" is the diagnosed case. Sensitivity being high implies that most of the real diabetic patients were appropriately identified, keeping false negatives in check. It is particularly vital in medicine where failing to detect may mean belated treatment.
+ 
 
 _Formula_
 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦 = 𝑇𝑃 / (𝑇𝑃 + 𝐹𝑁)
@@ -148,7 +151,9 @@ calcSensitivity <- function(df, actual, predicted) {
 
 ### Specificity
 
-Specificity measures how well the model is at identifying the negative cases.
+Specificity measures how well the model is at identifying the negative cases. 
+
+Specificity is the ratio of true negative cases (class = 0) that are actually predicted as negative. In that sense, it would be properly predicting those not diabetic. Having high specificity reduces false positives, and in screening for medical issues, avoiding unnecessary intervention or treatment is crucial.
 
 _Formula_
 𝑆𝑝𝑒𝑐𝑖𝑓𝑖𝑐𝑖𝑡𝑦 = 𝑇𝑁 / (𝑇𝑁 + 𝐹𝑃)
@@ -171,6 +176,8 @@ calcSpecificity <- function(df, actual, predicted) {
 ### F1 Score 
 
 F1 Score is high when both precision and recall are high. It is particularly useful when the class distribution is imbalanced (i.e., one class is much more frequent than the other), as it takes both false positives and false negatives into account.
+
+F1 score is a trade-off between precision and sensitivity, useful to evaluate general model performance for diabetes detection. Since our dataset can be imbalanced (i.e., fewer positive examples compared to negative examples), the F1 score compromised correct positive detection with minimal false alarms.
 
 _Formula_
 𝐹1 𝑆𝑐𝑜𝑟𝑒 = 2 × ( 𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 × 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦) / (𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 + 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦)
