@@ -467,4 +467,190 @@ ggplot(correlations_df, aes(x = reorder(term, target), y = target, fill = target
 
 
 ```
+Applying the Logistic Regression Model Based on Correlation and VIF Analysis
+Step 1: Interpretation of Correlation with Target
+From the correlation output, the strongest relationships with the target variable (high crime rate = 1, low crime rate = 0) are:
+
+Positive correlation (higher values → more crime)
+
+nox (0.7261) → Higher nitrogen oxide levels are associated with higher crime.
+indus (0.6048) → More industrial land is linked to higher crime.
+age (0.6301) → Older houses are associated with higher crime.
+rad (0.6281) → More access to highways correlates with higher crime.
+tax (0.6111) → Higher property tax correlates with higher crime.
+log_tax (0.6139) → The log-transformed tax rate also shows a strong correlation.
+
+Negative correlation (higher values → less crime)
+
+zn (-0.4317) → More residential zoning leads to lower crime.
+dis (-0.6187) → Greater distance from employment centers reduces crime.
+medv (-0.2706) & log_medv (-0.3586) → Higher median home values reduce crime.
+rm (-0.1526) → More rooms per dwelling has a weak negative effect on crime.
+Step 2: Selecting Variables Based on VIF and Correlation
+Since VIF < 5 for all variables, we do not need to remove any due to multicollinearity.
+We will choose the most relevant variables based on correlation strength and logical reasoning.
+
+Final Variable Selection for Logistic Regression
+Include positively correlated predictors (indicating higher crime):
+
+nox, indus, age, rad, tax (or log_tax, if needed)
+Include negatively correlated predictors (indicating lower crime):
+
+zn, dis, medv (or log_medv, if needed)
+
+```{r}
+model1 <- glm(target ~ nox + indus + age + rad + tax + dis + zn + medv, 
+             data = crime_training_df, 
+             family = binomial)
+
+summary(model1)
+
+```
+### Interpreting the Logistic Regression Model Output
+After applying the logistic regression model, we analyze the estimated coefficients, standard errors, z-values, and p-values to determine the significance and impact of each predictor on predicting high-crime neighborhoods (target = 1).
+
+Understanding Z-Score and P-Value in Logistic Regression
+In logistic regression, we evaluate the significance of each predictor variable using Z-scores and P-values.
+
+The Z-score (or "z value") measures how many standard deviations a coefficient is away from 0.
+
+A higher absolute value of Z indicates that the variable has a stronger effect on the target variable.
+If Z is close to 0, it suggests that the predictor has little impact.
+
+The P-value tells us whether the coefficient is statistically significant. 
+It answers:
+A small P-value (typically < 0.05) means the variable is statistically significant, meaning it likely has a real effect on crime rate.
+A high P-value (> 0.05) means the variable is likely not significant, suggesting no strong evidence that it affects crime risk.
+
+Interpretation:
+Variable	Estimate (Coefficient)	Std. Error	Z-Score	P-Value	
+
+Intercept	-28.19	4.54	-6.205	5.48e-10	
+The base log-odds of high crime in an area when all predictors are zero is very low.
+
+nox	40.71	6.99	5.826	5.69e-09	
+Strong positive effect: Higher pollution levels (nox) increase crime risk significantly.
+
+indus	-0.038	0.044	-0.853	0.393	
+Not significant: The proportion of non-retail business land has no meaningful effect on crime.
+
+age	0.027	0.010	2.641	0.008	
+Significant: Older buildings are associated with higher crime rates.
+
+rad	0.578	0.140	4.116	3.86e-05	
+Highly significant: Higher accessibility to highways increases crime risk.
+
+tax	-0.0057	0.0027	-2.095	0.036	
+Significant: Higher property taxes slightly decrease crime risk.
+
+dis	0.631	0.217	2.904	0.0037	
+Significant: Longer distances from employment centers increase crime risk.
+
+zn	-0.092	0.036	-2.552	0.0107	
+Significant: More residential zoning reduces crime risk.
+
+medv	0.065	0.031	2.085	0.037	
+Significant: Higher home values increase crime risk slightly.
+
+Interpretation:
+Non-Significant Predictor (p > 0.05)
+Variable	Estimate (Coefficient)	p-value	
+indus (-0.038)	p = 0.39	Not statistically significant. 
+The proportion of non-retail business land does not meaningfully impact crime prediction.
+
+AIC (Akaike Information Criterion)?
+AIC is a metric used to compare different models and choose the best one. It helps balance model fit and complexity.
+
+Lower AIC = Better Model
+
+A lower AIC means a better balance between accuracy and simplicity.
+If adding a variable reduces AIC, it improves the model.
+If adding a variable increases AIC, the model is overfitting.
+
+# Key Takeaways & Next Steps
+Remove Non-Significant Variable (indus)
+
+Since indus has p = 0.39 (not significant), remove it and re-run the model.
+Check Model Performance Again
+
+Lower AIC is better → removing an unnecessary variable might improve it.
+Check for Non-Linear Effects
+
+Some variables (like nox, age, medv) might have nonlinear effects. Try:
+Log Transformation: log(nox), log(medv)
+Polynomial Terms: age^2
+
+### Next Steps: Improving the Model
+
+### Step 1: Remove indus (Not Significant) and Re-run Model
+Since indus had a high p-value (0.39), it’s likely not contributing to predictions. 
+Let’s drop it and check if AIC improves.
+
+```{r}
+model2 <- glm(target ~ nox + age + rad + tax + dis + zn + medv, 
+              family = binomial, data = crime_training_df)
+
+summary(model2)  # Check new model summary
+AIC(model2)  # Compare AIC with previous model
+
+```
+AIC decreases, this model seems better
+
+### Step 2: Check for Nonlinear Effects
+
+Some variables like nox, medv, and age may have nonlinear relationships with crime rate.
+We can transform these variables using:
+
+Log transformation: log(nox), log(medv), log(age)
+Polynomial terms: age^2
+
+### Log Transformation:
+
+```{r}
+crime_training_df$log_nox <- log(crime_training_df$nox)
+crime_training_df$log_medv <- log(crime_training_df$medv)
+crime_training_df$log_age <- log(crime_training_df$age + 1)  # Avoid log(0)
+
+# Re-run model with transformed variables
+model3 <- glm(target ~ log_nox + log_age + rad + tax + dis + zn + log_medv, 
+              family = binomial, data = crime_training_df)
+
+summary(model3)  # Check new coefficients & p-values
+AIC(model3)  # Compare AIC
+
+```
+AIC worsens, we might need other techniques like interactions.
+
+### Step 3: Test Polynomial Features
+To check if the effect of age is curved (not linear), we can add age^2.
+
+Polynomial Term for age:
+
+```{r}
+crime_training_df$age_sq <- crime_training_df$age^2
+
+# Re-run model
+model4 <- glm(target ~ nox + age + age_sq + rad + tax + dis + zn + medv, 
+              family = binomial, data = crime_training_df)
+
+summary(model4)  # Check p-values and significance of age_sq
+AIC(model4)  # Compare AIC
+
+```
+### Model Performance
+AIC = 216.85
+This is lower than Model 3 (AIC = 231.03) and previous models, meaning Model 4 fits the data better.
+Residual Deviance = 198.85 (on 457 degrees of freedom)
+This is lower than Model 3 (215.03) → suggesting an improved fit.
+
+### Step 4: Compare All Models & Pick the Best One
+After running model2, model3, and model4, compare their AIC values:
+
+```{r}
+AIC(model1)  # Original model
+AIC(model2)  # Without indus
+AIC(model3)  # With log transformations
+AIC(model4)  # With polynomial term
+
+```
 
