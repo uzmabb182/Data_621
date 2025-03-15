@@ -121,352 +121,167 @@ zn, indus, tax, rad, lstat, and medv show skewness, so applying a log transforma
 age can be categorized into bins (e.g., young, middle-aged, old) since it ranges from 2.9 to 94.1.
 dis has a wide range, so normalization might be needed.
 
+### Checking Binary Logistic Regression Assumptions
 
-### Assumption Testing for Pearson Correlation on Crime Data
+Before interpreting results from a binary logistic regression, we must verify three key assumptions:
 
-### Step 1: Determine if Variables are Continuous
+Independence of Observations
+Linearity of the Logit
+No Multicollinearity
 
-To determine whether a variable is continuous, we check if it meets the criteria of interval or ratio-level measurement. 
+Now, let's discuss how to check these assumptions and which correlation method is best for your data (which contains both ordinal and continuous variables).
 
-Continuous variables have numerical values that can take any value within a range and have meaningful differences between values.
+Pearson Correlation, Spearman Rank Correlation, and Kendall’s Tau Rank Correlation are all methods used to measure the strength and direction of relationships between variables.
 
-```{r}
-length(unique(crime_training_df$medv))  # Count unique values
-length(unique(crime_training_df$lstat))
-length(unique(crime_training_df$tax))
-length(unique(crime_training_df$rad))
+However, they differ in terms of their assumptions, use cases, and how they quantify relationships.
 
-```
+Pearson Correlation: Suitable for continuous data when you want to measure linear associations.
+
+Spearman Rank Correlation: AAppropriate for both continuous and ordinal data. Particularly useful when the relationship is expected to be monotonic but not necessarily linear.
+
+Kendall’s Tau Rank Correlation: Suitable for both continuous and ordinal (ranked) data. Useful when the data may not follow a linear relationship.
+
+### Final Choice: Spearman's Rank Correlation
+Since your data has both ordinal and continuous variables, Spearman's correlation is the best choice because:
+
+It does not assume normality (unlike Pearson).
+It can handle ordinal variables (like chas, rad).
+It is more robust against outliers than Pearson.
+
+### Checking Independence Assumption Using Spearman's Correlation in Binary Logistic Regression
+
+#### What is the Independence Assumption?
+The independence assumption in binary logistic regression states that each observation (row) in the dataset should be independent of the others. This means:
+
+No duplicated data points (e.g., same neighborhood appearing multiple times).
+No clustered observations (e.g., observations grouped by region, time, or other factors).
+No strong correlations between residuals of observations, meaning observations do not systematically affect each other.
+
+### Why Use Spearman’s Correlation?
+Spearman's correlation measures monotonic relationships between variables, making it suitable when we have a mix of ordinal and continuous predictors.
+If there is high correlation between observations, it suggests possible dependence (e.g., neighborhoods with similar crime rates).
+
+### Compute Spearman's Correlation Between Observations
+We calculate the Spearman correlation matrix for all numeric variables (excluding target), which tells us if some variables are highly dependent (correlated).
+
 ```{r}
 # Load necessary library
+library(corrplot)
 library(dplyr)
 
-# Check data structure
+crime_training_df <- crime_training_df %>%
+  mutate(across(where(is.character), as.numeric))
+
+# Verify again
 str(crime_training_df)
 
-# Select only numeric variables (excluding binary categorical ones like 'chas' and 'target')
-continuous_vars <- crime_training_df %>% select(-chas, -target)
-
-# Display column names of selected continuous variables
-colnames(continuous_vars)
-
-```
-Interpretation:
-All selected variables are numeric, we proceed with further assumption testing.
-Some are categorical, we remove them before Pearson correlation.
-
-
-### Interpretation of the Distributions
-
-Highly Skewed Variables (Right-Skewed)
-zn, indus, rad, tax → Log transformation may help normalize these.
-
-Bimodal/Clustered Distributions
-dis, age, ptratio → Suggests distinct groups within the dataset.
-
-Normal-Looking Distributions
-rm, lstat, medv → These may not require transformation.
-
-All given variables are continuous except chas (binary).
-
-
-
-### Step 2: Check Normality for All Variables (Histograms, Q-Q Plots, Shapiro-Wilk Test)
-
-Since Pearson correlation requires normally distributed variables, we visualize their distributions.
-
-Pearson correlation assumes that the variables are normally distributed. We check this using histograms, Q-Q plots, and the Shapiro-Wilk test.
-
-### Variable Data Distribution Chart
-
-```{r}
-# Load necessary libraries
-library(ggplot2)
-library(gridExtra)  # For arranging multiple plots
-
-# Select only predictor variables (excluding 'target')
-predictors <- crime_training_df %>% select(-target)
-
-# Create histograms for each predictor variable
-plot_list <- lapply(names(predictors), function(var) {
-  ggplot(crime_training_df, aes_string(x = var)) +
-    geom_histogram(fill = "lightblue", color = "black", bins = 30) +
-    theme_minimal() +
-    ggtitle(var)
-})
-
-# Arrange plots in a grid layout
-grid.arrange(grobs = plot_list, ncol = 4)
-
-```
-### Boxplots for Outlier Detection
-
-```{r}
-crime_training_df %>% 
-  pivot_longer(cols = -target, names_to = "Variable", values_to = "Value") %>%
-  ggplot(aes(x = Variable, y = Value)) +
-  geom_boxplot(fill = "lightblue") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
-
-```
-
-```{r}
-# Perform Shapiro-Wilk test for normality on each variable
-shapiro_results <- sapply(continuous_vars, function(x) shapiro.test(x)$p.value)
-
-# Display results
-shapiro_results
-```
-Interpretation:
-
-Histogram:
-Bell-shaped curve → Normally distributed.
-Skewed (long tail) → Not normal (consider transformation).
-
-Shapiro-Wilk Test (p-value > 0.05):
-Variable is normally distributed.
-Variable is not normal (consider log() or sqrt() transformation).
-
-### Step 3: Check Linearity for All Variable Pairs (Scatter Plots)
-
-Pearson correlation assumes a linear relationship between two variables. We plot scatter plots with regression lines.
-```{r}
-# Create scatter plots for key variable pairs
-plot_list <- list(
-  ggplot(crime_training_df, aes(x=lstat, y=medv)) + geom_point() + geom_smooth(method="lm", col="red") + ggtitle("lstat vs medv"),
-  ggplot(crime_training_df, aes(x=tax, y=rad)) + geom_point() + geom_smooth(method="lm", col="red") + ggtitle("tax vs rad"),
-  ggplot(crime_training_df, aes(x=rm, y=medv)) + geom_point() + geom_smooth(method="lm", col="red") + ggtitle("rm vs medv"),
-  ggplot(crime_training_df, aes(x=indus, y=nox)) + geom_point() + geom_smooth(method="lm", col="red") + ggtitle("indus vs nox")
-)
-
-# Arrange scatter plots in a grid
-grid.arrange(grobs = plot_list, ncol = 2)
-
-```
-Interpretation:
-Points form a straight-line pattern, the assumption of linearity holds.
-Since the relationship is not curved, we will not use Spearman correlation testing.
-
-### Step 4: Check Homoscedasticity (Residual Plots)
-To ensure constant variance, we plot residuals vs. fitted values for key regression models.
-
-```{r}
-# Fit linear models
-model1 <- lm(medv ~ lstat, data=crime_training_df)
-model2 <- lm(tax ~ rad, data=crime_training_df)
-
-# Create residual plots
-par(mfrow = c(1, 2))  # Arrange plots in 1 row, 2 columns
-plot(model1$fitted.values, residuals(model1), main="Residual Plot (medv ~ lstat)")
-abline(h=0, col="red")
-
-plot(model2$fitted.values, residuals(model2), main="Residual Plot (tax ~ rad)")
-abline(h=0, col="red")
-
-```
-Interpretation:
-If residuals are evenly scattered, homoscedasticity holds.
-If residuals form a pattern (fanning out or clustering), consider transformation.
-
-Interpretation of Each Plot
-Left Plot: medv ~ lstat (Median Home Value vs. Lower Status Population)
-Observations:
-
-Residuals are spread unevenly: More variation at higher fitted values.
-Some funneling pattern at higher values → Potential heteroscedasticity.
-Top-right outliers → A few extreme values influence the model.
-
-Conclusion:
-
-Mild heteroscedasticity (variance is not constant).
-Potential fix: Apply log transformation (log(medv)) or check for influential points.
-Right Plot: tax ~ rad (Property Tax vs. Highway Accessibility)
-Observations:
-
-Clustered residuals at low fitted values.
-One extreme outlier (top-right) → Could be affecting the model.
-Residuals not randomly scattered → Signs of heteroscedasticity.
-
-Conclusion:
-
-Clear heteroscedasticity (variance is inconsistent).
-Potential fix: Try log transformation (log(tax)) or use robust regression.
-
-```{r}
-# Apply log transformation to medv and tax
-crime_training_df$log_medv <- log(crime_training_df$medv)
-crime_training_df$log_tax <- log(crime_training_df$tax)
-
-# Re-run regression models with log-transformed variables
-model1_log <- lm(log_medv ~ lstat, data = crime_training_df)
-model2_log <- lm(log_tax ~ rad, data = crime_training_df)
-
-# Plot new residuals
-par(mfrow = c(1, 2))  # Arrange in one row, two columns
-plot(model1_log$fitted.values, residuals(model1_log), main="Residual Plot (log_medv ~ lstat)")
-abline(h=0, col="red")
-
-plot(model2_log$fitted.values, residuals(model2_log), main="Residual Plot (log_tax ~ rad)")
-abline(h=0, col="red")
-
-```
-### Perform Breusch-Pagan Test for Homoscedasticity
-
-To confirm whether heteroscedasticity persists after transformation.
-
-```{r}
-library(lmtest)
-
-# Test for model1 (medv ~ lstat)
-bptest(model1_log)
-
-# Test for model2 (tax ~ rad)
-bptest(model2_log)
-
-```
-
-p < 0.05, variance is still an issue → we can proceed with robust regression.
-
-
-### Check for Influential Points (Outliers)
-We saw potential outliers in medv ~ lstat and tax ~ rad.
-Outliers can distort regression results.
-
-### Outlier Detection Using Cook’s Distance
-
-```{r}
-# Calculate Cook’s Distance for both models
-cooksd1 <- cooks.distance(model1_log)
-cooksd2 <- cooks.distance(model2_log)
-
-# Identify influential points
-influential1 <- which(cooksd1 > (4 / length(cooksd1)))
-influential2 <- which(cooksd2 > (4 / length(cooksd2)))
-
-# Print potential outliers
-print(influential1)
-print(influential2)
-
-# Plot Cook's Distance to visualize
-par(mfrow = c(1, 2))
-plot(cooksd1, type="h", main="Cook's Distance (log_medv ~ lstat)")
-abline(h = 4 / length(cooksd1), col = "red")
-
-plot(cooksd2, type="h", main="Cook's Distance (log_tax ~ rad)")
-abline(h = 4 / length(cooksd2), col = "red")
-
-```
-Left Plot: log_medv ~ lstat
-Observations:
-
-Most points have low Cook’s Distance, meaning they are not highly influential.
-A few peaks (outliers) exceed the red line, suggesting some observations have a strong influence on the model.
-
-Right Plot: log_tax ~ rad
-Observations:
-
-Almost all points are well below the red threshold, meaning no extreme influential points.
-A few taller spikes, but they are not exceeding the red line.
-
-### Compute Pearson Correlation (Final Step)
-
-If all assumptions hold, we compute Pearson correlation coefficients (r)
-
-### Correlation Heatmap b/w Variables
-
-```{r}
-# Load necessary libraries
-library(ggplot2)
-library(corrplot)
-
-# Compute correlation matrix (excluding categorical variables like 'chas' and 'target')
-crime_corr <- cor(crime_training_df %>% select(-chas, -target))
-
-# Generate heatmap with color legend
-corrplot(crime_corr, method="color", type="upper", 
-         tl.col="black", tl.srt=45, 
-         col=colorRampPalette(c("blue", "white", "red"))(200), # Color gradient from blue to red
-         addCoef.col = "black", # Show correlation values
-         number.cex = 0.7, # Adjust coefficient text size
-         mar = c(1,1,1,1), # Adjust margins
-         cl.lim = c(-1, 1) # Ensure legend covers -1 to 1
+###  Visualize Correlation Matrix
+
+# Compute Spearman correlation matrix
+numeric_data <- crime_training_df %>% select(where(is.numeric), -target)
+spearman_cor <- cor(numeric_data, method = "spearman", use = "pairwise.complete.obs")
+
+# Plot the Spearman correlation matrix with labels
+corrplot(spearman_cor, 
+         method = "color",         # Color-coded correlation plot
+         type = "upper",           # Show only upper triangle
+         tl.cex = 0.8,             # Adjust text size of axis labels
+         addCoef.col = "black",    # Add correlation values in black
+         number.cex = 0.7,         # Adjust correlation label size
+         col = colorRampPalette(c("blue", "white", "red"))(200) # Color gradient
 )
 
 
+
 ```
+### Checking for Violations of Independence Assumption
+Independence assumes that each observation is not influenced by another.
+If entire rows or columns have high correlations, this suggests potentially grouped observations that might violate the independence assumption.
+In the plot, we do not see entire rows or columns dominated by high correlations, which is a good sign that no groups are overly dependent.
 
 
-### Interpretation of the Variables Correlation:
+### Checking for Multicollinearity (High Correlation Between Predictors)
+A general rule of thumb is that if |𝜌| > 0.7, it indicates strong correlation between variables, which can lead to multicollinearity in the logistic regression model.
 
-Predictors with strong correlations may cause multicollinearity.
+From the matrix:
+indus & nox (𝜌 = 0.79) → Strong positive correlation, meaning they provide redundant information.
+tax & rad (𝜌 = 0.70) → These variables are highly correlated, indicating one may be removed.
+lstat & medv (𝜌 = -0.85) → Very strong negative correlation; keeping both might be problematic.
+log_medv & medv (𝜌 = 1.00) → Perfect correlation (since log transformation was applied), meaning one must be removed to prevent redundancy.
 
-Example: tax and rad (0.91) → If both are included in a regression model, they might distort predictions.
+Final Takeaways
+High correlation between predictors (|𝜌| > 0.7) indicates potential multicollinearity. Consider removing indus, rad, or medv to improve model stability.
+No evidence of entire rows/columns being highly correlated, suggesting no major independence violations.
+Use VIF for confirmation and decide on variable selection accordingly.
 
-Including both in the model confuses the algorithm → The model struggles to decide whether crime is caused by:
-Highway accessibility (rad)
-Property tax rate (tax)
 
-Results in inflated standard errors → Making coefficient estimates unreliable.
+### Checking Multicollinearity Using Variance Inflation Factor (VIF) in R
+Variance Inflation Factor (VIF) helps quantify multicollinearity by measuring how much the variance of regression coefficients is inflated due to correlation among predictors. 
+A VIF > 5 (or more conservatively, VIF > 10) suggests severe multicollinearity.
 
-Solution: Use only one of them or apply VIF (Variance Inflation Factor) analysis
-
-medv and lstat are highly correlated (-0.74).
-If medv predicts crime, lstat might not add much extra value.
-We should check which one performs better in logistic regression.
-
-Non-linearity in medv (home value).
-medv is not linearly related to crime (from previous scatter plots).
-Solution: Use a quadratic term (medv^2) to better capture trends.
+### Check VIF (Variance Inflation Factor)
+VIF helps confirm whether these high correlations affect regression coefficients.
 
 ```{r}
 library(car)
-vif(glm(target ~ tax + rad + lstat + medv + indus + nox + dis + age, data = crime_training_df, family = binomial))
+vif(glm(target ~ nox + age + rad + tax + dis + zn + medv, family = binomial, data = crime_training_df))
 
 ```
+Conclusion
+ There is NO severe multicollinearity (all VIF values are below 5).
+ No immediate need to drop variables based on VIF.
+ The variable dis (VIF = 3.58) shows moderate correlation with other predictors, but it's not problematic.
+ 
+ Next Steps:
 
-### Interpretation:
+Keep all predictors in the model.
+If we suspect redundancy, check pairwise correlations again or test removing dis to see if model performance improves.
 
-All VIF values are below 5, meaning there is no serious multicollinearity issue in the model.
+### Checking the Assumption of Linearity of the Logit for Binary Logistic Regression
 
-### Features Highly Related to Crime:
-
-The results below will show which features are most related to crime.
-
-```{r}
-cor(crime_training_df$target, crime_training_df %>% select(-chas, -target)) 
-
-```
-### Visualizing Correlation with Crime Rate
+In logistic regression, we assume that each continuous predictor has a linear relationship with the log-odds (logit) of the target variable. 
+If this assumption is violated, the model may be misleading or inaccurate.
 
 ```{r}
 # Load necessary libraries
 library(ggplot2)
 library(dplyr)
-library(corrr) # For correlation calculations
+library(tidyr)
 
-# Compute correlation of numeric predictors with `target`
-correlations <- crime_training_df %>% 
-  select(-chas) %>%  # Exclude categorical variable 'chas'
-  mutate(target = as.numeric(target)) %>% # Ensure target is numeric
-  correlate() %>% 
-  focus(target) %>%  # Focus only on correlations with `target`
-  arrange(desc(target)) # Sort in descending order
+# Fit the logistic regression model
+model <- glm(target ~ nox + age + rad + tax + dis + zn + medv, 
+             family = binomial, data = crime_training_df)
 
-# Convert to dataframe for plotting
-correlations_df <- as.data.frame(correlations)
+# Compute predicted probabilities
+crime_training_df$predicted_prob <- predict(model, type = "response")
 
-# Plot correlation values as a bar chart
-ggplot(correlations_df, aes(x = reorder(term, target), y = target, fill = target)) +
-  geom_bar(stat = "identity") +
-  coord_flip() +  # Flip for better readability
+# Compute logit (log-odds) transformation
+crime_training_df$logit <- log(crime_training_df$predicted_prob / 
+                              (1 - crime_training_df$predicted_prob))
+
+# Reshape data for faceting
+plot_data <- crime_training_df %>%
+  select(logit, nox, age, rad, tax, dis, zn, medv) %>%
+  pivot_longer(cols = -logit, names_to = "Predictor", values_to = "Value")
+
+# Create faceted scatter plot
+ggplot(plot_data, aes(x = Value, y = logit)) +
+  geom_point(alpha = 0.5, color = "blue") + 
+  geom_smooth(method = "loess", color = "red", se = FALSE) + 
+  facet_wrap(~ Predictor, scales = "free") +
   theme_minimal() +
-  labs(title = "Correlation of Each Variable with Crime Rate (target)",
+  labs(title = "Linearity of Logit Check for Binary Logistic Regression",
        x = "Predictor Variable",
-       y = "Correlation with Crime Rate") +
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) # Color gradient
-
+       y = "Logit of Predicted Probability")
 
 ```
+### Interpretation of the Linearity of Logit Check for Binary Logistic Regression
+This faceted scatter plot assesses the assumption of linearity of the logit for binary logistic regression. 
+The blue dots represent the relationship between each predictor variable and the logit of the predicted probability, while the red LOESS (Locally Estimated Scatterplot Smoothing) curve helps visualize patterns.
+
+### Overall Conclusion
+Several predictors (e.g., dis, medv, tax, zn) violate the linearity of logit assumption.
+
 ### Data Preparation
 
 This step involves cleaning and transforming data to improve model performance.
@@ -499,7 +314,7 @@ crime_training_df$age_group <- cut(crime_training_df$age, breaks=c(0, 30, 60, 10
 
 ### Building Models
 
-Three logistic regression models using different variable selections or transformations.
+Applying three logistic regression models using different variable selections or transformations.
 
 Approach:
 Model 1 (Baseline Model): Use all predictors.
@@ -523,6 +338,43 @@ model3 <- glm(target ~ log_medv + lstat + nox + ptratio + age_group, data=crime_
 #summary(model1)
 summary(model2)
 #summary(model3)
+
+```
+
+### Model Evaluation:
+Evaluate model performance and select the best model based on multiple criteria.
+
+Evaluation Metrics:
+Accuracy: (TP + TN) / (TP + TN + FP + FN)
+Precision: TP / (TP + FP)
+Recall (Sensitivity): TP / (TP + FN)
+Specificity: TN / (TN + FP)
+F1 Score: 2 * (Precision * Recall) / (Precision + Recall)
+AUC-ROC Curve: Evaluate model discrimination.
+
+
+```{r}
+# Load necessary library
+library(caret)
+library(pROC)
+
+# Predict on training data
+pred_probs <- predict(model2, type="response")
+pred_classes <- ifelse(pred_probs > 0.5, 1, 0)
+
+# Confusion Matrix
+conf_matrix <- table(Predicted=pred_classes, Actual=crime_training_df$target)
+print(conf_matrix)
+
+# Compute accuracy, precision, recall, F1-score
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+precision <- conf_matrix[2,2] / sum(conf_matrix[,2])
+recall <- conf_matrix[2,2] / sum(conf_matrix[2,])
+f1_score <- 2 * (precision * recall) / (precision + recall)
+f1_score
+
+# Print performance metrics
+cat("Accuracy:", accuracy, "\nPrecision:", precision, "\nRecall:", recall, "\nF1 Score:", f1_score)
 
 ```
 
