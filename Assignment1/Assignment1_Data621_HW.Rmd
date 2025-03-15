@@ -60,7 +60,8 @@ Before fitting a multiple linear regression (MLR) model, we analyze the dataset 
 The summary statistics below give us the mean, median, interquartile range, standard deviation and number of missing variables for the charts. 
 
 ```{r}
-skim(train_df)
+skim(train_df) # won't knit into pdf
+#summary(train_df)
 ```
 
 Here's what we can infer from the summary statistics:
@@ -1552,7 +1553,6 @@ print(evaluation_metrics)
 library(patchwork)
 performance_df <- compare_performance(base_model, high_impact_model, pj_model1, pj_model2, pj_model4, pj_model5, pj_model6, log_model1, log_model2, back_select_model, stp_logx_model, lasso_model,  rank = TRUE)
 
-print(performance_df)
 
 # Loop to print the plots in batches of 4
 for (i in seq(1, length(evalution_plots), by = 4)) {
@@ -1565,39 +1565,51 @@ for (i in seq(1, length(evalution_plots), by = 4)) {
 }
 
 ```
+
+We selected the Lasso model for its balance of predictive performance and simplicity. It automatically performs feature selection through its regularization term, helping us prevent overfitting while identifying the most relevant features for predicting TARGET_WINS. Although the model's R-squared indicates that it doesn't capture all of the variation in the target, its moderate MAE and RMSE provide a reliable baseline. Additionally, Lasso's interpretability allows us to better understand the relationship between predictors and the outcome. By choosing Lasso, we opted for a model that offers good performance, simplicity, and interpretability, making it easier to refine or extend in future iterations.
+
+Below we note our lasso perfomance metrics:
+
 ```{r}
-colnames(performance_df)
-model_metrics <- data.frame(
-  model_name = character(0), 
-  MAE = numeric(0),     
-  RMSE = numeric(0),    
-  RSquared = numeric(0),
-  AIC = numeric(0),
-  BIC = numeric(0)       
-)
-colnames(model_metrics)
+lasso_metrics <- evaluation_metrics %>%
+  filter(model_name == "Lasso") %>%
+  distinct(model_name, .keep_all = TRUE)
 
-common_cols <- intersect(colnames(performance_df), colnames(model_metrics))
+print(lasso_metrics)
 
-performance_df <- performance_df[, common_cols, drop = FALSE]
-model_metrics <- model_metrics[, common_cols, drop = FALSE]
-
-full_model_comparison <- rbind(performance_df, model_metrics)
-print(full_model_comparison)
-
-extra_models <- data.frame(
-  model_name = c("Elastic Net", "Random Forest"),
-  RSquared = c(elastic_net_r2, random_forest_r2), 
-  RMSE = c(elastic_net_rmse, random_forest_rmse) 
-)
-
-final_model_comparison <- rbind(performance_df, model_metrics)
-
-final_model_comparison <- final_model_comparison[order(final_model_comparison$RMSE), ]
-
-print(final_model_comparison)
 
 ```
+
+
+### Applying Prediction to Our Evalution
+
+With our models tested and evaluated, we can now apply our model to our final evaluation dataframe.
+
+#### Preparing the Evalulation Dataset  
+
+First we apply the same imputations and transformation our test dataframe that we applied to our training dataframe.
+
+```{r}
+numeric_cols <- sapply(stp25_test_df, is.numeric)
+
+# Impute missing values for numeric columns only
+stp25_test_df[numeric_cols][is.na(stp25_test_df[numeric_cols])] <- 
+  lapply(stp25_test_df[numeric_cols], function(x) mean(x, na.rm = TRUE))
+
+```
+
+We use the selected model to predict wins on our test dataframe. 
+
+
+```{r test-predictions}
+
+# Apply the Lasso model to the final evaluation dataframe
+predictedWins <- predict(lasso_model, stp25_test_df)
+stp25_test_df$PREDICTED_WINS <- predictedWins
+```
+
+
+We also back transform our predicted wins for ease of comparison.
 
 ```{r}
 # Backward transform (inverse Box-Cox) for Box-Cox transformed model
@@ -1616,56 +1628,13 @@ stp25_test_df$PREDICTED_WINS_INV <- predictedWins_inv
 # Evaluate the back-transformed predictions
 eval_predictions(base_model, stp25_test_df$PREDICTED_WINS_INV, stp25_test_df$TARGET_WINS, "Base Model (Back-Transformed)")
 
-
-```
-
-#### Preparing the Evalulation Dataset  
-
-TODO: imputation/transformations should match whatever we end up deciding
-QUES FOR THE GROUP: Is this the best place for data prep for the eval dataframe? also which are the correct prep steps? do we need to impute the prep set? 
-
-```{r}
-numeric_cols <- sapply(stp25_test_df, is.numeric)
-
-# Impute missing values for numeric columns only
-stp25_test_df[numeric_cols][is.na(stp25_test_df[numeric_cols])] <- 
-  lapply(stp25_test_df[numeric_cols], function(x) mean(x, na.rm = TRUE))
-
-# Ensure any transformations match the ones used during training 
-stp25_test_df$log_TEAM_BATTING_H <- log(stp25_test_df$TEAM_BATTING_H + 1) 
-
 ```
 
 
 
 
-### Applying Prediction to Our Evalution
+Below is a plot of our Predicted vs Actual wins.
 
-With our models tested and evaluated, we can now apply our model to our final evaluation dataframe.
-
-```{r test-predictions}
-
-# Apply the Lasso model to the final evaluation dataframe
-predictedWins <- predict(lasso_model, stp25_test_df)
-stp25_test_df$PREDICTED_WINS <- predictedWins
-```
-
-
-```{r}
-lasso_metrics <- evaluation_metrics %>%
-  filter(model_name == "Lasso") %>%
-  distinct(model_name, .keep_all = TRUE)
-
-print(lasso_metrics)
-
-cat("Lasso Model Metrics:\n")
-cat("MAE: ", lasso_metrics$MAE, "\n")
-cat("RMSE: ", lasso_metrics$RMSE, "\n")
-cat("R-squared: ", lasso_metrics$RSquared, "\n")
-cat("AIC: ", lasso_metrics$AIC, "\n")
-cat("BIC: ", lasso_metrics$BIC, "\n")
-
-```
 ```{r}
 # Predicted vs Actual plot for the Lasso Model
 ggplot(stp25_test_df, aes(x = TARGET_WINS, y = PREDICTED_WINS)) +
@@ -1678,13 +1647,9 @@ ggplot(stp25_test_df, aes(x = TARGET_WINS, y = PREDICTED_WINS)) +
 
 ```
 
-```{r}
-# Interpretation
-cat("\nInterpretation:\n")
-cat("The Lasso model achieved an MAE of", lasso_metrics$MAE, 
-    "which suggests the model has a low average error in predicting TARGET_WINS. The RMSE value of", 
-    lasso_metrics$RMSE, "supports this conclusion. The R-squared value of", lasso_metrics$RSquared, 
-    "indicates that the Lasso model explains a substantial portion of the variance in the TARGET_WINS.\n")
+
+The Lasso model achieved an MAE of `r lasso_metrics$MAE` which suggests the model has a low average error in predicting TARGET_WINS. The RMSE value of `r 
+lasso_metrics$RMSE` supports this conclusion. The R-squared value of `r lasso_metrics$RSquared` indicates that the Lasso model explains a substantial portion of the variance in the TARGET_WINS.
 
 ```
 
@@ -1699,6 +1664,9 @@ The plot featured above displays predicted wins versus actual values of target w
 
 The LASSO model's performance metrics provide insights into its accuracy. The Mean Absolute Error (MAE) of 10.03081 indicates that on average, the model's predictions are off by about 10 wins, which is reasonable given the real world context. The RMSE value of 12.94165 supports this as well, displaying that while the model performs relatively well on most predictions, it tends to be a bit further off when the errors are larger. This is expected due to RMSE penalizing larger errors heavier. The R-squared value of 0.2369009 shows that the model explains about 23.7% of the variance in TARGET_WINS, which is a decent amount. However, this also suggests that there is considerable unexplained variance, implying that the model does not capture all the factors that influence TARGET_WINS. Despite this, the model still offers useful predictive power, especially when combined with other techniques or additional data.
 
+#### Final Analysis
+
+The Lasso model was selected for its balance between predictive performance and simplicity. Lasso is particularly well-suited for this problem because it performs automatic feature selection through its regularization term, which helps prevent overfitting while identifying the most influential features. This is crucial when working with many predictors, some of which may not be directly relevant to TARGET_WINS. Although the model's R-squared value suggests that it does not capture all of the variation in the target variable, the moderate MAE and RMSE indicate that it provides a reliable baseline prediction. Moreover, the interpretability of Lasso makes it an ideal choice for understanding the relationship between predictors and the outcome. By selecting Lasso, we chose a model that offers good performance while being simple and interpretable, making it easier to refine or extend in future iterations. In conclusion, while the Lasso model could be improved with additional data or feature engineering, it is a reasonable, interpretable, and effective model for predicting TARGET_WINS based on the available predictors.
 
 ### Applying selcted model (Lasso) to the final evaluation data
 
@@ -1738,29 +1706,8 @@ predictedWinsEval <- round(predict(lasso_model, eval_df))
 eval_df$PREDICTED_WINS <- predictedWinsEval
 
 glimpse(eval_df)
-
-summary(eval_df$PREDICTED_WINS) 
-mean(eval_df$PREDICTED_WINS)    
-sd(eval_df$PREDICTED_WINS)  
-
-```
-
-```{r}
-plot(density(eval_df$PREDICTED_WINS), main = "Density of Predicted Wins", 
-     xlab = "Predicted Wins", col = "blue")  
 ```
 
 ```{r}
 write.csv(eval_df, "predictions.csv", row.names = F)
 ```
-
-#### Final Analysis 
-
-After applying the Lasso model onto the evaluation dataset, we were able to predict the wins. The minimum was 26 whereas the max was 112. The average value was 80 with a standard deviation of 10. Above is the density plot of the values.
-
-The Lasso model was selected for its balance between predictive performance and simplicity. Lasso is particularly well-suited for this problem because it performs automatic feature selection through its regularization term, which helps prevent overfitting while identifying the most influential features. This is crucial when working with many predictors, some of which may not be directly relevant to TARGET_WINS. Although the model's R-squared value suggests that it does not capture all of the variation in the target variable, the moderate MAE and RMSE indicate that it provides a reliable baseline prediction. Moreover, the interpretability of Lasso makes it an ideal choice for understanding the relationship between predictors and the outcome. By selecting Lasso, we chose a model that offers good performance while being simple and interpretable, making it easier to refine or extend in future iterations. 
-
-In conclusion, while the Lasso model could be improved with additional data or feature engineering, it is a reasonable, interpretable, and effective model for predicting TARGET_WINS based on the available predictors. 
-
-
-
