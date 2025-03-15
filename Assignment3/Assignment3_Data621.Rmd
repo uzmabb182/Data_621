@@ -58,6 +58,8 @@ head(crime_evaluation_df)
 
 
 ```
+
+
 ### Exploratory Data Analysis
 
 ```{r}
@@ -82,7 +84,7 @@ Third Quartile (p75): The 75th percentile, where 75% of the values are below thi
 Key Observations:
 
 Crime Rate Target (target)
-It’s a binary variable with a mean of 0.4914, meaning that about 49.14% of neighborhoods have a crime rate above the median.
+
 The median (p50) is 0, indicating that more than half of the data points fall in the low-crime category (target = 0).
 
 Median Home Value (medv)
@@ -119,6 +121,64 @@ zn, indus, tax, rad, lstat, and medv show skewness, so applying a log transforma
 age can be categorized into bins (e.g., young, middle-aged, old) since it ranges from 2.9 to 94.1.
 dis has a wide range, so normalization might be needed.
 
+
+### Assumption Testing for Pearson Correlation on Crime Data
+
+### Step 1: Determine if Variables are Continuous
+
+To determine whether a variable is continuous, we check if it meets the criteria of interval or ratio-level measurement. 
+
+Continuous variables have numerical values that can take any value within a range and have meaningful differences between values.
+
+```{r}
+length(unique(crime_training_df$medv))  # Count unique values
+length(unique(crime_training_df$lstat))
+length(unique(crime_training_df$tax))
+length(unique(crime_training_df$rad))
+
+```
+```{r}
+# Load necessary library
+library(dplyr)
+
+# Check data structure
+str(crime_training_df)
+
+# Select only numeric variables (excluding binary categorical ones like 'chas' and 'target')
+continuous_vars <- crime_training_df %>% select(-chas, -target)
+
+# Display column names of selected continuous variables
+colnames(continuous_vars)
+
+```
+Interpretation:
+All selected variables are numeric, we proceed with further assumption testing.
+Some are categorical, we remove them before Pearson correlation.
+
+
+
+
+### Interpretation of the Distributions
+
+Highly Skewed Variables (Right-Skewed)
+zn, indus, rad, tax → Log transformation may help normalize these.
+
+Bimodal/Clustered Distributions
+dis, age, ptratio → Suggests distinct groups within the dataset.
+
+Normal-Looking Distributions
+rm, lstat, medv → These may not require transformation.
+
+All given variables are continuous except chas (binary).
+
+
+
+### Step 2: Check Normality for All Variables (Histograms, Q-Q Plots, Shapiro-Wilk Test)
+
+Since Pearson correlation requires normally distributed variables, we visualize their distributions.
+
+Pearson correlation assumes that the variables are normally distributed. We check this using histograms, Q-Q plots, and the Shapiro-Wilk test.
+
 ### Variable Data Distribution Chart
 
 ```{r}
@@ -141,16 +201,178 @@ plot_list <- lapply(names(predictors), function(var) {
 grid.arrange(grobs = plot_list, ncol = 4)
 
 ```
-### Interpretation of the Distributions
+### Boxplots for Outlier Detection
 
-Highly Skewed Variables (Right-Skewed)
-zn, indus, rad, tax → Log transformation may help normalize these.
+```{r}
+crime_training_df %>% 
+  pivot_longer(cols = -target, names_to = "Variable", values_to = "Value") %>%
+  ggplot(aes(x = Variable, y = Value)) +
+  geom_boxplot(fill = "lightblue") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-Bimodal/Clustered Distributions
-dis, age, ptratio → Suggests distinct groups within the dataset.
+```
 
-Normal-Looking Distributions
-rm, lstat, medv → These may not require transformation.
+```{r}
+# Perform Shapiro-Wilk test for normality on each variable
+shapiro_results <- sapply(continuous_vars, function(x) shapiro.test(x)$p.value)
+
+# Display results
+shapiro_results
+```
+Interpretation:
+
+Histogram:
+Bell-shaped curve → Normally distributed.
+Skewed (long tail) → Not normal (consider transformation).
+
+Shapiro-Wilk Test (p-value > 0.05):
+Variable is normally distributed.
+Variable is not normal (consider log() or sqrt() transformation).
+
+### Step 3: Check Linearity for All Variable Pairs (Scatter Plots)
+
+Pearson correlation assumes a linear relationship between two variables. We plot scatter plots with regression lines.
+```{r}
+# Create scatter plots for key variable pairs
+plot_list <- list(
+  ggplot(crime_training_df, aes(x=lstat, y=medv)) + geom_point() + geom_smooth(method="lm", col="red") + ggtitle("lstat vs medv"),
+  ggplot(crime_training_df, aes(x=tax, y=rad)) + geom_point() + geom_smooth(method="lm", col="red") + ggtitle("tax vs rad"),
+  ggplot(crime_training_df, aes(x=rm, y=medv)) + geom_point() + geom_smooth(method="lm", col="red") + ggtitle("rm vs medv"),
+  ggplot(crime_training_df, aes(x=indus, y=nox)) + geom_point() + geom_smooth(method="lm", col="red") + ggtitle("indus vs nox")
+)
+
+# Arrange scatter plots in a grid
+grid.arrange(grobs = plot_list, ncol = 2)
+
+```
+Interpretation:
+Points form a straight-line pattern, the assumption of linearity holds.
+Since the relationship is not curved, we will not use Spearman correlation testing.
+
+### Step 4: Check Homoscedasticity (Residual Plots)
+To ensure constant variance, we plot residuals vs. fitted values for key regression models.
+
+```{r}
+# Fit linear models
+model1 <- lm(medv ~ lstat, data=crime_training_df)
+model2 <- lm(tax ~ rad, data=crime_training_df)
+
+# Create residual plots
+par(mfrow = c(1, 2))  # Arrange plots in 1 row, 2 columns
+plot(model1$fitted.values, residuals(model1), main="Residual Plot (medv ~ lstat)")
+abline(h=0, col="red")
+
+plot(model2$fitted.values, residuals(model2), main="Residual Plot (tax ~ rad)")
+abline(h=0, col="red")
+
+```
+Interpretation:
+If residuals are evenly scattered, homoscedasticity holds.
+If residuals form a pattern (fanning out or clustering), consider transformation.
+
+Interpretation of Each Plot
+Left Plot: medv ~ lstat (Median Home Value vs. Lower Status Population)
+Observations:
+
+Residuals are spread unevenly: More variation at higher fitted values.
+Some funneling pattern at higher values → Potential heteroscedasticity.
+Top-right outliers → A few extreme values influence the model.
+
+Conclusion:
+
+Mild heteroscedasticity (variance is not constant).
+Potential fix: Apply log transformation (log(medv)) or check for influential points.
+Right Plot: tax ~ rad (Property Tax vs. Highway Accessibility)
+Observations:
+
+Clustered residuals at low fitted values.
+One extreme outlier (top-right) → Could be affecting the model.
+Residuals not randomly scattered → Signs of heteroscedasticity.
+
+Conclusion:
+
+Clear heteroscedasticity (variance is inconsistent).
+Potential fix: Try log transformation (log(tax)) or use robust regression.
+
+```{r}
+# Apply log transformation to medv and tax
+crime_training_df$log_medv <- log(crime_training_df$medv)
+crime_training_df$log_tax <- log(crime_training_df$tax)
+
+# Re-run regression models with log-transformed variables
+model1_log <- lm(log_medv ~ lstat, data = crime_training_df)
+model2_log <- lm(log_tax ~ rad, data = crime_training_df)
+
+# Plot new residuals
+par(mfrow = c(1, 2))  # Arrange in one row, two columns
+plot(model1_log$fitted.values, residuals(model1_log), main="Residual Plot (log_medv ~ lstat)")
+abline(h=0, col="red")
+
+plot(model2_log$fitted.values, residuals(model2_log), main="Residual Plot (log_tax ~ rad)")
+abline(h=0, col="red")
+
+```
+### Perform Breusch-Pagan Test for Homoscedasticity
+
+To confirm whether heteroscedasticity persists after transformation.
+
+```{r}
+library(lmtest)
+
+# Test for model1 (medv ~ lstat)
+bptest(model1_log)
+
+# Test for model2 (tax ~ rad)
+bptest(model2_log)
+
+```
+
+p < 0.05, variance is still an issue → we can proceed with robust regression.
+
+
+### Check for Influential Points (Outliers)
+We saw potential outliers in medv ~ lstat and tax ~ rad.
+Outliers can distort regression results.
+
+### Outlier Detection Using Cook’s Distance
+
+```{r}
+# Calculate Cook’s Distance for both models
+cooksd1 <- cooks.distance(model1_log)
+cooksd2 <- cooks.distance(model2_log)
+
+# Identify influential points
+influential1 <- which(cooksd1 > (4 / length(cooksd1)))
+influential2 <- which(cooksd2 > (4 / length(cooksd2)))
+
+# Print potential outliers
+print(influential1)
+print(influential2)
+
+# Plot Cook's Distance to visualize
+par(mfrow = c(1, 2))
+plot(cooksd1, type="h", main="Cook's Distance (log_medv ~ lstat)")
+abline(h = 4 / length(cooksd1), col = "red")
+
+plot(cooksd2, type="h", main="Cook's Distance (log_tax ~ rad)")
+abline(h = 4 / length(cooksd2), col = "red")
+
+```
+Left Plot: log_medv ~ lstat
+Observations:
+
+Most points have low Cook’s Distance, meaning they are not highly influential.
+A few peaks (outliers) exceed the red line, suggesting some observations have a strong influence on the model.
+
+Right Plot: log_tax ~ rad
+Observations:
+
+Almost all points are well below the red threshold, meaning no extreme influential points.
+A few taller spikes, but they are not exceeding the red line.
+
+### Compute Pearson Correlation (Final Step)
+
+If all assumptions hold, we compute Pearson correlation coefficients (r)
 
 ### Correlation Heatmap b/w Variables
 
@@ -174,13 +396,8 @@ corrplot(crime_corr, method="color", type="upper",
 
 
 ```
-### Investigating the Relationship of lstat and medv with target
 
-```{r}
-ggplot(crime_training_df, aes(x=lstat, y=target)) + geom_point() + geom_smooth()
-ggplot(crime_training_df, aes(x=medv, y=target)) + geom_point() + geom_smooth()
 
-```
 ### Interpretation of the Variables Correlation:
 
 Predictors with strong correlations may cause multicollinearity.
@@ -202,6 +419,7 @@ We should check which one performs better in logistic regression.
 Non-linearity in medv (home value).
 medv is not linearly related to crime (from previous scatter plots).
 Solution: Use a quadratic term (medv^2) to better capture trends.
+
 
 ###  logistic regression model including both tax and rad
 
