@@ -156,8 +156,6 @@ All selected variables are numeric, we proceed with further assumption testing.
 Some are categorical, we remove them before Pearson correlation.
 
 
-
-
 ### Interpretation of the Distributions
 
 Highly Skewed Variables (Right-Skewed)
@@ -429,9 +427,6 @@ vif(glm(target ~ tax + rad + lstat + medv + indus + nox + dis + age, data = crim
 ### Interpretation:
 
 All VIF values are below 5, meaning there is no serious multicollinearity issue in the model.
-Both lstat and medv have very small p-values (< 0.001), meaning they are both statistically significant predictors of crime.
-lstat has a lower p-value (3.86e-08) than medv (0.00012), meaning lstat has a stronger relationship with crime compared to medv.
-Both should be kept in the model unless multicollinearity causes problems.
 
 ### Features Highly Related to Crime:
 
