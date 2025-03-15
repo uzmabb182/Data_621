@@ -420,18 +420,12 @@ Non-linearity in medv (home value).
 medv is not linearly related to crime (from previous scatter plots).
 Solution: Use a quadratic term (medv^2) to better capture trends.
 
-
-###  logistic regression model including both tax and rad
-
-Let's say we run a logistic regression model including both tax and rad:
 ```{r}
-model <- glm(target ~ tax + rad + lstat + medv, data=crime_training_df, family=binomial)
-summary(model)
+library(car)
+vif(glm(target ~ tax + rad + lstat + medv + indus + nox + dis + age, data = crime_training_df, family = binomial))
 
 ```
-```{r}
-vif(model)
-```
+
 ### Interpretation:
 
 All VIF values are below 5, meaning there is no serious multicollinearity issue in the model.
