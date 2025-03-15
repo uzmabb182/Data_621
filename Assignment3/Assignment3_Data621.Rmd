@@ -298,19 +298,61 @@ Standardization: Normalize numerical variables to bring them to the same scale.
 
 ```{r}
 # Handle missing values (if any)
+#crime_training_df$medv[is.na(crime_training_df$medv)] <- median(crime_training_df$medv, na.rm = TRUE)
+
+# Fill missing values with median
 crime_training_df$medv[is.na(crime_training_df$medv)] <- median(crime_training_df$medv, na.rm = TRUE)
+crime_training_df$lstat[is.na(crime_training_df$lstat)] <- median(crime_training_df$lstat, na.rm = TRUE)
+crime_training_df$dis[is.na(crime_training_df$dis)] <- median(crime_training_df$dis, na.rm = TRUE)
 
 # Log transformation
-crime_training_df$log_medv <- log(crime_training_df$medv + 1)
+#crime_training_df$log_medv <- log(crime_training_df$medv + 1)
+
+crime_training_df <- crime_training_df %>%
+  mutate(
+    log_medv = log(medv + 1),  # Avoid log(0)
+    log_lstat = log(lstat + 1),
+    log_dis = log(dis + 1)
+  )
+
 
 # Standardization
-crime_training_df$zn <- scale(crime_training_df$zn)
-crime_training_df$indus <- scale(crime_training_df$indus)
+#crime_training_df$zn <- scale(crime_training_df$zn)
+#crime_training_df$indus <- scale(crime_training_df$indus)
+
+#Standardization (Normalize Continuous Variables)
+#Standardization ensures that variables are on the same scale, improving model stability.
+crime_training_df <- crime_training_df %>%
+  mutate(
+    zn_scaled = scale(zn),
+    indus_scaled = scale(indus),
+    nox_scaled = scale(nox),
+    rm_scaled = scale(rm),
+    age_scaled = scale(age),
+    dis_scaled = scale(dis),
+    rad_scaled = scale(rad),
+    tax_scaled = scale(tax),
+    ptratio_scaled = scale(ptratio)
+  )
+
 
 # Create categorical age groups bins
 crime_training_df$age_group <- cut(crime_training_df$age, breaks=c(0, 30, 60, 100), labels=c("Young", "Middle-aged", "Old"))
 
 ```
+
+
+```{r}
+# Create Interaction Terms
+crime_training_df <- crime_training_df %>%
+  mutate(
+    lstat_medv_interact = log_lstat * log_medv,  # Income & housing price interaction
+    tax_rad_interact = tax * rad                # Tax burden & highway accessibility
+  )
+
+
+```
+
 
 ### Building Models
 
@@ -340,6 +382,7 @@ summary(model2)
 #summary(model3)
 
 ```
+
 
 ### Model Evaluation:
 Evaluate model performance and select the best model based on multiple criteria.
