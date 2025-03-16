@@ -627,7 +627,7 @@ print(paste("AUC Score:", auc_value))
 # Compute Precision-Recall Data
 pr_curve <- pr.curve(scores.class0 = classification_df$predicted_prob, weights.class0 = as.numeric(classification_df$class), curve = TRUE)
 
-# Plot Precision-Recall Curve
+# Plot Precision-Recall Curve 
 plot(pr_curve, col = "red", main = "Precision-Recall Curve")
 
 ```
