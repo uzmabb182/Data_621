@@ -400,15 +400,15 @@ crime_training_df <- crime_training_df %>%
 #Standardization ensures that variables are on the same scale, improving model stability.
 crime_training_df <- crime_training_df %>%
   mutate(
-    zn_scaled = scale(zn),
-    indus_scaled = scale(indus),
-    nox_scaled = scale(nox),
-    rm_scaled = scale(rm),
-    age_scaled = scale(age),
-    dis_scaled = scale(dis),
-    rad_scaled = scale(rad),
-    tax_scaled = scale(tax),
-    ptratio_scaled = scale(ptratio)
+    zn_scaled = as.numeric(scale(zn)),
+    indus_scaled = as.numeric(scale(indus)),
+    nox_scaled = as.numeric(scale(nox)),
+    rm_scaled = as.numeric(scale(rm)),
+    age_scaled = as.numeric(scale(age)),
+    dis_scaled = as.numeric(scale(dis)),
+    rad_scaled = as.numeric(scale(rad)),
+    tax_scaled = as.numeric(scale(tax)),
+    ptratio_scaled = as.numeric(scale(ptratio))
   )
 
 
@@ -443,8 +443,16 @@ Model 3 (Transformed Variables): Use transformed and interaction variables.
 # Load library
 library(MASS)
 
+model1 <- glm(target ~ zn + indus + chas + nox + rm + age + dis + rad + tax + ptratio + lstat + medv +
+                        log_medv + log_lstat + log_dis +
+                        zn_scaled + indus_scaled + nox_scaled + rm_scaled + age_scaled + dis_scaled +
+                        rad_scaled + tax_scaled + ptratio_scaled +
+                        lstat_medv_interact + tax_rad_interact + age_group,
+              data = crime_training_df, family = binomial)
+
+
 # Logistic Regression Model 1 (Baseline)
-model1 <- glm(target ~ ., data=crime_training_df, family=binomial)
+#model1 <- glm(target ~ ., data=crime_training_df, family=binomial)
 
 # Logistic Regression Model 2 (Stepwise Selection)
 model2 <- stepAIC(glm(target ~ ., data=crime_training_df, family=binomial), direction="both")
@@ -647,7 +655,6 @@ Once the best model is selected, we use it for prediction on crime_evaluation_df
 ```{r}
 
 # Handle missing values (if any)
-#crime_training_df$medv[is.na(crime_training_df$medv)] <- median(crime_training_df$medv, na.rm = TRUE)
 
 # Fill missing values with median
 crime_evaluation_df$medv[is.na(crime_evaluation_df$medv)] <- median(crime_evaluation_df$medv, na.rm = TRUE)
@@ -661,17 +668,16 @@ crime_evaluation_df <- crime_evaluation_df %>%
     log_lstat = log(lstat + 1),
     log_dis = log(dis + 1),
     
-    # Standardization (same as training)
-    zn_scaled = scale(zn),
-    indus_scaled = scale(indus),
-    nox_scaled = scale(nox),
-    rm_scaled = scale(rm),
-    age_scaled = scale(age),
-    dis_scaled = scale(dis),
-    rad_scaled = scale(rad),
-    tax_scaled = scale(tax),
-    ptratio_scaled = scale(ptratio),
-
+     # Standardization (must match training data)
+    zn_scaled = (zn - mean(crime_training_df$zn)) / sd(crime_training_df$zn),
+    indus_scaled = (indus - mean(crime_training_df$indus)) / sd(crime_training_df$indus),
+    nox_scaled = (nox - mean(crime_training_df$nox)) / sd(crime_training_df$nox),
+    rm_scaled = (rm - mean(crime_training_df$rm)) / sd(crime_training_df$rm),
+    age_scaled = (age - mean(crime_training_df$age)) / sd(crime_training_df$age),
+    dis_scaled = (dis - mean(crime_training_df$dis)) / sd(crime_training_df$dis),
+    rad_scaled = (rad - mean(crime_training_df$rad)) / sd(crime_training_df$rad),
+    tax_scaled = (tax - mean(crime_training_df$tax)) / sd(crime_training_df$tax),
+    ptratio_scaled = (ptratio - mean(crime_training_df$ptratio)) / sd(crime_training_df$ptratio),
 
     # Interaction terms (same as training)
     lstat_medv_interact = log_lstat * log_medv,
@@ -682,6 +688,9 @@ crime_evaluation_df <- crime_evaluation_df %>%
 crime_evaluation_df$age_group <- cut(crime_evaluation_df$age, breaks=c(0, 30, 60, 100), labels=c("Young", "Middle-aged", "Old"))
 
 ```
+
+
+
 
 
 ```{r}
@@ -697,7 +706,7 @@ colnames(crime_evaluation_df)
 ```{r}
 
 # Predict probabilities using model1
-eval_pred_prob <- predict(model2, newdata = crime_evaluation_df, type = "response")
+eval_pred_prob <- predict(model1, newdata = crime_evaluation_df, type = "response")
 
 # Convert probabilities to binary class (0 or 1) using a threshold of 0.5
 eval_pred_class <- ifelse(eval_pred_prob > 0.5, 1, 0)
