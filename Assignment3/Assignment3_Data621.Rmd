@@ -7,9 +7,8 @@ output: html_document
 
 ### Load Libraries
 
-```{r global_options, include=FALSE}
+```{r, warning = FALSE, message = FALSE}
 # Load required packages
-#install.packages("htmltools", dependencies = TRUE)
 library(htmltools)
 library(caret)
 library(pROC)
@@ -20,15 +19,13 @@ library(corrplot)
 library(skimr)
 require(DataExplorer)
 require(miscTools)
-#require(MASS)
+require(MASS)
 require(performance)
 require(lmtest)
 require(mice)
 require(glmnet)
 require(Metrics) 
 ```
-
-### Loading Datasets
 
 ### Variables in the Dataset:
 • zn: proportion of residential land zoned for large lots (over 25000 square feet) (predictor variable)  
@@ -164,6 +161,89 @@ If there is high correlation between observations, it suggests possible dependen
 ### Compute Spearman's Correlation Between Observations
 We calculate the Spearman correlation matrix for all numeric variables (excluding target), which tells us if some variables are highly dependent (correlated).
 
+### 1. Independence (Visual Inspection)
+
+```{r, warning = FALSE, message = FALSE}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+# Exclude categorical columns before pivoting
+crime_long <- crime_training_df %>%
+  dplyr::select(where(is.numeric)) %>%  # Keep only numeric columns
+  pivot_longer(cols = -target, names_to = "Variable", values_to = "Value")
+
+# Create scatter plots for each predictor vs target with a fitted line
+ggplot(crime_long, aes(x = Value, y = target)) +
+  geom_point(alpha = 0.5, color = "blue") +  # Scatter plot
+  geom_smooth(method = "lm", color = "red", se = FALSE) +  # Linear fit
+  facet_wrap(~Variable, scales = "free") +  # Multiple plots for each variable
+  theme_minimal() +
+  labs(title = "Independence Check: Scatter Plots of Predictors vs Target",
+       x = "Predictor Value",
+       y = "Crime Rate (Binary Target)")
+
+
+
+```
+
+
+```{r}
+# Load necessary library
+library(dplyr)
+
+# Initialize an empty data frame to store results
+independence_results <- data.frame(Variable = character(),
+                                   Correlation = numeric(),
+                                   P_Value = numeric(),
+                                   stringsAsFactors = FALSE)
+
+# Loop through each predictor variable (excluding the target)
+for (var in colnames(crime_training_df)[colnames(crime_training_df) != "target"]) {
+  
+  # Ensure the variable is numeric before computing Spearman correlation
+  if (is.numeric(crime_training_df[[var]])) {
+    
+    # Perform Spearman correlation test
+    test_result <- cor.test(crime_training_df[[var]], crime_training_df$target, method = "spearman")
+    
+    # Store results in a data frame
+    independence_results <- rbind(independence_results, 
+                                  data.frame(Variable = var, 
+                                             Correlation = test_result$estimate, 
+                                             P_Value = test_result$p.value))
+  }
+}
+
+# View results in tabular format
+print(independence_results)
+
+```
+### Checking for Independence:
+In Spearman’s method, we check the correlation between:
+
+Each independent variable and the dependent variable (target)
+If correlation is too low (|𝜌| < 0.1) and p-value > 0.05, the variable might not be useful in predicting the target.
+
+Variables to Consider Removing:
+
+chas (ρ = 0.0800, p = 0.0843) → No meaningful correlation with crime.
+Possibly rm (ρ = -0.1772, p = 0.00012) → Weak correlation but could check its importance in the model.
+
+Variables to Keep (for now, but monitor multicollinearity):
+
+nox (ρ = 0.7547)
+age (ρ = 0.6457)
+dis (ρ = -0.6591)
+indus (ρ = 0.6192)
+rad, tax, ptratio (moderate correlation)
+Transform / Create Interaction Terms:
+
+Log transform: dis (since it has a strong negative correlation)
+Categorize: age into "Young", "Middle-aged", "Old"
+Interaction term: tax * rad (both impact crime)
+
+
 ```{r}
 # Load necessary library
 library(corrplot)
@@ -172,13 +252,16 @@ library(dplyr)
 crime_training_df <- crime_training_df %>%
   mutate(across(where(is.character), as.numeric))
 
+crime_evaluation_df <- crime_evaluation_df %>%
+  mutate(across(where(is.character), as.numeric))
+
 # Verify again
 str(crime_training_df)
 
 ###  Visualize Correlation Matrix
 
 # Compute Spearman correlation matrix
-numeric_data <- crime_training_df %>% select(where(is.numeric), -target)
+numeric_data <- crime_training_df %>% dplyr::select(where(is.numeric), -target)
 spearman_cor <- cor(numeric_data, method = "spearman", use = "pairwise.complete.obs")
 
 # Plot the Spearman correlation matrix with labels
@@ -194,12 +277,6 @@ corrplot(spearman_cor,
 
 
 ```
-### Checking for Violations of Independence Assumption
-Independence assumes that each observation is not influenced by another.
-If entire rows or columns have high correlations, this suggests potentially grouped observations that might violate the independence assumption.
-In the plot, we do not see entire rows or columns dominated by high correlations, which is a good sign that no groups are overly dependent.
-
-
 ### Checking for Multicollinearity (High Correlation Between Predictors)
 A general rule of thumb is that if |𝜌| > 0.7, it indicates strong correlation between variables, which can lead to multicollinearity in the logistic regression model.
 
@@ -220,7 +297,8 @@ Variance Inflation Factor (VIF) helps quantify multicollinearity by measuring ho
 A VIF > 5 (or more conservatively, VIF > 10) suggests severe multicollinearity.
 
 ### Check VIF (Variance Inflation Factor)
-VIF helps confirm whether these high correlations affect regression coefficients.
+Variance Inflation Factor (VIF) – Measures how much variance in regression coefficients is inflated due to multicollinearity
+ANd helps confirm whether these high correlations affect regression coefficients.
 
 ```{r}
 library(car)
@@ -242,7 +320,7 @@ If we suspect redundancy, check pairwise correlations again or test removing dis
 In logistic regression, we assume that each continuous predictor has a linear relationship with the log-odds (logit) of the target variable. 
 If this assumption is violated, the model may be misleading or inaccurate.
 
-```{r}
+```{r, warning = FALSE, message = FALSE}
 # Load necessary libraries
 library(ggplot2)
 library(dplyr)
@@ -261,7 +339,7 @@ crime_training_df$logit <- log(crime_training_df$predicted_prob /
 
 # Reshape data for faceting
 plot_data <- crime_training_df %>%
-  select(logit, nox, age, rad, tax, dis, zn, medv) %>%
+  dplyr::select(logit, nox, age, rad, tax, dis, zn, medv) %>%
   pivot_longer(cols = -logit, names_to = "Predictor", values_to = "Value")
 
 # Create faceted scatter plot
@@ -277,7 +355,8 @@ ggplot(plot_data, aes(x = Value, y = logit)) +
 ```
 ### Interpretation of the Linearity of Logit Check for Binary Logistic Regression
 This faceted scatter plot assesses the assumption of linearity of the logit for binary logistic regression. 
-The blue dots represent the relationship between each predictor variable and the logit of the predicted probability, while the red LOESS (Locally Estimated Scatterplot Smoothing) curve helps visualize patterns.
+The blue dots represent the relationship between each predictor variable and the logit of the predicted probability, 
+while the red LOESS (Locally Estimated Scatterplot Smoothing) curve helps visualize patterns.
 
 ### Overall Conclusion
 Several predictors (e.g., dis, medv, tax, zn) violate the linearity of logit assumption.
@@ -350,7 +429,7 @@ crime_training_df <- crime_training_df %>%
     tax_rad_interact = tax * rad                # Tax burden & highway accessibility
   )
 
-
+colnames(crime_training_df)
 ```
 
 
@@ -363,7 +442,7 @@ Model 1 (Baseline Model): Use all predictors.
 Model 2 (Stepwise Selection): Use stepAIC() to select important variables.
 Model 3 (Transformed Variables): Use transformed and interaction variables.
 
-```{r}
+```{r, warning = FALSE, message = FALSE}
 # Load library
 library(MASS)
 
@@ -373,12 +452,16 @@ model1 <- glm(target ~ ., data=crime_training_df, family=binomial)
 # Logistic Regression Model 2 (Stepwise Selection)
 model2 <- stepAIC(glm(target ~ ., data=crime_training_df, family=binomial), direction="both")
 
-# Logistic Regression Model 3 (With transformations)
+# Logistic Regression Model 3 (With Transformations & Interactions)
 model3 <- glm(target ~ log_medv + lstat + nox + ptratio + age_group, data=crime_training_df, family=binomial)
+
+
+#summary(model3)
+#AIC(model3)  # Compare AIC
 
 # Summary of models
 #summary(model1)
-summary(model2)
+summary(model1)
 #summary(model3)
 
 ```
@@ -402,7 +485,7 @@ library(caret)
 library(pROC)
 
 # Predict on training data
-pred_probs <- predict(model2, type="response")
+pred_probs <- predict(model1, type="response")
 pred_classes <- ifelse(pred_probs > 0.5, 1, 0)
 
 # Confusion Matrix
@@ -420,11 +503,220 @@ f1_score
 cat("Accuracy:", accuracy, "\nPrecision:", precision, "\nRecall:", recall, "\nF1 Score:", f1_score)
 
 ```
+# Predict Probabilities for Training Data
+
+```{r}
+pred_prob_model1 <- predict(model1, type = "response")
+pred_prob_model2 <- predict(model2, type = "response")
+pred_prob_model3 <- predict(model3, type = "response")
+
+# Convert probabilities into binary classifications (Threshold = 0.5)
+pred_class_model1 <- ifelse(pred_prob_model1 > 0.5, 1, 0)
+pred_class_model2 <- ifelse(pred_prob_model2 > 0.5, 1, 0)
+pred_class_model3 <- ifelse(pred_prob_model3 > 0.5, 1, 0)
+
+```
+
+### Compute Confusion Matrices
+
+```{r}
+conf_matrix_model1 <- table(Predicted = pred_class_model1, Actual = crime_training_df$target)
+conf_matrix_model2 <- table(Predicted = pred_class_model2, Actual = crime_training_df$target)
+conf_matrix_model3 <- table(Predicted = pred_class_model3, Actual = crime_training_df$target)
+
+print(conf_matrix_model1)
+print(conf_matrix_model2)
+print(conf_matrix_model3)
+
+```
+### Evaluate Performance Metrics
+
+```{r}
+# Define a function to compute accuracy, precision, recall, and F1-score
+evaluate_model <- function(conf_matrix) {
+  accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+  precision <- conf_matrix[2,2] / sum(conf_matrix[,2])
+  recall <- conf_matrix[2,2] / sum(conf_matrix[2,])
+  f1_score <- 2 * ((precision * recall) / (precision + recall))
+  
+  return(list(Accuracy = accuracy, Precision = precision, Recall = recall, F1_Score = f1_score))
+}
+
+eval_model1 <- evaluate_model(conf_matrix_model1)
+eval_model2 <- evaluate_model(conf_matrix_model2)
+eval_model3 <- evaluate_model(conf_matrix_model3)
+
+print(eval_model1)
+print(eval_model2)
+print(eval_model3)
+
+```
+
+### Compute ROC & AUC for Models
+
+```{r}
+roc_model1 <- roc(crime_training_df$target, pred_prob_model1)
+roc_model2 <- roc(crime_training_df$target, pred_prob_model2)
+roc_model3 <- roc(crime_training_df$target, pred_prob_model3)
+roc_model1
+roc_model2
+roc_model3
+
+```
+```{r}
+# Plot ROC curves for comparison
+plot(roc_model1, col="red", main="ROC Curves for Logistic Models")
+plot(roc_model2, col="blue", add=TRUE)
+plot(roc_model3, col="green", add=TRUE)
+legend("bottomright", legend=c("Model 1", "Model 2", "Model 3"), col=c("red", "blue", "green"), lwd=2)
+
+
+```
+Model	Accuracy	Precision	Recall	F1 Score	AUC
+Model 1	0.938	  0.934	    0.939	  0.937	    0.9782
+Model 2	0.927	  0.917	    0.933	  0.925	    0.9776
+Model 3	0.852	  0.830	    0.864	  0.846	    0.9472
+
+Best Choice: Model 1
+Model 1 is the best choice because:
+
+Highest Accuracy (0.938) → It makes the fewest classification errors.
+Highest F1 Score (0.937) → It balances precision and recall effectively.
+Highest AUC (0.9782) → It has the best ability to distinguish between classes
+
+Model 1 is the most reliable, most precise, and best at distinguishing high-crime neighborhoods. 
+Model 2 performs well but has slightly lower Accuracy (0.927) and AUC (0.9776).
+Model 3 performs significantly worse, with much lower Accuracy (0.852) and AUC (0.9472).
+
+What Does "Fewest Classification Errors" Mean?
+A classification error happens when the model predicts the wrong category:
+
+False Negative (FN) → Model predicts 0 (low crime), but actual crime rate is high (1).
+False Positive (FP) → Model predicts 1 (high crime), but actual crime rate is low (0).
+Higher accuracy means fewer FPs & FNs → More correct predictions.
+
+Accuracy measures overall correctness of the classification model.
+It represents the proportion of correct predictions (both positive and negative) out of all predictions.
+
+Accuracy= (TP+TN)/(TP+FP+TN+FN)
+
+### Why Is This Important in Crime Prediction?
+ False Negatives Are Dangerous (Crime exists but is predicted as "safe")
+ Consequence: A high-crime area is misclassified as low-crime → Authorities don’t take necessary action.
+
+ Police resources may not be allocated where crime is actually high.
+ Residents feel falsely safe but face real crime threats.
+ Crime could increase due to lack of intervention.
+ False Positives Cause Unnecessary Fear & Resource Waste (Safe area misclassified as high-crime)
+ Consequence: A low-crime area is misclassified as high-crime → Unnecessary actions are taken.
+
+ Increased policing in safe areas, wasting law enforcement resources.
+ Real estate values may drop due to incorrect classification.
+ Residents may feel unsafe, even though crime is low.
+ 
+ Bottom Line: Highest accuracy (0.938) = Best model for crime prevention
+ 
+### What Does the Highest F1 Score (0.937) Mean?
+F1 Score of 0.937 means that model balances Precision and Recall very well.
+ F1 = 2 x (Precision x Sensitivity)/(Precision + Sensitivity)
+
+Precision ("When the model says high crime, is it actually high crime?")
+High Precision = Few False Positives (FP) → Model doesn’t falsely label safe areas as high crime.
+
+Recall ("Did the model find all the high-crime areas?")
+High Recall = Few False Negatives (FN) → Model doesn’t miss actual high-crime areas.
+
+A high F1 Score (0.937) means:
+Few False Positives (Safe areas aren’t wrongly classified as high crime)
+Few False Negatives (Actual high-crime areas are correctly identified)
+The model is well-balanced and reliable.
+
+### What Does the Highest AUC (0.9782) Mean?
+ROC (Receiver Operating Characteristic) curve is a graph that shows how well a model can separate two classes (e.g., high-crime vs. low-crime areas).
+AUC (Area Under the Curve) measures how well your model separates two classes of high-crime (1) vs. low-crime (0) areas.
+
+A high AUC (0.9782) means:
+
+Model correctly distinguishes between crime-prone and safe areas most of the time.
+It rarely confuses high-crime neighborhoods with low-crime ones.
+It performs better than random guessing (which has an AUC of 0.5).
+In simple terms: AUC = 0.9782, meaning model is very effective at separating high-crime and low-crime areas! 
+
+### Apply the Best Model to Evaluation Data
+
+Once the best model is selected, we use it for prediction on crime_evaluation_df.
+
+
+```{r}
+
+# Handle missing values (if any)
+#crime_training_df$medv[is.na(crime_training_df$medv)] <- median(crime_training_df$medv, na.rm = TRUE)
+
+# Fill missing values with median
+crime_evaluation_df$medv[is.na(crime_evaluation_df$medv)] <- median(crime_evaluation_df$medv, na.rm = TRUE)
+crime_evaluation_df$lstat[is.na(crime_evaluation_df$lstat)] <- median(crime_evaluation_df$lstat, na.rm = TRUE)
+crime_evaluation_df$dis[is.na(crime_evaluation_df$dis)] <- median(crime_evaluation_df$dis, na.rm = TRUE)
+
+# Ensure necessary transformations in evaluation data
+crime_evaluation_df <- crime_evaluation_df %>%
+  mutate(
+    log_medv = log(medv + 1),  # Avoid log(0)
+    log_lstat = log(lstat + 1),
+    log_dis = log(dis + 1),
+    
+    # Standardization (same as training)
+    zn_scaled = scale(zn),
+    indus_scaled = scale(indus),
+    nox_scaled = scale(nox),
+    rm_scaled = scale(rm),
+    age_scaled = scale(age),
+    dis_scaled = scale(dis),
+    rad_scaled = scale(rad),
+    tax_scaled = scale(tax),
+    ptratio_scaled = scale(ptratio),
+
+
+    # Interaction terms (same as training)
+    lstat_medv_interact = log_lstat * log_medv,
+    tax_rad_interact = tax * rad
+  )
+
+    # Create categorical age groups bins
+crime_evaluation_df$age_group <- cut(crime_evaluation_df$age, breaks=c(0, 30, 60, 100), labels=c("Young", "Middle-aged", "Old"))
+
+```
+
+
+```{r}
+
+
+colnames(crime_evaluation_df) 
+
+#colnames(crime_training_df)
+```
 
 
 
+```{r}
+
+# Predict probabilities using model1
+eval_pred_prob <- predict(model2, newdata = crime_evaluation_df, type = "response")
+
+# Convert probabilities to binary class (0 or 1) using a threshold of 0.5
+eval_pred_class <- ifelse(eval_pred_prob > 0.5, 1, 0)
+
+# Add predictions to the evaluation data
+crime_evaluation_df$predicted_prob <- eval_pred_prob
+crime_evaluation_df$predicted_class <- eval_pred_class
 
 
+file_path <- "C:/Users/Uzma/Downloads/crime_evaluation_df.csv"
+
+# Write dataframe to CSV
+write.csv(crime_evaluation_df, file = file_path, row.names = FALSE)
+crime_evaluation_df
+
+```
 
 
 
