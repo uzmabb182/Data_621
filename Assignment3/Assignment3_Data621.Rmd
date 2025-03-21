@@ -377,7 +377,7 @@ Standardization: Normalize numerical variables to bring them to the same scale.
 
 ```{r}
 # Handle missing values (if any)
-#crime_training_df$medv[is.na(crime_training_df$medv)] <- median(crime_training_df$medv, na.rm = TRUE)
+
 
 # Fill missing values with median
 crime_training_df$medv[is.na(crime_training_df$medv)] <- median(crime_training_df$medv, na.rm = TRUE)
@@ -385,7 +385,7 @@ crime_training_df$lstat[is.na(crime_training_df$lstat)] <- median(crime_training
 crime_training_df$dis[is.na(crime_training_df$dis)] <- median(crime_training_df$dis, na.rm = TRUE)
 
 # Log transformation
-#crime_training_df$log_medv <- log(crime_training_df$medv + 1)
+
 
 crime_training_df <- crime_training_df %>%
   mutate(
@@ -395,9 +395,6 @@ crime_training_df <- crime_training_df %>%
   )
 
 
-# Standardization
-#crime_training_df$zn <- scale(crime_training_df$zn)
-#crime_training_df$indus <- scale(crime_training_df$indus)
 
 #Standardization (Normalize Continuous Variables)
 #Standardization ensures that variables are on the same scale, improving model stability.
