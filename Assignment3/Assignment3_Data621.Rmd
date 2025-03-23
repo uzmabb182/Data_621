@@ -428,8 +428,6 @@ crime_training_df <- crime_training_df %>%
 
 colnames(crime_training_df)
 ```
-
-
 ### Building Models
 
 Applying three logistic regression models using different variable selections or transformations.
@@ -443,6 +441,7 @@ Model 3 (Transformed Variables): Use transformed and interaction variables.
 # Load library
 library(MASS)
 
+# Logistic Regression Model 1 (Baseline)
 model1 <- glm(target ~ zn + indus + chas + nox + rm + age + dis + rad + tax + ptratio + lstat + medv +
                         log_medv + log_lstat + log_dis +
                         zn_scaled + indus_scaled + nox_scaled + rm_scaled + age_scaled + dis_scaled +
@@ -450,29 +449,37 @@ model1 <- glm(target ~ zn + indus + chas + nox + rm + age + dis + rad + tax + pt
                         lstat_medv_interact + tax_rad_interact + age_group,
               data = crime_training_df, family = binomial)
 
+# Summary of models
+summary(model1)
 
-# Logistic Regression Model 1 (Baseline)
-#model1 <- glm(target ~ ., data=crime_training_df, family=binomial)
+AIC(model1)  # Compare AIC
+```
+
+
+```{r}
 
 # Logistic Regression Model 2 (Stepwise Selection)
 model2 <- stepAIC(glm(target ~ ., data=crime_training_df, family=binomial), direction="both")
 
-# Logistic Regression Model 3 (With Transformations & Interactions)
-model3 <- glm(target ~ log_medv + lstat + nox + ptratio + age_group, data=crime_training_df, family=binomial)
+summary(model2)
 
-
-#summary(model3)
-#AIC(model3)  # Compare AIC
-
-# Summary of models
-#summary(model1)
-summary(model1)
-#summary(model3)
+AIC(model2)  # Compare AIC
 
 ```
 
+```{r}
 
+# Logistic Regression Model 3 (With Transformations & Interactions)
+model3 <- glm(target ~ log_medv + lstat + nox + ptratio + age_group, data=crime_training_df, family=binomial)
+
+summary(model3)
+
+AIC(model3)  # Compare AIC
+
+
+```
 ### Model Evaluation:
+
 Evaluate model performance and select the best model based on multiple criteria.
 
 Evaluation Metrics:
@@ -578,16 +585,16 @@ legend("bottomright", legend=c("Model 1", "Model 2", "Model 3"), col=c("red", "b
 
 ```
 Model	Accuracy	Precision	Recall	F1 Score	AUC
-Model 1	0.938	  0.934	    0.939	  0.937	    0.9782
+Model 1	0.933   0.925	    0.938	  0.931	    0.9787
 Model 2	0.927	  0.917	    0.933	  0.925	    0.9776
 Model 3	0.852	  0.830	    0.864	  0.846	    0.9472
 
 Best Choice: Model 1
 Model 1 is the best choice because:
 
-Highest Accuracy (0.938) → It makes the fewest classification errors.
-Highest F1 Score (0.937) → It balances precision and recall effectively.
-Highest AUC (0.9782) → It has the best ability to distinguish between classes
+Highest Accuracy (0.933) → It makes the fewest classification errors.
+Highest F1 Score (0.931) → It balances precision and recall effectively.
+Highest AUC (0.9787) → It has the best ability to distinguish between classes
 
 Model 1 is the most reliable, most precise, and best at distinguishing high-crime neighborhoods. 
 Model 2 performs well but has slightly lower Accuracy (0.927) and AUC (0.9776).
@@ -606,6 +613,7 @@ It represents the proportion of correct predictions (both positive and negative)
 Accuracy= (TP+TN)/(TP+FP+TN+FN)
 
 ### Why Is This Important in Crime Prediction?
+
  False Negatives Are Dangerous (Crime exists but is predicted as "safe")
  Consequence: A high-crime area is misclassified as low-crime → Authorities don’t take necessary action.
 
@@ -622,7 +630,8 @@ Accuracy= (TP+TN)/(TP+FP+TN+FN)
  Bottom Line: Highest accuracy (0.938) = Best model for crime prevention
  
 ### What Does the Highest F1 Score (0.937) Mean?
-F1 Score of 0.937 means that model balances Precision and Recall very well.
+
+F1 Score of 0.931 means that model balances Precision and Recall very well.
  F1 = 2 x (Precision x Sensitivity)/(Precision + Sensitivity)
 
 Precision ("When the model says high crime, is it actually high crime?")
@@ -637,6 +646,7 @@ Few False Negatives (Actual high-crime areas are correctly identified)
 The model is well-balanced and reliable.
 
 ### What Does the Highest AUC (0.9782) Mean?
+
 ROC (Receiver Operating Characteristic) curve is a graph that shows how well a model can separate two classes (e.g., high-crime vs. low-crime areas).
 AUC (Area Under the Curve) measures how well your model separates two classes of high-crime (1) vs. low-crime (0) areas.
 
@@ -690,9 +700,6 @@ crime_evaluation_df$age_group <- cut(crime_evaluation_df$age, breaks=c(0, 30, 60
 ```
 
 
-
-
-
 ```{r}
 
 
@@ -700,8 +707,6 @@ colnames(crime_evaluation_df)
 
 #colnames(crime_training_df)
 ```
-
-
 
 ```{r}
 
@@ -723,6 +728,87 @@ write.csv(crime_evaluation_df, file = file_path, row.names = FALSE)
 crime_evaluation_df
 
 ```
+
+### Compare AIC and BIC
+
+```{r}
+cat("Model 1 AIC:", AIC(model1), " | BIC:", BIC(model1), "\n")
+cat("Model 2 AIC:", AIC(model2), " | BIC:", BIC(model2), "\n")
+cat("Model 3 AIC:", AIC(model3), " | BIC:", BIC(model3), "\n")
+
+```
+### Compute McFadden’s R² (using pscl package)
+
+```{r}
+# Install if needed: install.packages("pscl")
+library(pscl)
+
+cat("Model 1 McFadden's R²:", pR2(model1)["McFadden"], "\n")
+cat("Model 2 McFadden's R²:", pR2(model2)["McFadden"], "\n")
+cat("Model 3 McFadden's R²:", pR2(model3)["McFadden"], "\n")
+
+```
+```{r}
+# Correct way to extract AUC values
+auc_model1 <- roc_model1$auc
+auc_model2 <- roc_model2$auc
+auc_model3 <- roc_model3$auc
+
+model_metrics <- tibble(
+  Model = c("Model 1", "Model 2", "Model 3"),
+  AIC = c(AIC(model1), AIC(model2), AIC(model3)),
+  BIC = c(BIC(model1), BIC(model2), BIC(model3)),
+  McFadden_R2 = c(pR2(model1)["McFadden"], 
+                  pR2(model2)["McFadden"], 
+                  pR2(model3)["McFadden"]),
+  Accuracy = c(eval_model1$Accuracy, eval_model2$Accuracy, eval_model3$Accuracy),
+  F1_Score = c(eval_model1$F1_Score, eval_model2$F1_Score, eval_model3$F1_Score),
+  AUC = c(auc_model1, auc_model2, auc_model3)
+)
+
+print(model_metrics)
+
+
+```
+
+### Key Metrics
+
+AIC (Akaike Information Criterion) -> Model fit with penalty for complexity -> Lower is better
+
+BIC (Bayesian Information Criterion) -> Like AIC but penalizes complexity more heavily -> Lower is better
+
+McFadden's R² (a type of pseudo-R² for logistic regression) -> Pseudo R²: measures improvement over null model -> Higher is better
+
+Accuracy -> Overall correctness (TP+TN)/(Total) -> Higher is better
+
+F1 Score -> Balance of Precision and Recall -> Higher is better
+
+AUC (Area Under the ROC Curve) -> Classifier’s ability to distinguish classes (ROC) -> Closer to 1 is better
+
+### Interpretation of Results
+
+### Model 1
+Best in predictive performance across the board: precision, recall, F1, AUC.
+Slightly higher AIC/BIC → a bit more complex (more variables/features).
+Most accurate and reliable in identifying high-crime areas, which is critical.
+
+### Model 2
+Very close in performance to Model 1, just slightly lower on most metrics.
+Lower AIC/BIC, meaning it's simpler and less prone to overfitting.
+If model interpretability or computation is a concern, this is a great trade-off.
+
+### Model 3
+Clearly underperforms across all metrics.
+Lower accuracy (0.85), lower precision and recall, and worse McFadden’s R².
+Best to discard this model for this task.
+
+### Recommended Model: Model 1
+
+Highest F1 Score (0.9319): best balance of precision & recall.
+Highest Recall (0.9381): means it catches nearly all crime areas.
+Highest AUC (0.9787): best ability to distinguish between classes.
+Best McFadden’s R² (0.730): indicates strong model fit.
+Even though AIC/BIC is a bit higher, the gain in performance justifies the complexity, especially in a high-stakes domain like crime prediction.
 
 
 
