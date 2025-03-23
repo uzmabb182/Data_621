@@ -28,6 +28,7 @@ require(Metrics)
 ```
 
 ### Variables in the Dataset:
+
 • zn: proportion of residential land zoned for large lots (over 25000 square feet) (predictor variable)  
 • indus: proportion of non-retail business acres per suburb (predictor variable)  
 • chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) (predictor variable)  
