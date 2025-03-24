@@ -465,7 +465,79 @@ ggplot(df_full_model_logit, aes(x = predictor_value, y = logit)) +
 
 ### Using mathematical transformations
 
-TBD, may have to use some log transformation to address the outliers but may need further exploration during model building.
+To reduce the influence of outliers and better align the data with the assumptions of logistic regression, log-transformations were applied to tax, zn, dis, and lstat. This transformation helps normalize the data, reduce variance, and enhance model interpretability. A small constant was added to zn before the transformation to account for zero values.
+
+
+```{r log-transform}
+df_training_1h_log <- df_training_one_hot |>
+  mutate(
+    log_tax = log(tax),
+    log_dis = log(dis),
+    log_zn = log(zn + 1),
+    log_lstat = log(lstat),
+    log_medv = log(medv),
+    log_indus = log(indus),
+    log_ptratio = log(ptratio),
+  ) |>
+  subset(select = -c(tax, dis, zn, lstat, medv, indus, ptratio))
+
+
+model_full_log <- glm(target ~., binomial(link = "logit"), data=df_training_1h_log)
+summary(model_full_log)
+```
+
+####  Outlier
+
+Applying the log transformation didn't make too much of a difference with our questionable points (280, 338, and 14)
+
+```{r cooksd-leverage-log}
+par(mar = c(5, 4, 4, 2) + 0.1)
+plot(model_full_log, which = c(4, 6, 1, 2, 3, 5), col=df_training_1h_log$target,  id.n = 5)
+```
+
+
+
+#### Linearity 
+
+Applying the log transformation helped the linearity for some of the variables. It had less of an effect on medv, indus, and ptratio
+
+```{r check-for-linearity-log-model, fig.width=7, fig.height=12, echo = FALSE}
+
+# predict the probability of high crime rate
+predicted_probs <- predict(model_full_log, newdata=df_training_1h_log, type = "response")
+
+df_full_model_logit <- df_training_1h_log |>
+  subset(select = -c(target)) |>
+  mutate(
+    chas = as.numeric(chas),
+    logit = log(predicted_probs/(1-predicted_probs))
+  ) |>
+  gather(
+    key = "predictor", 
+    value = "predictor_value", 
+    -logit
+  )
+
+ggplot(df_full_model_logit, aes(x = predictor_value, y = logit)) +
+  geom_point(alpha = 0.5, color = "blue") + 
+  geom_smooth(method = "loess", color = "red", se = FALSE) + 
+  facet_wrap(~predictor, scales = "free") +
+  theme_minimal() +
+  labs(title = "Linearity of Logit Check for Binary Logistic Regression",
+       x = "Predictor Variable",
+       y = "Logit of Predicted Probability")
+
+
+```
+
+#### Colinearity
+
+A Variance Inflation Factor test on our model with logged predictors shows that `nox` and `medv` should be considered for removal. `rm` and `log_dis` may also need to considered.
+
+```{r}
+car::vif(model_full_log) |> sort()
+```
+
 
 ## MODEL BUILDING
 
@@ -611,9 +683,25 @@ summary(model_dendo)
 
 ### Model comparison
 ```{r full-model-lrstats}
-LRstats(model_full, backward_model, model_corr, model_pca, model_dendo)
+
+library(pscl)
+
+stats <- LRstats(model_full, model_full_log,
+        backward_model, model_corr, model_pca, model_dendo)
+
+stats$mcfaddenR2 <- NA 
+stats["model_full", "mcfaddenR2"] <-  pR2(model_full)["McFadden"]
+stats["model_full_log", "mcfaddenR2"] <-  pR2(model_full_log)["McFadden"]
+stats["backward_model", "mcfaddenR2"] <-  pR2(backward_model)["McFadden"]
+stats["model_corr", "mcfaddenR2"] <-  pR2(model_corr)["McFadden"]
+stats["model_pca", "mcfaddenR2"] <-  pR2(model_pca)["McFadden"]
+stats["model_dendo", "mcfaddenR2"] <-  pR2(model_dendo)["McFadden"]
+
+stats 
 ```
 
+
+----
 
 #### Checking the Model's Conditions
 
@@ -630,7 +718,6 @@ We will examine the following key conditions for fitting a logistic model:
 ##### Confidence Interval
 
 ```{r confint, echo=FALSE, warning=FALSE, message=FALSE}
-
 confint(model_full)
 
 ```
@@ -649,7 +736,4 @@ model_summary <- summary(model_full)
 anova(model_full, test = "Chisq")
 ```
 
-Running the model through an ANOVA test . 
-
-We have already confirmed that the dependent variable `target` only contains binary values where 0 represents a neighborhood with crime rate below the median crime rate and 1 represents a neighborhood with crime rate above the median crime rate. Our dataset contains a large enough number of independent observations (466). Next we will check conditions 4-6. 
 

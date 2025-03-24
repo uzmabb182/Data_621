@@ -24,10 +24,10 @@ train %>%
   geom_boxplot() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-cor_matrix <- cor(train %>% select(-target))
+cor_matrix <- cor(train %>% subset(select=-c(target)))
 corrplot(cor_matrix, method = "color", tl.cex = 0.7)
 
-cor_target <- cor(train %>% select(-target), train$target)
+cor_target <- cor(train %>% subset(select=-c(target)), train$target)
 print(cor_target)
 ```
 
