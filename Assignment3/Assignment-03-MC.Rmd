@@ -212,28 +212,18 @@ introduce(df_training)
 missing_values_count <- sapply(data, function(x) sum(is.na(x)))
 print(missing_values_count)
 
-
-```
-
-```{r explore-qq-plots}
-plot_qq(df_training, sampled_rows = 1000L)
-
-```
-
-
-Scatterplots of y=`target` plotted against each of the parameters confirm that the dependent variable is binomial. Therefore, linear regression is not be the best fit for this data and we should explore logistic regression such as logit and probit. 
-
-```{r explore-scatterplot}
-# scatter plot doesn't show much
-plot_scatterplot(df_training, by = "target")
 ```
 
 
 ### Distribution
+Scatterplots of y=`target` plotted against each of the parameters confirm that the dependent variable is binomial. Therefore, linear regression is not be the best fit for this data and we should explore logistic regression such as logit and probit. 
 
-```{r data-exploration-simple}
-plot_prcomp(na.omit(df_training))
+```{r explore-scatterplot}
+# scatter plot doesn't show much
+# plot_scatterplot(df_training, by = "target")
+# plot_qq(df_training, sampled_rows = 1000L)
 ```
+
 
 ```{r}
 plot_qq(df_training, by="target", sampled_rows = 1000L)
