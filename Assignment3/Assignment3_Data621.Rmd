@@ -2,7 +2,9 @@
 title: "Assignment3_Data621"
 author: "Mubashira Qari"
 date: "2025-03-09"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ### Load Libraries
@@ -62,7 +64,7 @@ head(crime_evaluation_df)
 
 ```{r}
 #dim(crime_training_df)
-skim(crime_training_df)
+#skim(crime_training_df)
 
 ```
 
@@ -725,8 +727,8 @@ crime_evaluation_df$predicted_class <- eval_pred_class
 file_path <- "C:/Users/Uzma/Downloads/crime_evaluation_df.csv"
 
 # Write dataframe to CSV
-write.csv(crime_evaluation_df, file = file_path, row.names = FALSE)
-crime_evaluation_df
+# write.csv(crime_evaluation_df, file = file_path, row.names = FALSE)
+# crime_evaluation_df
 
 ```
 

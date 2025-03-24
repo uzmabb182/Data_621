@@ -3,6 +3,7 @@ title: "D621 - Assignment 3"
 author: "Marco Castro"
 date: "2025-03-07"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 ---
@@ -29,10 +30,10 @@ library(MASS)
 library(factoextra)
 ```
 
-```{r import-data echo=FALSE}
+```{r import-data, echo=FALSE}
 
-df_training <- read_csv("crime-training-data_modified.csv")
-df_eval <- read_csv("crime-evaluation-data_modified.csv")
+df_training  <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-training-data_modified.csv")
+df_eval <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-evaluation-data_modified.csv")
 
 ```
 
@@ -58,13 +59,17 @@ df_training <- df_training |>
     target = as.factor(target),
   )
 
+numeric_cols <- c('zn', 'indus', 'nox', 'rm', 'age', 'dis', 'tax', 'ptratio', 'lstat', 'medv')
+
+factor_cols <- c('chas', 'rad', 'target')
+
 glimpse(df_training)
 
 ```
 
 A closer examination of the `rad` data shows that that our observations have a rad index value of 1-8 or 24 in this column. Below are the counts: 
 
-```{r count-rads, echo=FALSE}}
+```{r count-rads, echo=FALSE}
 
 rad_counts <- table(df_training$rad)
 
@@ -78,13 +83,10 @@ We can now calculate the summary statistics for the numeric parameters in our da
 
 ```{r explore-means-medians}
 
-# only show means for numeric values
-df_training_numeric <- df_training |>
-  subset(select = -c(chas, rad, target))
-
-for (param in colnames(df_training_numeric)) {
+# only show summary stats for numeric values
+for (param in numeric_cols) {
   cat("\nSummary for", param, ":\n")
-  print(describe(df_training_numeric[[param]]))
+  print(describe(df_training[[param]]))
 }
 ```
 
@@ -328,7 +330,7 @@ print(cor_results)
 
 Next we can visualize the correlations in clusters.
 
-```{r check-for-correlation, echo=FALSE}
+```{r check-for-correlation-clusters, echo=FALSE}
 
 df_training_subset <- df_training_one_hot |>
   subset(select = -c(target)) |>
@@ -441,32 +443,29 @@ To check this condition, I created a scatterplot with a loess line to check that
 ```{r check-for-linearity-full-model, fig.width=7, fig.height=12, echo = FALSE}
 
 # predict the probability of high crime rate
-probabilities_full <- predict(model_full, type = "response")
+predicted_probs <- predict(model_full, newdata=df_training_one_hot, type = "response")
 
-# df_training_one_hot_numerical <- df_training_one_hot 
-# |>   subset(select = c(age, dis, indus, lstat, medv, nox, ptratio, rm, tax, zn))
+df_full_model_logit <- df_training_one_hot |>
+  subset(select = -c(target)) |>
+  mutate(
+    chas = as.numeric(chas),
+    logit = log(predicted_probs/(1-predicted_probs))
+  ) |>
+  gather(
+    key = "predictor", 
+    value = "predictor_value", 
+    -logit
+  )
 
-predictors <- colnames(df_training_one_hot)
+ggplot(df_full_model_logit, aes(x = predictor_value, y = logit)) +
+  geom_point(alpha = 0.5, color = "blue") + 
+  geom_smooth(method = "loess", color = "red", se = FALSE) + 
+  facet_wrap(~predictor, scales = "free") +
+  theme_minimal() +
+  labs(title = "Linearity of Logit Check for Binary Logistic Regression",
+       x = "Predictor Variable",
+       y = "Logit of Predicted Probability")
 
-df_training_one_hot_full <- df_training_one_hot |>
-  mutate(logit = log(probabilities_full/(1-probabilities_full))) |>
-  gather(key = "predictors", value = "predictor_value", -logit)
-
-#for (param in colnames(df_training_one_hot)) {
-  
-  #df <- df_training_one_hot_full |>
-  #s  filter(param %in% predictors)
-  
-  param_plot <- ggplot(df_training_one_hot, aes(logit, predictor_value))+
-    geom_point(size = 0.05, alpha = 0.5) +
-    geom_smooth(method = "loess") + 
-    theme_bw() + 
-    facet_wrap(~predictors, scales = "free_y", ncol=3) + 
-    labs(title = paste("Linearity Tests")) +
-    theme(plot.title = element_text(hjust = 0.5))
-  
-  print(param_plot)
-#}
 
 
 ```
@@ -513,7 +512,7 @@ These models were guided by the results of our correlation plot. The correlation
 corrplot(df_training_cor, method="shade", order="hclust", addrect=4)
 
 model_corr <-  glm(target ~ indus + chas + radq_low + medv, binomial(link = "logit"), data=df_training_one_hot)
-summary(model_mc2)
+summary(model_corr)
 ```
 
 ####  Model using Principal Components
@@ -592,7 +591,7 @@ dist_one_hot = as.dist(m = 1 - abs(df_training_cor))
 par(mar = c(5, 4, 4, 2) + 0.1)
 plot(hclust(dist_one_hot))
 
-numeric_cols <- c('zn', 'indus', 'nox', 'rm', 'age', 'dis', 'tax', 'ptratio', 'lstat', 'medv')
+
 sapply(numeric_cols, function(param) {
   pairwise.t.test(
     x = df_training_one_hot[, param],
