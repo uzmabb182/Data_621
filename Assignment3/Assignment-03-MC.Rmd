@@ -28,6 +28,9 @@ library(vcd)
 library(vcdExtra)
 library(MASS)
 library(factoextra)
+
+library(caret)
+library(pROC)
 ```
 
 ```{r import-data, echo=FALSE}
@@ -689,13 +692,58 @@ library(pscl)
 stats <- LRstats(model_full, model_full_log,
         backward_model, model_corr, model_pca, model_dendo)
 
-stats$mcfaddenR2 <- NA 
-stats["model_full", "mcfaddenR2"] <-  pR2(model_full)["McFadden"]
-stats["model_full_log", "mcfaddenR2"] <-  pR2(model_full_log)["McFadden"]
-stats["backward_model", "mcfaddenR2"] <-  pR2(backward_model)["McFadden"]
-stats["model_corr", "mcfaddenR2"] <-  pR2(model_corr)["McFadden"]
-stats["model_pca", "mcfaddenR2"] <-  pR2(model_pca)["McFadden"]
-stats["model_dendo", "mcfaddenR2"] <-  pR2(model_dendo)["McFadden"]
+stats$McFaddenR2 <- NA 
+stats$Accuracy <- NA 
+stats$Precision <- NA 
+stats$Recall <- NA 
+stats$Sensitivity <- NA 
+stats$Specificity <- NA 
+stats$F1_score <- NA 
+stats$AUC <- NA 
+
+enhanceEvaluationMetrics <- function(df, model_name) {
+  model <- get(model_name)
+  
+  if (model_name == "model_full_log") {
+    model_data <- df_training_1h_log
+  } else if (model_name == "model_pca") {
+    model_data <- df_training_one_hot_pca
+  } else {
+    model_data <- df_training_one_hot
+  }
+  
+  df[model_name, "McFaddenR2"] <- pR2(model)["McFadden"]
+  
+  pred_probs <- predict(model, type = "response")
+  
+  pred_probs_factor <- as.factor(ifelse(pred_probs > 0.5, 1, 0))
+  conf_matrix <- confusionMatrix(pred_probs_factor, model_data$target)
+  df[model_name, "Accuracy"] <- conf_matrix$overall['Accuracy']
+  df[model_name, "Precision"] <- conf_matrix$byClass['Precision']
+  df[model_name, "Recall"] <- conf_matrix$byClass['Recall']
+  df[model_name, "F1_score"] <- conf_matrix$byClass['F1']
+
+  #roc_model <- roc(as.factor(model_data$target), pred_probs)
+  #plot(roc_model, main = "ROC Curve using pROC", col = "red", lwd = 2)
+  
+  TPR <- conf_matrix$byClass["Sensitivity"] 
+  FPR <- conf_matrix$byClass["Specificity"]
+  df[model_name, "Sensitivity"] <- TPR
+  df[model_name, "Specificity"] <- FPR
+  # roc_auc not working
+  df[model_name, "AUC"] <- MLmetrics::AUC(y_true = model_data$target, y_pred = pred_probs) 
+
+  return(df) 
+}
+
+
+models <- list(model_full, model_full_log, backward_model, model_corr, model_pca, model_dendo)
+
+# Loop through the list of models and update the dataframe for each
+for (model_name in rownames(stats)) {
+  
+  stats <- enhanceEvaluationMetrics(stats, model_name)
+}
 
 stats 
 ```
