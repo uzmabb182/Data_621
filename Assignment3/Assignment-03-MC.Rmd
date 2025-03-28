@@ -99,6 +99,7 @@ for (param in numeric_cols) {
 Below is series of boxplots for all numeric parameters where target is our dependent variable.
 
 ```{r explore-boxplot}
+dev.off()
 plot_boxplot(df_training, by = "target", title="Boxplots of Target vs Param")
 ```
 
@@ -478,11 +479,8 @@ df_training_1h_log <- df_training_one_hot |>
     log_dis = log(dis),
     log_zn = log(zn + 1),
     log_lstat = log(lstat),
-    log_medv = log(medv),
-    log_indus = log(indus),
-    log_ptratio = log(ptratio),
   ) |>
-  subset(select = -c(tax, dis, zn, lstat, medv, indus, ptratio))
+  subset(select = -c(tax, dis, zn, lstat))
 
 
 model_full_log <- glm(target ~., binomial(link = "logit"), data=df_training_1h_log)

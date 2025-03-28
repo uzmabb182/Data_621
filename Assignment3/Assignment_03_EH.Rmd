@@ -1,0 +1,177 @@
+---
+title: "Assignment_03_EH"
+author: "Erick Hadi"
+date: "2025-03-22"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(forecast)
+library(MASS)
+library(caret)
+library(tibble)
+library(tidyverse)
+```
+
+## R Markdown
+
+
+```{r import-data, echo=FALSE}
+crime_data  <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-training-data_modified.csv")
+crime_eval <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-evaluation-data_modified.csv")
+
+```
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r}
+# Summary statistics
+summary(crime_data)
+sapply(crime_data, sd, na.rm = TRUE)
+```
+
+```{r}
+colSums(is.na(crime_data))
+```
+
+```{r}
+correlation_matrix <- cor(crime_data[ ,sapply(crime_data, is.numeric)], use = "complete.obs")
+corrplot(correlation_matrix, method = "circle")
+```
+
+```{r}
+library(ggplot2)
+
+numeric_vars <- crime_data[sapply(crime_data, is.numeric)]
+
+for (var in colnames(numeric_vars)) {
+  print(ggplot(crime_data, aes_string(x = var)) +
+          geom_histogram(bins = 30, fill = "blue", color = "black") +
+          labs(title = paste("Distribution of", var), x = var, y = "Count"))
+}
+
+library(e1071)
+apply(numeric_vars, 2, skewness, na.rm = TRUE)
+
+```
+
+```{r}
+correlation_with_target <- cor(numeric_vars, crime_data$target, use = "complete.obs")
+print(correlation_with_target)
+
+for (var in colnames(numeric_vars)) {
+  print(ggplot(crime_data, aes_string(x = "factor(target)", y = var)) +
+          geom_boxplot() +
+          labs(title = paste(var, "by Target"), x = "Target", y = var))
+}
+
+```
+
+```{r}
+for (var in colnames(numeric_vars)) {
+  print(ggplot(crime_data, aes_string(y = var)) +
+          geom_boxplot() +
+          labs(title = paste("Outliers in", var), y = var))
+}
+
+```
+
+```{r}
+for (var in colnames(numeric_vars)) {
+  print(ggplot(crime_data, aes_string(x = var, y = "target")) +
+          geom_point(alpha = 0.5) +
+          geom_smooth(method = "loess", col = "red") +
+          labs(title = paste("Target vs", var), x = var, y = "Target"))
+}
+
+```
+
+
+```{r}
+crime_transform <- crime_data
+
+rm_lambda <- BoxCox.lambda(crime_transform$rm)
+nox_lambda <- BoxCox.lambda(crime_transform$nox)
+
+crime_transform <- crime_transform %>%
+  mutate(
+    rm_transform = BoxCox(rm, rm_lambda),
+    nox_transform = BoxCox(nox, nox_lambda),
+    
+    dis_transform = log(dis),
+    zn_transform = log(zn + 1),
+    lstat_transform = log(lstat),
+    
+    age_transform = log(max(age, na.rm = TRUE) + 1 - age),
+    ptratio_transform = log(max(ptratio, na.rm = TRUE) + 1 - ptratio)
+  )
+
+crime_transform <- crime_transform %>%
+  mutate(across(everything(), ~ifelse(is.infinite(.), NA, .)))
+
+```
+
+```{r}
+set.seed(621)
+
+crimeTrain <- createDataPartition(crime_transform$target, p=0.8, list=FALSE)
+crimetraining <- crime_transform[crimeTrain,]
+crimetesting <- crime_transform[-crimeTrain,]
+```
+
+
+```{r}
+model_1 <- glm(target ~ zn_transform + indus + chas + nox_transform + rm_transform + age_transform + dis_transform + rad + tax + ptratio_transform + lstat_transform + medv, data = crimetraining , family = binomial)
+summary(model_1)
+```
+
+```{r}
+model_stepAIC <- model_1 %>% stepAIC(trace = FALSE)
+summary(model_stepAIC)
+```
+
+
+```{r}
+evaluate_model <- function(model, dataset, target_col, model_name) {
+  dataset[[model_name]] <- ifelse(predict.glm(model, dataset, "response") >= 0.5, 1, 0)
+  
+  cm <- confusionMatrix(factor(dataset[[model_name]]), factor(dataset[[target_col]]), "1")
+  
+  metrics <- tibble(
+    Model = model_name,
+    Accuracy = cm$byClass["Accuracy"],
+    F1 = cm$byClass["F1"],
+    Deviance = model$deviance,
+    R2 = 1 - model$deviance / model$null.deviance,
+    AIC = model$aic
+  )
+  
+  return(list(cm = cm, metrics = metrics))
+}
+
+```
+
+```{r}
+results <- evaluate_model(model_1, crimetesting, target_col = "target", model_name = "Model #1")
+cm_1 <- results$cm
+
+results <- evaluate_model(model_stepAIC, crimetesting, target_col = "target", model_name = "Model #2")
+cm_2 <- results$cm
+
+cm_1
+cm_2
+
+```
+
+
+
+
+
+
