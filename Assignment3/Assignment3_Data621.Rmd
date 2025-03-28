@@ -281,6 +281,7 @@ corrplot(spearman_cor,
 
 ```
 ### Checking for Multicollinearity (High Correlation Between Predictors)
+
 A general rule of thumb is that if |𝜌| > 0.7, it indicates strong correlation between variables, which can lead to multicollinearity in the logistic regression model.
 
 From the matrix:
@@ -289,17 +290,20 @@ tax & rad (𝜌 = 0.70) → These variables are highly correlated, indicating on
 lstat & medv (𝜌 = -0.85) → Very strong negative correlation; keeping both might be problematic.
 log_medv & medv (𝜌 = 1.00) → Perfect correlation (since log transformation was applied), meaning one must be removed to prevent redundancy.
 
-Final Takeaways
+Final Takeaways:
+
 High correlation between predictors (|𝜌| > 0.7) indicates potential multicollinearity. Consider removing indus, rad, or medv to improve model stability.
 No evidence of entire rows/columns being highly correlated, suggesting no major independence violations.
 Use VIF for confirmation and decide on variable selection accordingly.
 
 
-### Checking Multicollinearity Using Variance Inflation Factor (VIF) in R
+### Checking Multicollinearity Using Variance Inflation Factor (VIF)
+
 Variance Inflation Factor (VIF) helps quantify multicollinearity by measuring how much the variance of regression coefficients is inflated due to correlation among predictors. 
 A VIF > 5 (or more conservatively, VIF > 10) suggests severe multicollinearity.
 
 ### Check VIF (Variance Inflation Factor)
+
 Variance Inflation Factor (VIF) – Measures how much variance in regression coefficients is inflated due to multicollinearity
 ANd helps confirm whether these high correlations affect regression coefficients.
 
@@ -357,6 +361,7 @@ ggplot(plot_data, aes(x = Value, y = logit)) +
 
 ```
 ### Interpretation of the Linearity of Logit Check for Binary Logistic Regression
+
 This faceted scatter plot assesses the assumption of linearity of the logit for binary logistic regression. 
 The blue dots represent the relationship between each predictor variable and the logit of the predicted probability, 
 while the red LOESS (Locally Estimated Scatterplot Smoothing) curve helps visualize patterns.
@@ -481,6 +486,7 @@ AIC(model3)  # Compare AIC
 
 
 ```
+
 ### Model Evaluation:
 
 Evaluate model performance and select the best model based on multiple criteria.
@@ -518,6 +524,7 @@ f1_score
 cat("Accuracy:", accuracy, "\nPrecision:", precision, "\nRecall:", recall, "\nF1 Score:", f1_score)
 
 ```
+
 # Predict Probabilities for Training Data
 
 ```{r}
@@ -660,77 +667,8 @@ It rarely confuses high-crime neighborhoods with low-crime ones.
 It performs better than random guessing (which has an AUC of 0.5).
 In simple terms: AUC = 0.9782, meaning model is very effective at separating high-crime and low-crime areas! 
 
-### Apply the Best Model to Evaluation Data
-
-Once the best model is selected, we use it for prediction on crime_evaluation_df.
 
 
-```{r}
-
-# Handle missing values (if any)
-
-# Fill missing values with median
-crime_evaluation_df$medv[is.na(crime_evaluation_df$medv)] <- median(crime_evaluation_df$medv, na.rm = TRUE)
-crime_evaluation_df$lstat[is.na(crime_evaluation_df$lstat)] <- median(crime_evaluation_df$lstat, na.rm = TRUE)
-crime_evaluation_df$dis[is.na(crime_evaluation_df$dis)] <- median(crime_evaluation_df$dis, na.rm = TRUE)
-
-# Ensure necessary transformations in evaluation data
-crime_evaluation_df <- crime_evaluation_df %>%
-  mutate(
-    log_medv = log(medv + 1),  # Avoid log(0)
-    log_lstat = log(lstat + 1),
-    log_dis = log(dis + 1),
-    
-     # Standardization (must match training data)
-    zn_scaled = (zn - mean(crime_training_df$zn)) / sd(crime_training_df$zn),
-    indus_scaled = (indus - mean(crime_training_df$indus)) / sd(crime_training_df$indus),
-    nox_scaled = (nox - mean(crime_training_df$nox)) / sd(crime_training_df$nox),
-    rm_scaled = (rm - mean(crime_training_df$rm)) / sd(crime_training_df$rm),
-    age_scaled = (age - mean(crime_training_df$age)) / sd(crime_training_df$age),
-    dis_scaled = (dis - mean(crime_training_df$dis)) / sd(crime_training_df$dis),
-    rad_scaled = (rad - mean(crime_training_df$rad)) / sd(crime_training_df$rad),
-    tax_scaled = (tax - mean(crime_training_df$tax)) / sd(crime_training_df$tax),
-    ptratio_scaled = (ptratio - mean(crime_training_df$ptratio)) / sd(crime_training_df$ptratio),
-
-    # Interaction terms (same as training)
-    lstat_medv_interact = log_lstat * log_medv,
-    tax_rad_interact = tax * rad
-  )
-
-    # Create categorical age groups bins
-crime_evaluation_df$age_group <- cut(crime_evaluation_df$age, breaks=c(0, 30, 60, 100), labels=c("Young", "Middle-aged", "Old"))
-
-```
-
-
-```{r}
-
-
-colnames(crime_evaluation_df) 
-
-#colnames(crime_training_df)
-```
-
-```{r}
-
-# Predict probabilities using model1
-eval_pred_prob <- predict(model1, newdata = crime_evaluation_df, type = "response")
-
-# Convert probabilities to binary class (0 or 1) using a threshold of 0.5
-eval_pred_class <- ifelse(eval_pred_prob > 0.5, 1, 0)
-
-# Add predictions to the evaluation data
-crime_evaluation_df$predicted_prob <- eval_pred_prob
-crime_evaluation_df$predicted_class <- eval_pred_class
-
-
-file_path <- "C:/Users/Uzma/Downloads/crime_evaluation_df.csv"
-
-# Write dataframe to CSV
-# write.csv(crime_evaluation_df, file = file_path, row.names = FALSE)
-# crime_evaluation_df
-
-```
 
 ### Compare AIC and BIC
 
@@ -816,5 +754,84 @@ Even though AIC/BIC is a bit higher, the gain in performance justifies the compl
 
 
 
+### Apply the Best Model to Evaluation Data
+
+Once the best model is selected, we use it for prediction on crime_evaluation_df.
+
+
+```{r}
+
+# Handle missing values (if any)
+
+# Fill missing values with median
+crime_evaluation_df$medv[is.na(crime_evaluation_df$medv)] <- median(crime_evaluation_df$medv, na.rm = TRUE)
+crime_evaluation_df$lstat[is.na(crime_evaluation_df$lstat)] <- median(crime_evaluation_df$lstat, na.rm = TRUE)
+crime_evaluation_df$dis[is.na(crime_evaluation_df$dis)] <- median(crime_evaluation_df$dis, na.rm = TRUE)
+
+# Ensure necessary transformations in evaluation data
+crime_evaluation_df <- crime_evaluation_df %>%
+  mutate(
+    log_medv = log(medv + 1),  # Avoid log(0)
+    log_lstat = log(lstat + 1),
+    log_dis = log(dis + 1),
+    
+     # Standardization (must match training data)
+    zn_scaled = (zn - mean(crime_training_df$zn)) / sd(crime_training_df$zn),
+    indus_scaled = (indus - mean(crime_training_df$indus)) / sd(crime_training_df$indus),
+    nox_scaled = (nox - mean(crime_training_df$nox)) / sd(crime_training_df$nox),
+    rm_scaled = (rm - mean(crime_training_df$rm)) / sd(crime_training_df$rm),
+    age_scaled = (age - mean(crime_training_df$age)) / sd(crime_training_df$age),
+    dis_scaled = (dis - mean(crime_training_df$dis)) / sd(crime_training_df$dis),
+    rad_scaled = (rad - mean(crime_training_df$rad)) / sd(crime_training_df$rad),
+    tax_scaled = (tax - mean(crime_training_df$tax)) / sd(crime_training_df$tax),
+    ptratio_scaled = (ptratio - mean(crime_training_df$ptratio)) / sd(crime_training_df$ptratio),
+
+    # Interaction terms (same as training)
+    lstat_medv_interact = log_lstat * log_medv,
+    tax_rad_interact = tax * rad
+  )
+
+    # Create categorical age groups bins
+crime_evaluation_df$age_group <- cut(crime_evaluation_df$age, breaks=c(0, 30, 60, 100), labels=c("Young", "Middle-aged", "Old"))
+
+```
+
+
+```{r}
+
+
+colnames(crime_evaluation_df) 
+
+#colnames(crime_training_df)
+```
+
+
+```{r}
+
+# Predict probabilities using model1
+eval_pred_prob <- predict(model1, newdata = crime_evaluation_df, type = "response")
+
+# Convert probabilities to binary class (0 or 1) using a threshold of 0.5
+eval_pred_class <- ifelse(eval_pred_prob > 0.5, 1, 0)
+
+# Add predictions to the evaluation data
+crime_evaluation_df$predicted_prob <- eval_pred_prob
+crime_evaluation_df$predicted_class <- eval_pred_class
+
+
+file_path <- "C:/Users/Uzma/Downloads/crime_evaluation_df.csv"
+
+# Write dataframe to CSV
+# write.csv(crime_evaluation_df, file = file_path, row.names = FALSE)
+ crime_evaluation_df
+
+```
+```{r}
+# use the predicted_class and predicted_prob values as your final output
+
+head(crime_evaluation_df[, c("predicted_prob", "predicted_class")])
+
+
+```
 
 
