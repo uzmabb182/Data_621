@@ -592,6 +592,75 @@ Model 1	0.933   0.925	    0.938	  0.931	    0.9787
 Model 2	0.927	  0.917	    0.933	  0.925	    0.9776
 Model 3	0.852	  0.830	    0.864	  0.846	    0.9472
 
+### Model comparison
+```{r full-model-lrstats}
+
+library(vcdExtra)
+library(pscl)
+#models <- list(model_full, model_full_log, backward_model, backward_log_model, model_corr, model_pca, model_dendo)
+
+stats <- LRstats(model1, model2, model3)
+
+stats$McFaddenR2 <- NA 
+stats$Accuracy <- NA 
+stats$Precision <- NA 
+#stats$Recall <- NA 
+stats$Sensitivity <- NA 
+stats$Specificity <- NA 
+stats$F1_score <- NA 
+stats$AUC <- NA 
+stats$CV_est_predict_err <- NA 
+stats$CV_adj_est <- NA 
+
+enhanceEvaluationMetrics <- function(df, model_name) {
+  model <- get(model_name)
+  
+  if (model_name == "model_full_log" | model_name == "backward_log_model") {
+    model_data <- df_training_1h_log
+  } else if (model_name == "model_pca") {
+    model_data <- df_training_one_hot_pca
+  } else if (model_name != "model1" & model_name != "model2" & model_name != "model3") {
+    model_data <- df_training_one_hot
+  } else {
+    model_data <- crime_training_df
+  }
+  
+  df[model_name, "McFaddenR2"] <- pR2(model)["McFadden"]
+  
+  pred_probs <- predict(model, type = "response")
+  
+  pred_probs_factor <- as.factor(ifelse(pred_probs > 0.5, 1, 0))
+  conf_matrix <- confusionMatrix(as.factor(pred_probs_factor), as.factor(model_data$target))
+  df[model_name, "Accuracy"] <- conf_matrix$overall['Accuracy']
+  df[model_name, "Precision"] <- conf_matrix$byClass['Precision']
+  #df[model_name, "Recall"] <- conf_matrix$byClass['Recall']
+  df[model_name, "F1_score"] <- conf_matrix$byClass['F1']
+  df[model_name, "Sensitivity"] <- conf_matrix$byClass["Sensitivity"] 
+  df[model_name, "Specificity"] <- conf_matrix$byClass["Specificity"]
+
+  #roc_model <- roc(as.factor(model_data$target), pred_probs)
+  #plot(roc_model, main = "ROC Curve using pROC", col = "red", lwd = 2)
+  # roc_auc not working, so use MLmetrics
+  df[model_name, "AUC"] <- MLmetrics::AUC(y_true = model_data$target, y_pred = pred_probs) 
+  
+  # Cross-Validation using 10 folsds
+  cv_result <- boot::cv.glm(model_data, model, K= 10)
+  df[model_name, "CV_est_predict_err"] <- cv_result$delta[1]
+  df[model_name, "CV_adj_est"] <- cv_result$delta[2]
+  
+  return(df) 
+}
+
+
+# Loop through the list of models and update the dataframe for each
+for (model_name in rownames(stats)) {
+  
+  stats <- enhanceEvaluationMetrics(stats, model_name)
+}
+
+stats 
+```
+
 Best Choice: Model 1
 Model 1 is the best choice because:
 

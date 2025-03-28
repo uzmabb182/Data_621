@@ -692,6 +692,7 @@ summary(model_dendo)
 ### Model comparison
 ```{r full-model-lrstats}
 
+library(vcdExtra)
 library(pscl)
 #models <- list(model_full, model_full_log, backward_model, backward_log_model, model_corr, model_pca, model_dendo)
 
