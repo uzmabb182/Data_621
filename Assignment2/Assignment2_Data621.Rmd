@@ -39,30 +39,6 @@ classification_df <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_
 head(classification_df)
 
 ```
-```{r}
-
-# Count occurrences of each class
-class_counts <- table(classification_df$class)
-
-# Compute percentages
-class_percentages <- prop.table(class_counts) * 100
-
-# Print results
-print(class_counts)
-print(class_percentages)
-
-```
-
-
-Class 0 (majority) → 124 samples
-Class 1 (minority) → 57 samples
-
-A dataset is considered imbalanced if the class distribution is highly skewed, typically:
-
-Mild imbalance: One class is 60-70%, the other is 30-40%.
-Moderate imbalance: One class is 70-85%, the other is 15-30%.
-Severe imbalance: One class is 90% or more, the other is 10% or less.
-Since Class 1 still makes up 31.5%, this dataset has a mild imbalance, but it's not extreme.
 
 
 ### The dataset has three key columns:
@@ -102,7 +78,7 @@ print(conf_matrix)
 ```
 ### Applying Classification Metric Functions
 
-1-  Accuracy:
+### 1-  Accuracy:
 
 -   Accuracy measures overall correctness of the classification model.
 -   It represents the proportion of correct predictions (both positive and negative) out of all predictions.
@@ -133,7 +109,7 @@ accuracy <- calculate_accuracy(classification_df)
 print(paste("Accuracy:", accuracy))
 
 ```
-2-  Classification Error Rate
+### 2-  Classification Error Rate
 
 It is the proportion of incorrectly classified cases.
 ErrorRate <- (FP + FN) / (TP + TN + FP + FN)
@@ -158,8 +134,8 @@ print(paste("Error Rate:", error_rate))
 ```
 ### Interpretation:
 
-19.34% of the predictions are incorrect.
-This means that 80.66% of the predictions were correct (since Accuracy + Error Rate = 1).
+19.34% of the predictions are incorrectly classified (Error Rate)
+80.66% of the predictions were correctly classified (Accuracy).
 A lower error rate is better, as it indicates fewer mistakes in classification.
 If the error rate is high, the model may need improvement through better feature selection, threshold tuning, or model optimization.
 
@@ -176,13 +152,14 @@ The sum of accuracy + error rate = 1
 sum(accuracy, error_rate)
 ```
 
-3-  Precision (Positive Predictive Value)
+### 3-  Precision (Positive Predictive Value)
 
 -   Measures how many of the predicted positive cases were actually positive.
 
 -   Precision= TP/(TP+FP)
 
 TP (True Positives) = Correctly predicted positive cases.
+
 FP (False Positives) = Incorrectly predicted positives (actual class was 0, but predicted as 1).
 
 ### Why Do We Calculate Precision (Positive Predictive Value)?
@@ -220,11 +197,11 @@ Precision=0.84375
 ### Interpretation:
 
 84.38% of the predicted positive cases are actually correct.
-15.62% of the predicted positives are false positives (wrongly classified as positive).
+
 A higher precision is desirable in cases where false positives have major consequences.
 
 
-4-  Sensitivity (Recall / True Positive Rate)
+### 4-  Sensitivity (Recall / True Positive Rate)
 
 -   Measures the proportion of actual positives correctly identified.
 
@@ -271,7 +248,7 @@ Sensitivity=0.4737
 ### What Does This Mean?
 
 The model correctly identifies about 47.37% of the actual positive cases.
-52.63% of the actual positive cases were missed (False Negatives).
+
 This means many positive cases were classified as negative, which could be a big issue in high-risk scenarios (e.g., medical testing).
 
 ### Is This a Good Sensitivity Score?
@@ -290,7 +267,7 @@ Random Forest or Boosting models often improve recall.
 
 
 
-5- Specificity (True Negative Rate)
+### 5- Specificity (True Negative Rate)
 
 -   Measures the proportion of actual negatives correctly identified.
 
@@ -340,7 +317,7 @@ Specificity=0.9597
 ### Interpretation:
 
 95.97% of actual negative cases were correctly classified as negative.
-4.03% of the actual negative cases were incorrectly classified as positive (False Positives).
+
 The model is very good at recognizing negative cases and avoids too many false positives.
 
 ### Is This a Good Specificity Score?
@@ -367,7 +344,7 @@ Use Different Models (SVM, Decision Trees, Random Forest)
 
 
 
-6-  F1 Score:
+### 6-  F1 Score:
 
 F1 = 2 x (Precision x Sensitivity)/(Precision + Sensitivity)
 
@@ -650,7 +627,7 @@ print(paste("AUC Score:", auc_value))
 # Compute Precision-Recall Data
 pr_curve <- pr.curve(scores.class0 = classification_df$predicted_prob, weights.class0 = as.numeric(classification_df$class), curve = TRUE)
 
-# Plot Precision-Recall Curve
+# Plot Precision-Recall Curve 
 plot(pr_curve, col = "red", main = "Precision-Recall Curve")
 
 ```

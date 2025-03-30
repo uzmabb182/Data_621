@@ -1,6 +1,6 @@
 ---
 title: "Assignment2"
-author: "MQ MC"
+author: "MQ MC Puja Roy"
 date: "2025-02-23"
 output: html_document
 ---
@@ -126,7 +126,10 @@ calcPrecision <- function(df, actual, predicted) {
 
 ### Sensitivity
 
-Sensitivity tells you how well the model is at identifying positive cases. 
+Sensitivity tells you how well the model is at identifying positive cases.  
+
+Sensitivity is true positives properly predicted as positive divided by true positive cases (class = 1). "Class" here is the real diagnosis (for example, having diabetes) and "scored.class" is the diagnosed case. Sensitivity being high implies that most of the real diabetic patients were appropriately identified, keeping false negatives in check. It is particularly vital in medicine where failing to detect may mean belated treatment.
+ 
 
 _Formula_
 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦 = 𝑇𝑃 / (𝑇𝑃 + 𝐹𝑁)
@@ -148,7 +151,9 @@ calcSensitivity <- function(df, actual, predicted) {
 
 ### Specificity
 
-Specificity measures how well the model is at identifying the negative cases.
+Specificity measures how well the model is at identifying the negative cases. 
+
+Specificity is the ratio of true negative cases (class = 0) that are actually predicted as negative. In that sense, it would be properly predicting those not diabetic. Having high specificity reduces false positives, and in screening for medical issues, avoiding unnecessary intervention or treatment is crucial.
 
 _Formula_
 𝑆𝑝𝑒𝑐𝑖𝑓𝑖𝑐𝑖𝑡𝑦 = 𝑇𝑁 / (𝑇𝑁 + 𝐹𝑃)
@@ -171,6 +176,8 @@ calcSpecificity <- function(df, actual, predicted) {
 ### F1 Score 
 
 F1 Score is high when both precision and recall are high. It is particularly useful when the class distribution is imbalanced (i.e., one class is much more frequent than the other), as it takes both false positives and false negatives into account.
+
+F1 score is a trade-off between precision and sensitivity, useful to evaluate general model performance for diabetes detection. Since our dataset can be imbalanced (i.e., fewer positive examples compared to negative examples), the F1 score compromised correct positive detection with minimal false alarms.
 
 _Formula_
 𝐹1 𝑆𝑐𝑜𝑟𝑒 = 2 × ( 𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 × 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦) / (𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛 + 𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦)
@@ -229,38 +236,48 @@ False Positive Rate (FPR) = FP / (FP + TN) = 1 - specificity_val
 
 ```{r roc-curve}
 
-#  rewrite getRoc function using own formula
-
-library(pROC)
-library(verification)
-
-getRoc <- function(df, actual) {
+generate_manual_roc <- function(data, actual_col = "class", prob_col = "scored.probability") {
+  thresholds <- seq(0, 1, by = 0.01)
+  TPR <- numeric(length(thresholds))
+  FPR <- numeric(length(thresholds))
   
-  vals <- df[[actual]]
+  for (i in seq_along(thresholds)) {
+    threshold <- thresholds[i]
+    predicted <- ifelse(data[[prob_col]] >= threshold, 1, 0)
+    
+    
+    cm <- table(factor(predicted, levels = c(0, 1)), 
+                factor(data[[actual_col]], levels = c(0, 1)))
+    
+    TP <- cm["1", "1"]
+    TN <- cm["0", "0"]
+    FP <- cm["1", "0"]
+    FN <- cm["0", "1"]
+    
+    TPR[i] <- if ((TP + FN) == 0) 0 else TP / (TP + FN)
+    FPR[i] <- if ((FP + TN) == 0) 0 else FP / (FP + TN)
+  }
   
-  pos <- sum(vals)
-  neg <- sum(!vals)
-
-  tn <- cumsum(!vals)
-  spec <- tn/neg
-
-  tp <- pos - cumsum(vals)
-  sens <- tp/pos
-
-  rocplot <- plot(1 - spec, sens, type = "l", col = "red", 
-     ylab = "Sensitivity", xlab = "1 - Specificity")
-  abline(c(0,0),c(1,1))
+  
+  plot(FPR, TPR, type = "l", col = "blue", lwd = 2,
+       xlab = "False Positive Rate (1 - Specificity)", 
+       ylab = "True Positive Rate (Sensitivity)",
+       main = "Custom ROC Curve (Manual Method)")
+  abline(0, 1, col = "gray", lty = 2)
   
   
-  # Area Under the Curve
-  width <- diff(c(0, 1 - sens))
-  auc <- sum(spec*width)
-
-  return(c(plot = rocplot, auc = auc))
+  auc_manual <- abs(sum(diff(FPR) * (head(TPR, -1) + tail(TPR, -1)) / 2))
+  
+  return(list(AUC = auc_manual, TPR = TPR, FPR = FPR))
 }
+
+roc_manual <- generate_manual_roc(df)
+roc_manual$AUC
 
 ```
 
+
+To demonstrate how an ROC curve is constructed, a manual function was created that calculates the true positive rate and false positive rate across a sequence of thresholds ranging from 0 to 1. At each threshold, the function generates a new set of predicted classes and recalculates the confusion matrix to capture changes in sensitivity and specificity. After collecting all the points, the trapezoidal method was used to estimate the area under the curve (AUC), which provides a single measure of the model’s ability to distinguish between the two classes. The function and model shows how small changes in the threshold can significantly impact the balance between true and false positives.
 
 11. Use your created R functions and the provided classification output data set to produce all of the 
 classification metrics discussed above.
@@ -296,18 +313,13 @@ getRoc(data_df, "class")
 ```{r caret}
 
 library(caret)
-ccm <- confusionMatrix(as.factor(data_df$scored.class), as.factor(data_df$class))
 
-print(ccm)
+caret_results <- confusionMatrix(as.factor(df$scored.class), as.factor(df$class), positive = "1")
 
-# Extract sensitivity
-#sensitivity <- ccm$byClass["Sensitivity"]
-print(sensitivity)
-
-# F1 Score is part of the metrics printed in cm$byClass
-print(ccm$byClass['F1'])
-
+print(caret_results)
 ```
+
+To compare the manually calculated classification metrics with a built-in method,  the caret package and its confusionMatrix() function were used. This function efficiently returns a detailed summary of model performance, including accuracy, sensitivity, specificity, precision, and more. It also provides additional statistics like Kappa and balanced accuracy, which help to interpret the model’s effectiveness beyond just standard metrics. 
 
 13. Investigate the pROC package. Use it to generate an ROC curve for the data set. How do the results 
 compare with your own functions?
@@ -316,7 +328,12 @@ compare with your own functions?
 
 library(pROC)
 
-rocCurve <- roc(data_df$class, data_df$scored.probability) 
-plot(rocCurve, legacy.axes = TRUE, print.auc = TRUE)
+roc_pROC <- roc(df$class, df$scored.probability)
 
+plot(roc_pROC, main = "ROC Curve using pROC", col = "red", lwd = 2)
+abline(0, 1, col = "gray", lty = 2)
+
+auc(roc_pROC)
 ```
+
+For this question, the pROC package was used to generate an ROC curve and calculate the AUC using built-in functions. The curve produced by pROC is nearly identical to the one generated by the manual function, and the AUC values were nearly the same. While writing the function by hand was valuable for learning the underlying mechanics of ROC analysis, using pROC is clearly more efficient and practical for real-world work.

@@ -1,19 +1,17 @@
 ---
 title: "Assignment1_Data621"
-author: "Mubashira Qari, Marco Castro, Puja Roy, Zach Rose"
+author: "Mubashira Qari, Marco Castro, Puja Roy, Zach Rose, Erick Hadi"
 date: "2025-02-09"
 output:
   html_document:
     df_print: paged
+  pdf_document: default
 ---
-
-### Load Libraries
 
 ```{r global_options, include=FALSE}
 library(tidyverse)
 library(ggplot2)
 library(skimr)
-# 
 require(car)
 require(DataExplorer)
 require(miscTools)
@@ -24,17 +22,11 @@ require(mice)
 require(caret)
 require(glmnet)
 require(Metrics) 
+require(leaps)
+require(Amelia)
 ```
 
-## Data Exploration
-
-In this section, we perform our exploratory analysis to understand our dataset and identify potential issues such as missing values and outliers
-
-### Loading Datasets
-
-First, we load in our data
-
-```{r}
+```{r load-data, echo=FALSE}
 
 eval_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment1/moneyball-evaluation-data.csv")
 train_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment1/moneyball-training-data.csv")
@@ -48,25 +40,86 @@ eval_df <- data.frame(eval_data) |>
 train_df <- data.frame(train_data) |>
   drop_columns("INDEX")
 ```
-### Understanding the TARGET_WINS Field in the Moneyball Dataset:
 
-The TARGET_WINS field represents the number of games a team won in a given baseball season. 
+## Section 1: Data Exploration
 
-This is the dependent variable (target variable) in the multiple linear regression model.
+In this section, we perform exploratory analysis to understand our dataset and identify potential issues such as missing values and outliers
 
-We will be trying to predict TARGET_WINS based on other team performance metrics.
+### Shape of Data
+Our evaluation dataframe consists of 16 variables (excluding an INDEX field) all consisting of integer values. A cursory look demonstrates the presence of null values in some of our fields. Note that the TARGET_WINS field — the number of games a team won in a given baseball season — wil be used as the dependent variable in our analysis. 
 
-### Viewing Field Values:
-
-We can see there are fields with null values
 
 ```{r}
-str(eval_df)
 str(train_df)
 ```
+
+### Analysis of the training Dataset
+
+Before fitting a multiple linear regression (MLR) model, we analyze the dataset for potential issues such as missing values, extreme outliers, multicollinearity, and variable distributions. 
+
+The summary statistics below give us the mean, median, interquartile range, standard deviation and number of missing variables for the charts. 
+
+```{r}
+skim(train_df) # won't knit into pdf
+#summary(train_df)
+```
+
+Here's what we can infer from the summary statistics:
+
+#### 1. TARGET_WINS
+
+The min value of 0 and max of 146 suggest some potential outliers or erroneous data points, since most teams win between 50-110 games in a season. Below we examine a Box Plot of TARGET_WINS. 
+
+
+```{r}
+
+boxplot(train_df$TARGET_WINS, main="Distribution of Team Wins", ylab="Wins", col="lightblue")
+
+```
+
+The Box Plot for Outlier Detection & Distribution Analysis shows an Interquartile Range - IQR with a range roughly from 70 to 92 wins.
+
+The Box Plot suggests that there are several small circles (outliers) below the lower whisker. Additionally, there are some outliers above the upper whisker, but visually fewer than the low-end.
+
+Since The TARGET_WINS column has missing values, we should remove those rows since we can’t predict missing outcomes. Similarly, if it has a zero (0) value, we may also want to drop this row, as it is highly suspicious that a team would have 0 wins in 162 games.
+
+
+```{r}
+
+train_df <- train_df %>% 
+  filter(!is.na(TARGET_WINS) & TARGET_WINS >0)
+
+```
+
+
+#### 2. Missing Values
+
+Some variables have a significant number of missing values. In particular:
+
+- TEAM_BATTING_HBP (2085 missing values) <- very unreliable
+- TEAM_BASERUN_CS (772 missing values) <- potentially unreliable
+- TEAM_BATTING_SO (102 missing values)
+- TEAM_BASERUN_SB (131 missing values)
+- TEAM_PITCHING_SO (102 missing values)
+- TEAM_FIELDING_DP (286 missing values)
+
+Additionally, four variables have values of zero (0) reported that appear suspicious. In particular:
+- TEAM_BATTING_SO & TEAM_PITCHING_SO have the same rows entered as zero suggesting that data may not have been available for these entries.
+- TEAM_BATTING_HR & TEAM_PITCHING_HR have the same rows entered as zero suggesting that data may not have been available for these entries.
+
+_Actionable Steps:_
+- Removing TEAM_BATTING_HBP since most of it's values are missing.
+- Impute missing values (later on).
+
+```{r}
+
+train_df <- train_df[, !names(train_df) %in% "TEAM_BATTING_HBP"]
+
+```
+
 ### Faceted Scatter Plot with Linear Regression Lines:
 
-These scatter plots give us a sense of the relationship between the each variable and TARGET_WINS. Data points are plotted where the x-axis represents the predictor variable, and the y-axis represents the number of wins. A black trend line is fitted using linear regression is showing the general direction of the relationship.
+These scatter plots give us a sense of the relationship between the each variable and TARGET_WINS. Data points are plotted where the x-axis represents the predictor variable, and the y-axis represents the number of wins. A black trend line is fitted using linear regression to show the general direction and strength of the relationship between each variable and TARGET_WINS.
 
 ```{r}
 train_df %>%
@@ -77,8 +130,6 @@ train_df %>%
   facet_wrap(~variable, scales ="free", ncol = 4) +
   labs(x = element_blank(), y = "Wins")
 ```
-_Interpretation_
-
 
 The slope of the regression line in each facet is used to determine the strength of relationship between the independent variable represent on the x-axis vs the dependent variable y (TARGET_WINS). The steeper the slope, the stronger the relationship is between the two variables. The direction of the slope tells whether the relationship is positive or negative: 
 - if the line is sloped to the right, it is a positive relationship meaning we can expect an increase in y as x increases
@@ -91,40 +142,22 @@ _Positive Predictors of Wins:_ TEAM_BATTING_2B, TEAM_BATTING_BB, TEAM_BATTING_H,
 
 _Negative Predictors of Wins:_ TEAM_FIELDING_E, TEAM_PITCHING_H, TEAM_PITCHING_SO.
 
-_Weak or No Influence:_ TEAM_BATTING_3B, TEAM_BATTING_HBP, TEAM_BATTING_SO, TEAM_FIELDING_DP, TEAM_PITCHING_HR.
+_Weak or No Influence:_ TEAM_BATTING_3B, TEAM_BATTING_SO, TEAM_FIELDING_DP, TEAM_PITCHING_HR, , TEAM_BATTING_HBP (Removed).
 
-### Sorted Correlations
 
-#### Correlation Between All Variables
+### Correlations
 
-```{r correlation-heatmap}
-plot_correlation(train_df, type = "all")
-```
-_Interpretration_
+In this section, we examine two different types of correlations:
+- correlation between dependent and independent variables
+- correlation between all variables
 
-The Correlation Heatmap shows that the following variables are very highly correlated with one another
-- TEAM_BATTING_HR and TEAM_PITCHING_HR have a correlation value of 0.97
-- TEAM_FIELDING_E and TEAM_PITCHING_H have a correlation value of 0.67
-- TEAM_FIELDING_E and TEAM_BATTING_BB have a correlation value of -0.66
-- TEAM_BATTING_3B and TEAM_BATTING_HR have a correlation value of -0.64
-- TEAM_FIELDING_E and TEAM_BATTING_HR have a correlation value of -0.59
-- TEAM_FIELDING_E and TEAM_PITCHING_HR have a correlation value of -0.57
-- TEAM_BATTING_H and TEAM_BATTING_2B have a correlation value of -0.57
-- TEAM_FIELDING_E and TEAM_BATTING_3B have a correlation value of 0.51
-- 
+#### Correlation Between Dependent and Independent variables
 
-#### Correlation Between TARGET_WINS and [x]
+The correlation between the dependent variable TARGET_WINS and each of the independent variables. In this context, correlation pertains to the strength (0:1) and direction (+/-) of the relationship between the dependent and independent variable. A higher strength is indicated by a number closer to 1 and describes a greater change on the dependent variable by the independent variable. The direction describes whether the change is increasing (positive) or decreasing (negative). The chart below suggest that there is a relatively weak relationship between the TARGET_WINS and TEAM_BASERUN_SB and should be considered for omission from our models.
 
 ```{r}
 correlation_with_target <- cor(train_df, use = "complete.obs")["TARGET_WINS", ] %>%
   sort(decreasing = TRUE)  # Sort from highest to lowest correlation
-print(correlation_with_target)
-```
-
-
-
-```{r}
-library(ggplot2)
 
 correlation_data <- data.frame(Variable = names(correlation_with_target), Correlation = correlation_with_target)
 
@@ -136,368 +169,160 @@ ggplot(correlation_data, aes(x = reorder(Variable, Correlation), y = Correlation
   theme_minimal()
 
 ```
-### Checking Correlations and Finding	Action:
 
-Strong positive correlation (> 0.5)	-> keep the variable in regression.
 
-Strong negative correlation (< -0.5) -> Keep (inverse relationship).
+#### Correlation Between All Variables
 
-Weak correlation (~0)	-> Consider removing.
+Testing the correlation between all variables shows how the change in one variable affects the change in another. In this case, a high correlation value between two independent variables, regardless of direction, suggests multicollinearity between the variables meaning that they are not independent from one another and thus breaks our assumption of independence. 
 
-Two highly correlated variables (> 0.85) -> Drop one to avoid multicollinearity.
+```{r correlation-before-imputation}
+cor_matrix <- cor(train_df, use = "complete.obs")
+cor_df <- as.data.frame(as.table(cor_matrix))
+cor_df <- cor_df[cor_df$Var1 != cor_df$Var2, ]
+cor_df <- cor_df[order(cor_df$Freq, decreasing = TRUE), ]
+```
 
-### Summary of Datasets
+The correlation matrix shows that the following variables are very highly correlated with one another:
 
+_Top 3 Positive Correlation_
 ```{r}
-skim(eval_df)
-skim(train_df)
+head(cor_df, 3)
+```
+
+_Top 3 Negative Correlation_
+```{r}
+head(cor_df[order(cor_df$Freq), ], 3)
 ```
 
 
 
-```{r}
-summary(train_df)
-```
+### Potential Outliers & Data Issues
 
-```{r}
-summary(eval_df)
-```
-
-
-
-### Calculate mean, median, and standard deviation for key numerical columns
-
-```{r}
-
-train_df %>%
-  summarise(across(where(is.numeric), list(mean = mean, median = median, sd = sd), na.rm = TRUE))
-
-``` 
-The summarise(across()) function above is calculating the mean, median, ans standard deviation for all the numerical variables.
-
-### Analysis of the training Dataset Before Fitting a Multiple Linear Regression Model:
-
-Before fitting a multiple linear regression (MLR) model, we analyze the dataset for potential issues such as missing values, extreme outliers, multicollinearity, and variable distributions. 
-
-Here's what we can infer from the summary statistics:
-
-#### 1. Understanding the Target Variable (TARGET_WINS)
-
-Range: 0 to 146 wins
-
-Mean: ~80.79 wins
-
-Median: 82 wins
-
-Distribution: The min value of 0 and max of 146 suggest some potential outliers or erroneous data points, since most teams win between 50-110 games in a season.
-
-
-```{r}
-
-boxplot(train_df$TARGET_WINS, main="Distribution of Team Wins", ylab="Wins", col="lightblue")
-
-```
-
-_Actionable Steps:_
-
-- Drop row with zero (0) value.
-
-#### 2. Missing Values
-
-Some variables have a significant number of missing values. In particular:
-
-- TEAM_BATTING_SO (102 missing values)
-- TEAM_BASERUN_SB (131 missing values)
-- TEAM_BASERUN_CS (772 missing values) <- potentially unreliable
-- TEAM_BATTING_HBP (2085 missing values) <- very unreliable
-- TEAM_PITCHING_SO (102 missing values)
-- TEAM_FIELDING_DP (286 missing values)
-
-Additionally, four variables have values of zero (0) reported that appear suspicious. In particular:
-- TEAM_BATTING_SO & TEAM_PITHCING_SO have the same rows entered as zero suggesting that data may not have been available for these entries.
-- TEAM_BATTING_HR & TEAM_PITHCING_HR have the same rows entered as zero suggesting that data may not have been available for these entries.
-
-_Actionable Steps:_
-
-- Impute missing values (using mean/median or regression techniques).
-
-- Consider removing TEAM_BATTING_HBP and TEAM_BASERUN_CS if they are highly incomplete and do not contribute much.
-
-#### 3. Potential Outliers & Data Issues
-
-Several variables have extreme max values that seem unrealistic. Specifically:
+We observed the following values that seem suspicious:
 
 - TEAM_PITCHING_H (Max = 30,132) <- Likely an error since typical values range from 1,200 - 1,700.
 - TEAM_PITCHING_SO (Max = 19,278) <- Suspiciously high (typical range: 500 - 1,500).
-
 - TEAM_PITCHING_BB (Max = 3,645) <- Very high (typical range: 300 - 700).
 - TEAM_FIELDING_E (Max = 1,898) <- Likely an error since the normal range is ~ 70-200.
 
+We will take a look at only potential outliers that have a significant leverage when we start fitting our model.
 
-_Actionable Steps:_
 
-- Check for data entry errors.
 
-- Remove extreme outliers if they distort model performance.
+## Section 3: Data Preparation
 
-#### 4. Feature Selection Considerations:
+Before fitting our model, we will consider the following data cleaning steps:
 
-Batting Variables: TEAM_BATTING_H, TEAM_BATTING_2B, TEAM_BATTING_3B, TEAM_BATTING_HR, TEAM_BATTING_BB are likely strong predictors of team wins. Note that TEAM_BATTING_H includes TEAM_BATTING_2B, TEAM_BATTING_3B, TEAM_BATTING_HR data.
-
-Pitching Variables: TEAM_PITCHING_H, TEAM_PITCHING_HR, TEAM_PITCHING_BB, TEAM_PITCHING_SO will impact defensive strength.
-
-Fielding Variables: TEAM_FIELDING_E (errors) and TEAM_FIELDING_DP (double plays) may have a weaker impact compared to batting and pitching.
-
-_Actionable Steps:_
-
-TEAM_PITCHING_H, TEAM_PITCHING_HR, and TEAM_PITCHING_BB may be highly correlated, which can cause multicollinearity in the regression model.
-
-TEAM_BATTING_H, TEAM_BATTING_2B, and TEAM_BATTING_3B may also be strongly correlated since total hits include doubles and triples.
-
-#### 5. Data Cleaning Recommendations Before Fitting the Model
-
-Handle Missing Values
-
-Consider dropping or imputing variables with too many missing values (e.g., TEAM_BATTING_HBP).
-
-Impute TEAM_BASERUN_SB, TEAM_BASERUN_CS, and TEAM_FIELDING_DP appropriately.
+- Consider dropping or imputing variables with too many missing values (e.g., TEAM_BATTING_HBP).
 
 - Remove or Adjust Extreme Outliers
 
-Remove highly unrealistic values in pitching, fielding, and errors.
-
-- Check for Multicollinearity
-
-Use Variance Inflation Factor (VIF) to detect multicollinearity and drop redundant features.
-
-- Feature Engineering
-
-Consider derived metrics like batting average (H/AB), on-base percentage (OBP), or earned run average (ERA) instead of raw counts.
-
-_Conclusion_
-
-The dataset contains inconsistencies, missing values, and extreme outliers that need to be addressed before fitting an MLR model. 
-
 Once cleaned, feature selection and multicollinearity checks will be essential to ensure a robust and interpretable model for predicting team wins.
 
+####  Identifying Missing Values
 
-### Analysis of the Box Plot for TARGET_WINS (Team Wins Distribution)
-
-This box plot provides valuable insights into the distribution of team wins in the training dataset. 
-
-Here’s what we can infer:
-
-#### 1. Median and Spread of Wins
-
-The thick horizontal line inside the box represents the median (~82 wins).
-
-The box itself (Interquartile Range - IQR) shows the middle 50% of the data, which seems to range roughly from 70 to 92 wins.
-
-#### 2. Box Plot – for Outlier Detection & Distribution Analysis:
-
-- Low-end outliers (~0-40 wins): There are several small circles (outliers) below the lower whisker.
-
-- High-end outliers (~110-146 wins): There are some outliers above the upper whisker, but visually fewer than the low-end.
-
-### Consideration for Regression?
-
-- These low-win teams might be problematic for modeling because they could represent incomplete or missing data.
-
-- Potential data entry issues (e.g., a team with 0 wins) should be checked.
-
-- If extreme values skew the regression, we might need transformations (log scaling)
-
-#### 3. Data Skewness and Symmetry
-
-The box is fairly centered, suggesting a roughly symmetric distribution.
-
-
-```{r}
-
-hist(train_df$TARGET_WINS, 
-     main = "Histogram of Team Wins with Density Curve", 
-     xlab = "Wins", 
-     col = "lightgray", 
-     border = "black", 
-     breaks = 20, 
-     probability = TRUE)  # Converts y-axis to density
-
-lines(density(train_df$TARGET_WINS, na.rm = TRUE), 
-      col = "red", 
-      lwd = 2)  # Adds a red density curve
-```
-
-## Data Preparation
-
-- Analyze Missing Values from Train Datasets.
-
-
+We previously identified several variables with many missing fields. Our first step was to drop _TEAM_BATTING_HBP_ as most of its values were missing. In this next section, we will address the following missing values 
 
 ```{r}
 
 missing_values <- train_df %>%
   summarise(across(everything(), ~ sum(is.na(.)))) %>%
-  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Missing_Count")
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Missing_Count") %>%
+  filter(Missing_Count > 0) %>%
+  arrange(desc(Missing_Count))
 
 print(missing_values)
 
 ```
 
-```{r}
-ggplot(missing_values, aes(y = reorder(Variable, Missing_Count), x = Missing_Count, fill = Missing_Count > 0)) +
-  geom_col() +
-  labs(title = "Missing Values in Training Dataset",
-       x = "Number of Missing Values",
-       y = "Variables") +
-  scale_fill_manual(values = c("gray", "red"), labels = c("No Missing", "Has Missing")) +
-  theme_minimal()
-```
-### Strategy for Missing Values Column wise:
-
-There are four main options for handling missing values:
-
-#### 1. Remove Rows with Missing Target (TARGET_WINS)
-
-If the TARGET_WINS column has missing values, remove those rows since we can’t predict missing outcomes.
-
-```{r}
-
-train_df <- train_df %>% filter(!is.na(TARGET_WINS))
-
-```
-
-#### 2. Removing Columns with Too Many Missing Values
-
-If a column has too many missing values (e.g., >50% missing), it may be better to remove it.
-
-The _TEAM_BATTING_HBP_ column is mostly empty and not critical.
-
-```{r}
-
-train_df <- train_df[, !names(train_df) %in% "TEAM_BATTING_HBP"]
-
-```
-#### 3. Address Suspicious Values
-
 The variables _TEAM_BATTING_SO_, _TEAM_PITCHING_SO_, _TEAM_BATTING_HR_, and _TEAM_PITCHING_HR_ included several observations with a value of zero. As the rows were the same for both variables, it appears that these may also be missing observations as the likelihood that a team's batters did not have a single strikeout nor did their pitchers pitch a single strikeout over the course of a 162 game season is highly unlikely. We will therefore treat these as missing observations and impute using the median value which is more robust to outliers then using the mean values. We will also drop the single row where the team did not win a single game, as this is also suspicious.
 
-```{r model4-transformations}
+#### Handling Missing Values
+
+Next, we will address the remaining missing values. We will weight several options:
+
+##### Removing Missing Values
+
+Dropping missing values could result in significantly reducing the sample size and thus the predictive power of your model. It can also introduce bias if the missing data is not missing completely at random (MCAR) or if too many observations are dropped from certain categories. We will therefore explore other methods.
+
+##### Mean Imputation
+
+Mean imputation makes the imputed values less variable and could lead to an underestimation of the variability in your model. It may also over-simplify the observations and create artificial relationships. It can also introduce bias if the missing data is not missing completely at random (MCAR) or if too many observations are dropped from certain categories.
+
+##### Median Imputation
+
+Median imputation has many of the same issues as mean imputation but is more robust to the effects of skewing and outliers. However, it can also introduce bias if the missing data is not missing completely at random (MCAR) or if too many observations are dropped from certain categories.
+
+##### Regression Imputation
+
+Regression Imputation uses predictive models to predict missing values based on our dataframe and is one of the suggested techniques for values Missing at Random (MAR). However, if data is not Missing at Random (MAR), we can inadvertently introduce bias in our data.
+
+##### Imputing
+
+Upon further analysis, we noticed a pattern between 4 parameters with missing values: TEAM_BATTING_SO, TEAM_PITCHING_SO, TEAM_BATTING_HR, and TEAM_PITCHING_HR suggesting that these missing values may be MAR. However, no pattern was evident for the other three parameters with missing values (TEAM_BASERUN_CS,	TEAM_FIELDING_DP, TEAM_BASERUN_SB) suggesting that they may be MCAR. As such, we should apply two separate techniques for the missing values suitable for their specific classification. Specifically, we will apply:
+
+- Median imputation to TEAM_BASERUN_CS,	TEAM_FIELDING_DP, TEAM_BASERUN_SB as it is a more robust form of imputation for MCAR values than mean imputation which is more affected by outliers
+- MICE imputation to TEAM_BATTING_SO, TEAM_PITCHING_SO, TEAM_BATTING_HR, and TEAM_PITCHING_HR as it as more robust method for MAR values.
+
+```{r median-imputation}
+
+library(miscTools)
+
+train_df_median <- train_df
+median_val <- colMedians(train_df_median, na.rm = TRUE)
+
+# Impute using medians
+for(i in c('TEAM_BASERUN_CS',	'TEAM_FIELDING_DP', 'TEAM_BASERUN_SB'))
+    train_df_median[,i][is.na(train_df_median[,i])] <- median_val[i]
+
+```
+
+
+```{r convert-dubious-values-to-na}
 
 # Convert dubious stats to NAs for pitching
 # and drop unnecessary columns
-train_df <- train_df |>
+train_df_median <- train_df_median |>
   mutate(
     TEAM_BATTING_SO = if_else(TEAM_BATTING_SO > 0, TEAM_BATTING_SO, NA_integer_),
     TEAM_PITCHING_SO = if_else(TEAM_PITCHING_SO > 0, TEAM_PITCHING_SO, NA_integer_),
     TEAM_BATTING_HR = if_else(TEAM_BATTING_HR > 0, TEAM_BATTING_HR, NA_integer_),
     TEAM_PITCHING_HR = if_else(TEAM_PITCHING_HR > 0, TEAM_PITCHING_HR, NA_integer_)
-  ) |>
-  filter(TARGET_WINS > 0) 
-```
-
-
-
-### Handling Missing Values
-
-Next, we will address the remaining missing values. We will weight several options
-
-#### Option 1: Removing Missing Values
-
-- Missing Values Cause Errors in Regression Models
-
-- lm() in R cannot handle missing values and will return an error if NAs exist in predictor variables.
-
-- Removing missing values ensures that the model runs smoothly without interruptions.
-
-_Pros_
-
-- Convenience. If too many rows have missing values, R removes them automatically, reducing sample size.
-
-
-_Cons_
-
-- If missing values are not randomly distributed, removing them may bias the dataset.
-
-- Reduced sample size 
-
-_Conclusion_
-
-Instead of na.omit(), imputation methods (like mean/median filling) may be better for handling missing data.
-
-Removing rows with missing data is sometimes not the best approach, especially if a large portion of data is lost. We will therefore explore other methods.
-
-#### Option 2: Mean
-
-Instead of removing missing values, fill them with the mean:
-
-```{r}
-
-train_df_mean <- train_df
-mean_val <- colMeans(train_df, na.rm = TRUE)
-
-# Impute using Means
-for(i in colnames(train_df))
-    train_df[,i][is.na(train_df[,i])] <- mean_val[i]
-
-plot_qq(train_df, sampled_rows = 1000L)
-
-# Missing values per column
-colSums(is.na(train_df_mean))
+  ) 
 
 ```
-_Pros_
 
-_Cons_
-Not usually recommended for serious analyses because it reduces the variance and doesn't account for the uncertainty in imputations.
+```{r apply-regimp-to-mar}
 
-#### Option 3: Median
+regimp <- lm(TEAM_BATTING_SO ~ . - TEAM_PITCHING_SO - TEAM_BATTING_HR - TEAM_PITCHING_HR, data = train_df_median)
 
-Instead of removing missing values, fill them with the median:
+# Predict missing values 
+train_df_median$TEAM_BATTING_SO[is.na(train_df_median$TEAM_BATTING_SO)] <- predict(regimp, newdata = train_df_median[is.na(train_df_median$TEAM_BATTING_SO), ])
 
-```{r}
+regimp <- lm(TEAM_PITCHING_SO ~ . - TEAM_BATTING_SO - TEAM_BATTING_HR - TEAM_PITCHING_HR, data = train_df_median)
 
-library(miscTools)
+# Predict missing values 
+train_df_median$TEAM_PITCHING_SO[is.na(train_df_median$TEAM_PITCHING_SO)] <- predict(regimp, newdata = train_df_median[is.na(train_df_median$TEAM_PITCHING_SO), ])
 
-train_df_median <- train_df
-median_val <- colMedians(train_df, na.rm = TRUE)
+regimp <- lm(TEAM_BATTING_HR ~ . - TEAM_PITCHING_SO - TEAM_BATTING_SO - TEAM_PITCHING_HR, data = train_df_median)
 
-# Impute using medians
-for(i in colnames(train_df))
-    train_df_median[,i][is.na(train_df_median[,i])] <- as.integer(median_val[i])
+# Predict missing values 
+train_df_median$TEAM_BATTING_HR[is.na(train_df_median$TEAM_BATTING_HR)] <- predict(regimp, newdata = train_df_median[is.na(train_df_median$TEAM_BATTING_HR), ])
 
-plot_qq(train_df_median, sampled_rows = 1000L)
-# Missing values per column
-colSums(is.na(train_df_median))
+regimp <- lm(TEAM_PITCHING_HR ~ . - TEAM_PITCHING_SO - TEAM_BATTING_SO - TEAM_BATTING_HR, data = train_df_median)
+
+# Predict missing values 
+train_df_median$TEAM_PITCHING_HR[is.na(train_df_median$TEAM_PITCHING_HR)] <- predict(regimp, newdata = train_df_median[is.na(train_df_median$TEAM_PITCHING_HR), ])
+
+train_df_clean <- train_df_median |>
+  filter(!TEAM_BATTING_HR < 0)
+
+print(colSums(is.na(train_df_clean)))
 ```
-
-_Pros_
-
-_Cons_
-
-#### Option 4: Multivariate Imputation by Chained Equations (MICE)
-
-Multivariate Imputation by Chained Equations (MICE) is a type of Multiple Imputation.
-
-```{r mice}
-
-
-train_df_mice <- mice(data=train_df, m=30, maxit=10, seed=12345, print=FALSE)
-```
-
-```{r}
-
-train_df_clean <- train_df_mice$data
-sum(is.na(train_df_clean))  # Total missing values
-  
-```
-
-_Pros_
-
-_Cons_
 
 ### Splitting the training dataset
 
-We split the original training dataset into a training and testing dataset in order to test the strength of our model without testing the model on data that the model has already seen. The training dataset will hold 75% of our original observations, while the test dataset will hold 25%. 
+We split the original training dataset into a training and testing dataset in order to test the strength of our model without testing the model on data that the model has already seen. The training dataset will contain 75% randomly selected observations from our original dataset of 2276 observations, while the test dataset will hold 25%. Some potential drawbacks of this technique are that we will make our sample size smaller, which may negatively affect our model if our sample size is small. As our split training set will still contain 1706 observations, it should still provide an adequate sample size. We also explore Cross-Validation techniques later on in our analysis. 
 
 ```{r model4-split-data}
 
@@ -511,7 +336,7 @@ stp75_train_df <- train_df_clean[train_ind, ]
 stp25_test_df <- train_df_clean[-train_ind, ]
 ```
 
-### Outliers
+### Handling Outliers
 
 The Residuals vs. Fitted and QQ Plots show a fairly linear pattern, while Scale-Location plot suggest Homoscedasticity. However, the Residuals vs Leverage plot reveals the presence of some outliers. 
 
@@ -570,418 +395,24 @@ plot(stp_model_full, which = 4,  id.n = 8)
 
 As the Cooks Distance (Di) value is less than 0.5 for all of the remaining outliers appear, they are not significantly influential and can be left in our dataset.
 
-## Building Models 
 
-### Model 1: Base Baseball Stats Model
+---
 
-- This model includes fundamental offensive, defensive, and pitching stats that logically contribute to wins.
 
-#### Why were these variables selected?
+## Section 3: Building Models 
 
-TEAM_BATTING_H (Hits): More hits increase the chances of scoring.
+In this section we will build several models which we will compare and evaluate before selecting a final model.
 
-TEAM_BATTING_HR (Home Runs): Home runs are a major contributor to runs.
+### Feature Selection Analysis
 
-TEAM_PITCHING_SO (Strikeouts): More strikeouts reduce opponent scoring.
-
-TEAM_FIELDING_E (Errors): More errors lead to more opponent runs (negative predictor).
-
-Why exclude some variables?
-
-TEAM_BASERUN_SB (Stolen Bases): Limited impact on overall wins.
-
-TEAM_PITCHING_BB (Walks Allowed): May not be as predictive when combined with strikeouts.
-
-#### Model Summary Statistics
-
-```{r}
-
-base_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = stp75_train_df)
-
-# View model summary
-summary(base_model)
-
-```
-
-#### Interpreting the Coefficients of the Regression Model
-
-1- Intercept (8.05)
-
-When all predictor variables (TEAM_BATTING_H, TEAM_BATTING_HR, TEAM_PITCHING_SO, TEAM_FIELDING_E) are zero, a team is expected to have 8.05 wins.
-Significant (p = 0.04) → The intercept is meaningful in this context.
-
-2- TEAM_BATTING_H (Hits) → 0.05 (p < 2e-16 *)
-
-positive & highly significant
-Interpretation: For every additional hit, the team is expected to win 0.052 more games.
-Example: If a team gets 100 more hits in a season, they would be expected to win ~5 more games (100 × 0.05).
-Conclusion: More hits lead to more wins, which is expected in baseball.
-
-3- TEAM_BATTING_HR (Home Runs) → -0.008 (p = 0.26026 - Not Significant)
-Negative (unexpected) & not significant
-
-Interpretation: More home runs slightly decrease wins, but the effect is very small and not statistically significant.
-Example: Hitting 100 more home runs would decrease wins by 008, which doesn’t make sense. We should consider removing this variable.
-
-Possible Issues:
-Multicollinearity: Home runs may be highly correlated with other batting stats (like hits or doubles), causing misleading coefficients.
-Outliers/Bad Teams: Some losing teams hit a lot of home runs but still lost, skewing results.
-
-Solution:
-Check VIF (Variance Inflation Factor) for multicollinearity.
-Add an interaction term (e.g., TEAM_BATTING_HR * TEAM_BATTING_BB).
-Consider removing this variable if it remains insignificant.
-
-4_ TEAM_PITCHING_SO (Strikeouts by Pitchers) → +0.0025 (p = 0.005)
-Weakly positive, borderline significant
-
-Interpretation: More strikeouts slightly increase wins, but the effect is very small tough statistically significant (p = 0.005).
-Example: If a team strikes out 500 more batters in a season, they would win 0.5 more games.
-
-Conclusion:
-Strikeouts help teams win, but they are not the strongest predictor of wins.
-The effect might be hidden by other defensive factors (e.g., walks, home runs allowed).
-
-Solution:
-Consider adding walks (TEAM_PITCHING_BB) or earned run average (ERA) to capture pitching effectiveness better.
-
-5- TEAM_FIELDING_E (Errors) → -0.023 (p < 2e-16 *)
-Negative & highly significant
-
-Interpretation: For every additional error, a team is expected to lose 0.023 more games.
-Example: A team with 50 more errors in a season would lose ~1 more game (50 × 0.021).
-Conclusion: More errors directly hurt a team’s chances of winning, which makes sense in baseball.
-
-#### Key Metric Interpretation:
-
-Residual Std. Error	13.78	The average prediction error is ~13.78 wins.
-
-Adjusted R²	0.2349	The model explains 23.5% of variance in TARGET_WINS (not very strong). 
-
-F-Statistic	175.6 (p < 2.2e-16)	The overall model is statistically significant.
-
-p < 2.2e-16 → The probability of getting this result by random chance is essentially 0 (very small).
-
-#### Conclusion: 
-
-At least one of the predictor variables in the model significantly affects TARGET_WINS.
-
-If the p-value is very small (< 0.05), we reject the null hypothesis that "none of the independent variables explain wins."
-
-Our model as a whole is meaningful and explains a significant amount of variation in team wins.
-
-At least one of our predictors (TEAM_BATTING_H, TEAM_BATTING_HR, TEAM_PITCHING_SO, TEAM_FIELDING_E) is statistically significant in predicting wins.
-
-The F-statistic of 175.6 (p < 2.2e-16) means our model is highly statistically significant. This confirms that at least one of our variables—such as home runs, hits, strikeouts, or errors—has a real impact on predicting wins.
-
-However, we still need to check which specific variables are the most meaningful (p-values of individual coefficients) and whether we can improve the model further.
-
-#### Implementing Improvement in the Model:
-
-##### Step 1: Check for Multicollinearity (VIF Test)
-
-Multicollinearity occurs when predictor variables are highly correlated, leading to unstable coefficients and inflated standard errors.
-
-We use the Variance Inflation Factor (VIF) test. A VIF > 5 suggests multicollinearity, and VIF > 10 is a strong sign of redundancy.
-
-##### Run VIF test in R:
-
-```{r}
-
-library(car)
-vif(base_model)
-
-```
-
-##### Interpretation
-Since all VIF values are below 5, there is no significant multicollinearity in the model. This means:
-
-Each predictor contributes unique information to explaining TARGET_WINS.
-Regression coefficients are stable, and we do not need to remove any variables due to multicollinearity.
-The model is not distorted by highly correlated predictors.
-
-
-##### Step 2: Test Interaction Term (TEAM_BATTING_HR * TEAM_BATTING_BB)
-
-If a team hits more home runs and draws more walks, they likely score more runs.
-We test if walks amplify the impact of home runs on wins.
-
-```{r}
-
-interaction_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + 
-                          TEAM_BATTING_HR:TEAM_BATTING_BB + 
-                          TEAM_PITCHING_SO + TEAM_FIELDING_E, 
-                        data = stp75_train_df)
-
-summary(interaction_model)
-
-```
-
-##### Interpretation:
-
-
-Model now includes an interaction term (TEAM_BATTING_HR:TEAM_BATTING_BB) to see if walks (BB) affect the impact of home runs (HR) on wins. Let’s break down the results.
-
-The average prediction error is ±13.31 wins, slightly better than before (13.78).
-The model explains 27.2% of the variance in wins (up from 23.6% in the original model).
-Similar to R², meaning additional predictors added value to the model.
-The model as a whole is statistically significant (at least one predictor explains wins).
-
-More Home Runs (HR) Alone → Fewer Wins (Unexpected):
-The negative coefficient (-0.1650) on TEAM_BATTING_HR suggests that hitting more home runs alone does not necessarily lead to more wins.
-
-Walks (BB) Alone Have a Weak Impact on Wins:
-The coefficient for TEAM_BATTING_BB is negative (-0.0074) and not statistically significant (p = 0.1387).
-This means that walks alone do not have a strong impact on wins.
-
-The Interaction Term (TEAM_BATTING_HR * TEAM_BATTING_BB) is Highly Significant (p = 3.39e-10)
-Positive Coefficient (+0.000301)
-
-Teams that hit home runs AND get on base with walks tend to win more games.
-This confirms that home runs are more valuable when combined with walks.
-
-##### Visualizing the Interaction Effect:
-We want to see how home runs (TEAM_BATTING_HR) and walks (TEAM_BATTING_BB) impact wins (TARGET_WINS) together.
-
-```{r}
-library(ggplot2)
-
-ggplot(stp75_train_df, aes(x = TEAM_BATTING_HR, y = TARGET_WINS, color = TEAM_BATTING_BB)) +
-  geom_point(alpha = 0.7) + 
-  geom_smooth(method = "lm", se = FALSE, color = "black") +
-  scale_color_gradient(low = "blue", high = "red") +
-  labs(title = "Interaction Effect of Home Runs and Walks on Wins",
-       x = "Home Runs",
-       y = "Wins",
-       color = "Walks (BB)") +
-  theme_minimal()
-
-
-```
-Red (high walks) teams should have higher wins for the same HRs.
-Blue (low walks) teams may not benefit as much from HRs.
-The trendline is steeper for teams with more walks, confirming that walks amplify HR impact.
-
-##### Adding TEAM_BATTING_2B (Doubles) to the Model:
-Doubles (2B) are a strong indicator of offensive power and often correlate with scoring more runs.
-If a team doesn’t hit home runs, but hits many doubles, it can still score efficiently.
-
-```{r}
-improved_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + 
-                        TEAM_BATTING_2B + TEAM_BATTING_HR:TEAM_BATTING_BB + 
-                        TEAM_PITCHING_SO + TEAM_FIELDING_E, 
-                      data = stp75_train_df)
-
-summary(improved_model)
-
-```
-##### Interpretation:
-
-The average prediction error is ±13.42 wins (slightly better than before).
-The model explains 27.9% of the variance in wins (slightly better than 27.2% in the previous model).
-Adjusted for number of predictors (still an improvement from before).
-The model is statistically significant overall.
-
-##### Improvement After Adding TEAM_BATTING_2B (Doubles)?
-Model performance improved slightly (R² increased from 27.2% → 27.9%).
-Doubles (TEAM_BATTING_2B) unexpectedly have a negative impact on wins.
-
-Possible issue: Doubles may be highly correlated with other batting stats (e.g., hits, HRs).
-Solution: We will Check multicollinearity (VIF) or add an interaction term (e.g., TEAM_BATTING_2B * TEAM_BATTING_H).
-HRs alone are still negative (-0.1612), but the interaction term remains strong.
-Conclusion: HRs are only useful when paired with walks.
-
-#### Key Findings
-Adding TEAM_BATTING_2B slightly improves model performance 
-
-R² increased from 27.2% → 27.9% (small improvement).
-Residual Standard Error decreased from 13.31 → 13.25 (better fit).
-Unexpected negative coefficient for doubles (-0.0429, p = 3.09e-06) 
-
-Suggests that more doubles lead to fewer wins, which is counterintuitive.
-Possible reasons:
-Multicollinearity with TEAM_BATTING_H (hits).
-Bad teams might hit many doubles but still lose.
-Interaction term (TEAM_BATTING_HR * TEAM_BATTING_BB) remains strong and positive 
-
-Confirms that HRs are more valuable when combined with walks.
-Suggests plate discipline (BBs) is crucial for power hitters.
-Decision: Should we keep TEAM_BATTING_2B?
-
-If VIF test shows high correlation with TEAM_BATTING_H, we should drop it.
-If interaction terms (e.g., TEAM_BATTING_2B * TEAM_BATTING_H) make sense, we could try that instead.
-
-#### Test Four Assumptions:
-
-##### Linearity 
-```{r check-for-Linearity-m1i}
-plot(improved_model, which=1)
-```
-
-
-Our diagnostic plots show a fairly linear model. 
-##### Normality Check:
-
-```{r check-for-normality-m1i}
-
-plot(improved_model, which=2)
-shapiro.test(residuals(improved_model))
-# Shapiro-Wilk normality test: look for high p-value
-```
-Our QQ plot suggests normality thought there is obvious skewing on the tails, particularly on the right.
-
-A Shapiro Wilk's Test statistic had a value of W = 0.9971  suggesting normality.
-
-However, the p-value (0.0033) is less than < 0.05 suggesting that residuals do not follow a normal distribution.
-
-##### Heterocedasticity:
-
-```{r check-for-Heterocedasticity-m1i echo: false}
-
-plot(improved_model, which=3)
-bptest(improved_model)
-# Breusch-Pagan test; look for high p-value
-```
-Test Statistic (BP = 200.46) suggest higher evidence of heteroscedasticity. Additionally, the p-value is extremely small (much less than 0.05), suggesting higher evidence of heteroscedasticity and that we may need to transform the data to meet the Assumption of Homoscedasticity.
-
-##### Independence:
-
-
-```{r check-for-independence-m1i}
-
-acf(residuals(improved_model))
-durbinWatsonTest(improved_model)
-# Durbin Watson should be close to 2
-```
-
-Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.03 and an autocorrelation value of -0.0017. Furthermore, as our p-value (0.558) is greater than 0.05, we do not have enough evidence to reject the null hypothesis that there is no autocorrelation. In other words, the test results suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
-
-##### Multicolinearity:
-
-```{r}
-
-# Check Variance Inflation Factor (VIF)
-vif(improved_model)
-    
-```
-TEAM_BATTING_H,  TEAM_BATTING_2B,  TEAM_PITCHING_SO,  TEAM_FIELDING_E are in the range of (1-5) - No significant multicollinearity (good)
-
-TEAM_BATTING_HR, TEAM_BATTING_HR:TEAM_BATTING_BB are in the range of (> 10) shows Severe multicollinearity (highly problematic).
-
-
-### Model 2: High-Impact Features Model (Based on Correlation & VIF)
-
-We select variables based on correlation with TARGET_WINS and ensure they are not highly correlated with each other (VIF < 5).
-
-```{r}
-library(car)
-
-# Manually selected high-impact variables
-high_impact_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_HR +
-                        TEAM_PITCHING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = stp75_train_df)
-
-# View model summary
-summary(high_impact_model)
-
-plot(high_impact_model)
-
-# Check for multicollinearity
-vif(high_impact_model)
-
-```
-
-#### Why these variables?
-
-TEAM_BATTING_2B (Doubles): Important for offensive production.
-
-TEAM_PITCHING_HR (Home Runs Allowed): Directly impacts opponent scoring (negative impact).
-
-Removed highly correlated variables (VIF > 5).
-
-What changed?
-
-Better feature selection → Based on both domain knowledge and correlation analysis.
-
-Removes redundant variables that cause multicollinearity.
-
-### Model 3: Log-Transformed Model (Handling Skewness & Outliers)
-
-- Some baseball statistics (e.g., Home Runs, Strikeouts) have skewed distributions. We apply log transformation to stabilize variance.
-
-```{r}
-
-# Apply log transformation to selected variables
-train_df_log <- stp75_train_df %>%
-  mutate(
-    log_BATTING_H = log1p(TEAM_BATTING_H),
-    log_BATTING_HR = log1p(TEAM_BATTING_HR),
-    log_PITCHING_SO = log1p(TEAM_PITCHING_SO)
-  )
-
-
-# Fit model with transformed variables
-log_model <- lm(TARGET_WINS ~ log_BATTING_H + log_BATTING_HR + log_PITCHING_SO + TEAM_FIELDING_E, data = train_df_log)
-
-# View model summary
-summary(log_model)
-
-plot(log_model)
-
-```
-#### Why log transformation?
-
-Fixes right-skewed distributions (e.g., extreme HR and SO values).
-
-Helps meet the linear regression assumption of normality.
-
-Reduces outlier influence.
-
-What changed?
-
-More stable regression coefficients with reduced variability.
-
-Improves the model fit for non-linear relationships.
-
-#### Comparision between three Models:
-
-- Compare Adjusted R² across models:
-
-```{r}
-summary(base_model)$adj.r.squared
-summary(high_impact_model)$adj.r.squared
-summary(log_model)$adj.r.squared
-
-
-```
-- Check Mean Squared Error (MSE):
-
-```{r}
-
-mse_base <- mean((stp75_train_df$TARGET_WINS - predict(base_model, stp75_train_df))^2)
-mse_high_impact <- mean((stp75_train_df$TARGET_WINS - predict(high_impact_model, stp75_train_df))^2)
-mse_log <- mean((train_df_log$TARGET_WINS - predict(log_model, train_df_log))^2)
-
-print(c(mse_base, mse_high_impact, mse_log))
-
-```
-- Evaluate Multicollinearity (VIF check):
-
-```{r}
-
-vif(high_impact_model)
-
-
-```
-
-### Model 4: Variable Selection Using Backward Selection 
-
-For this model, we are using backward selection to arrive at the smallest number of variables with statistical significance. In this case, we begin by creating a model containing all predictors, then gradually remove the variable with the highest P-value until only the variables with statistical significance remain. 
+In this section, we use Best Subset Selection and Cross-Validation techniques to get a estimate of the optimal number of predictors in our model.
 
 ##### Best Subset Selection
-We will use Best Subset Selection to get a estimate of the optimal number of predictors in our model. This test uses Mallows’ Cp.
+
+Best Subset Selection uses Mallows’ Cp to calculate the optimal number of predictors in our model.
 
 ```{r model4-best-subset}
-library(leaps)
+
 regfit_full = regsubsets(TARGET_WINS ~ ., data = stp75_train_df, nvmax = 11)
 regfit_summary = summary(regfit_full)
 plot(regfit_summary$cp, xlab="Number of variables", ylab="cp")
@@ -1022,9 +453,29 @@ for(k in 1:5) {
 rmse_cv = sqrt(apply(cv_errors,2,mean))
 plot(rmse_cv, pch=5, type="b")
 ```
+
 Based on the _Cross Validation_ method, we estimate that our model should have `r which.min(rmse_cv)` observations.
 
-##### Backward Selection Method
+##### Correlation with Clean Dataset
+
+We created another correlation heatmap with our clean training dataset. This time we see strong evidence of multicollinearity between:
+- TEAM_BATTING_HR and TEAM_PITCHING_HR (0.97)
+- TEAM_BATTING_HR and TEAM_BATTING_3B (-0.64)
+- TEAM_BATTING_HR and TEAM_BATTING_SO (0.69)
+- TEAM_BATTING_3B and TEAM_BATTING_SO (-0.69)
+- TEAM_PITCHING_H and TEAM_FIELDING_E (0.67)
+- TEAM_BATTING_BB and TEAM_FIELDING_E (-0.65)
+
+We may need to consider omitting one of the predictors from each pair in our models to ensure that we are not introducing multicollinearity in our model and making our model unnecessarily complex, particulary for the two homerun fields.
+
+```{r correlation-heatmap}
+plot_correlation(stp75_train_df, type = "all")
+```
+
+
+### Variable Selection Using Backward Selection 
+
+To better understand our variables and their relationships, we first created a model using backward selection to arrive at the smallest number of variables with statistical significance. In this case, we begin by creating a model containing all predictors, then gradually remove the variable with the highest P-value until only the variables with statistical significance remain. 
 
 ```{r backward-selection}
 summary(stp_model_full)
@@ -1045,16 +496,12 @@ _TEAM_PITCHING_SO_ has the highest p-value. We removed TEAM_PITCHING_SO from our
 
 ```{r}
 back_select_model <- update(back_select_model, . ~ . - TEAM_PITCHING_SO)
-summary(back_select_model)
-AIC(back_select_model)
 ```
 
 _TEAM_BATTING_SO_ has the highest p-value. We removed TEAM_BATTING_SO from our predictors and update the model.
 
 ```{r}
 back_select_model <- update(back_select_model, . ~ . - TEAM_BATTING_SO)
-summary(back_select_model)
-AIC(back_select_model)
 ```
 
 
@@ -1062,8 +509,6 @@ _TEAM_BASERUN_CS_ has the highest p-value. We removed TEAM_BASERUN_CS from our p
 
 ```{r}
 back_select_model <- update(back_select_model, . ~ . - TEAM_BASERUN_CS)
-summary(back_select_model)
-AIC(back_select_model)
 ```
 
 _TEAM_PITCHING_BB_ has the highest p-value. We removed TEAM_PITCHING_BB from our predictors and update the model.
@@ -1074,88 +519,33 @@ summary(back_select_model)
 AIC(back_select_model)
 ```
 
-Backward selection using P-values arrives at a model with six variables with high statistical significance  ((p-value < 0.001) and three with moderate (p-value ~= 0.1) statistical significance. Arriving at 11 predictors is consistent with our Best Subset Selection test.
+Backward selection using o-values arrives at a model with six variables with high statistical significance  ((p-value < 0.001) and three with moderate (p-value ~= 0.1) statistical significance. Arriving at 9 predictors is consistent with our Best Subset Selection test. A VIF test shows that there are no evidence of strong multicollinearity.  
 
 ```{r model-4-diagnose}
 vif(back_select_model)
-plot(back_select_model)
 ```
 
-
-### 4B: Alternate Model Selection
-
-Another approach to model selection involves a combination of step-wise selection and contextual selection. In this example, we can first drop _TEAM_BATTING_2B_ (2 base hits), _TEAM_BATTING_3B_ (3 base hits), _TEAM_BATTING_HR_ (home runs) before conducting our stepwise selection, as data for these columns is represented in the _TEAM_BATTING_H_ (total hits) column, thus signaling the existence of dependence between hit count variables and total hits. It is not totally clear if _TEAM_PITCHING_HR_ is also included in _TEAM_PITCHING_H_ from the supporting document but we will remove it in the event that a similar relationship exists. __Alternatively__, we could have created a new column (TEAM_BATTING_1B) by subtracting the sum of 2 base hits, 3 base hits, and homeruns from total hits, but this alternatively solution would have a) added complexity into our model and b) added uncertainty due to possible missing values in the home runs columns. 
-
-
-```{r model4-drop-hits-cols}
-stp75s_train_df <- stp75_train_df |> 
-    drop_columns(c("TEAM_BATTING_2B", "TEAM_BATTING_3B", "TEAM_BATTING_HR", "TEAM_PITCHING_HR"))
-
-stp25s_test_df <- stp25_test_df |> 
-    drop_columns(c("TEAM_BATTING_2B", "TEAM_BATTING_3B", "TEAM_BATTING_HR", "TEAM_PITCHING_HR"))
-
-stp_model_sm <- lm(TARGET_WINS ~ ., data = stp75s_train_df)
-
-# Backward step-wise regression
-stpb_model_sm <- step(stp_model_sm, direction = "backward")
-```
-
-Performing an automated step-wise backward selection gives us 8 viable predictors. Examining the VIF shows that eight parameters are not strongly correlated with our dependent variable.
+###### Linearity
 
 ```{r}
-vif(stpb_model_sm)
-summary(stpb_model_sm)
-AIC(stpb_model_sm)
-plot(stpb_model_sm)
-```
-
-Looking at the p-values and t-values for the remaining 7 predictors show that there is one variables without statistical significance, TEAM_PITCHING_H. As this predictor has a high p-value (0.12) and a low t-value (-1.54), we should consider removing it.
-
-
-```{r}
-stpb_model_xs <- update(stpb_model_sm, . ~ . - TEAM_PITCHING_H)
-summary(stpb_model_xs)
-AIC(stpb_model_xs)
-plot(stpb_model_xs)
-```
-
-Removing the TEAM_PITCHING_H slightly increases our AIC from 13623.39 to 13623.78 and slightly decreases the Adjusted R-squared from 0.2864 to 0.2858, but overall the models are somewhat similar the auto-generated step-wise selected model.
-
-
-#### Variant Comparison
-
-The function _compare_performance_ allows comparison of various metrics across diffrent models including R2 and R2 (adj.). It also weights AIC and BIC values to help rank the performance of our models. Based on the result of this test, it appears that our original backward-selected model performed best.
-
-```{r model4-comparison-1}
-compare_performance(back_select_model, stpb_model_sm, stpb_model_xs, rank = TRUE)
-```
-#### Model Diagnostics
-
-In this section, we will test if our original backward-selected model meets the four assumptions for linearity.
-
-##### Linearity
-
-```{r check-for-linearity-m4}
 plot(back_select_model, which=1)
 ```
 
 Our diagnostic plots show a fairly linear model.
 
-##### Normality
+###### Normality
 
-```{r check-for-normality-m4}
+```{r}
 
 plot(back_select_model, which=2)
 shapiro.test(residuals(back_select_model))
 # Shapiro-Wilk normality test: look for high p-value
 ```
-Our QQ plot suggests normality thought there is obvious skewing on the tails, particularly on the right.
+Our QQ plot suggests normality thought there is obvious skewing on the tails, particularly on the right. This is confirmed by a Shapiro Wilk's Test statistic of 0.9967 which suggesting normality.
 
-A Shapiro Wilk's Test statistic had a value of 0.9967 is close to 1 suggesting normality. However, the p-value (0.0010) is less than < 0.05 suggests that residuals may not follow a normal distribution.
+###### Heteroscedasticity:
 
-##### Heteroscedasticity:
-
-```{r check-for-homoscedasticity-m4 echo: false}
+```{r echo=FALSE}
 
 plot(back_select_model, which=3)
 plot(back_select_model, which=4)
@@ -1164,30 +554,620 @@ bptest(back_select_model)
 ```
 Our Scale-Location plot shows that points appear somewhat evenly distributed above and below the trend line. While there is no obvious fan/wedge pattern, there is clustering in the center suggesting underfitting, high leverage outliers or that additional transformation may be needed. As our Cook's Distance plot has no values with a greater than 1, we can rule our the effects of high leverage points.
 
-The Breusch-Page test statistic BP (210.37) and the small p-value (2.2e-16) suggest evidence of heteroscedasticity. Though the values are different that we may need to transform the data to meet the Assumption of Homoscedasticity.
+The Breusch-Page test statistic BP (238.69) and the small p-value (2.2e-16) suggest evidence of heteroscedasticity. Though the values are different that we may need to transform the data to meet the Assumption of Homoscedasticity.
 
 
 ##### Independence:
 
-```{r check-for-independence-m4}
+```{r}
 
 acf(residuals(back_select_model))
 durbinWatsonTest(back_select_model)
 # Durbin Watson should be close to 2
 ```
 
-Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.03 and an autocorrelation value of -0.0017. Furthermore, as our p-value (0.558) is greater than 0.05, we do not have enough evidence to reject the null hypothesis that there is no autocorrelation. In other words, the test results suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
+Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.06 and an autocorrelation value of -0.0342. Furthermore, as our p-value (0.222) is greater than 0.05, we do not have enough evidence to reject the null hypothesis that there is no autocorrelation. In other words, the test results suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
 
-_Conclusion_
-The backward selected model violates the Homoscedasticity Assumption and has mixed results for our Normality Assumption. We should therefore test applying transformations to our model.
+### Hand-Selected Models
 
-### 4C: Model with Transformed Data
+The following models were created by hand-selecting predictors based on their perceived importance to a team's performance.
+
+#### Model H1: Base Baseball Stats Model
+
+This model includes fundamental offensive, defensive, and pitching stats that logically contribute to wins and includes the following variables for the respective reasons
+
+- TEAM_BATTING_H (Hits): More hits increase the chances of scoring.
+- TEAM_BATTING_HR (Home Runs): Home runs are a major contributor to runs.
+- TEAM_PITCHING_SO (Strikeouts): More strikeouts reduce opponent scoring.
+- TEAM_FIELDING_E (Errors): More errors lead to more opponent runs (negative predictor).
+
+_Why we excluded some variables?_
+- TEAM_BASERUN_SB (Stolen Bases): Limited impact on overall wins.
+- TEAM_PITCHING_BB (Walks Allowed): May not be as predictive when combined with strikeouts.
+
+##### Model Summary Statistics
+
+```{r}
+
+base_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = stp75_train_df)
+
+# View model summary
+summary(base_model)
+
+```
+
+##### Interpreting the Coefficients of the Regression Model
+
+1. Intercept (15.15)
+When all predictor variables (TEAM_BATTING_H, TEAM_BATTING_HR, TEAM_PITCHING_SO, TEAM_FIELDING_E) are zero, a team is expected to have 15.15 wins.
+
+2. TEAM_BATTING_H (Hits) 
+For every additional hit, the team is expected to win 0.048 more games. More hits lead to more wins, which is expected in baseball.
+
+3. TEAM_BATTING_HR (Home Runs) 
+More home runs slightly increases wins, but the effect is very small. We should consider removing this variable as the t-value and p-value suggest that it is not statistically significant.
+
+4. TEAM_PITCHING_SO (Strikeouts by Pitchers)
+More strikeouts slightly decreases wins, but the effect is very small and not statistically significant. We should consider adding walks (TEAM_PITCHING_BB) to capture pitching effectiveness better.
+
+5. TEAM_FIELDING_E
+For every additional error, a team is expected to lose 0.02 games. More errors directly hurt a team’s chances of winning, which makes sense in baseball.
+
+The F-statistic of 127.1 (p < 2.2e-16) means our model is highly statistically significant. This suggests that at least one of our variables—such as home runs, hits, strikeouts, or errors—has a real impact on predicting wins.
+
+However, we still need to check which specific variables are the most meaningful (p-values of individual coefficients) and whether we can improve the model further.
+
+##### Diagnosing our Model
+
+###### Checking for Multicollinearity (VIF Test)
+
+Multicollinearity occurs when predictor variables are highly correlated, leading to unstable coefficients and inflated standard errors. Using the Variance Inflation Factor (VIF) test we see no evidence of strong multicollinearity in the model.
+
+```{r}
+vif(base_model)
+```
+
+###### Linearity 
+```{r}
+plot(base_model, which=1)
+```
+
+
+Our diagnostic plots show a fairly linear model. 
+
+###### Normality Check:
+
+```{r}
+
+plot(base_model, which=2)
+shapiro.test(residuals(base_model))
+# Shapiro-Wilk normality test: look for high p-value
+```
+Our QQ plot suggests normality thought there is obvious skewing on the tails, particularly on the right. This is confirmed by A Shapiro Wilk's Test statistic of W = 0.9980  suggesting normality.
+
+###### Heterocedasticity:
+
+```{r  echo=FALSE}
+
+plot(base_model, which=3)
+bptest(base_model)
+# Breusch-Pagan test; look for high p-value
+```
+Test Statistic (BP = 188.29) suggests evidence of heteroscedasticity. Additionally, the p-value is extremely small (much less than 0.05), suggesting higher evidence of heteroscedasticity and that we may need to transform the data to meet the Assumption of Homoscedasticity.
+
+###### Independence:
+
+
+```{r}
+
+acf(residuals(base_model))
+durbinWatsonTest(base_model)
+# Durbin Watson should be close to 2
+```
+
+Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson which suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
+
+
+
+#### Model H2: Test Interaction Term (TEAM_BATTING_HR * TEAM_BATTING_BB)
+
+If a team hits more home runs and draws more walks, they likely to score more runs. We test if walks amplify the impact of home runs on wins.
+
+```{r}
+
+interaction_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + 
+                          TEAM_BATTING_HR:TEAM_BATTING_BB + 
+                          TEAM_PITCHING_SO + TEAM_FIELDING_E, 
+                        data = stp75_train_df)
+
+summary(interaction_model)
+
+```
+
+This model includes an interaction term (TEAM_BATTING_HR:TEAM_BATTING_BB) to see if walks (BB) affect the impact of home runs (HR) on wins. 
+
+Like model H1, this model is statistically significant. Our Adjusted R² is higher than that of model H1 suggesting that the additional predictors has added value to the model.
+
+More Home Runs (HR) Alone → Fewer Wins (Unexpected):
+The negative coefficient (-0.1650) on TEAM_BATTING_HR suggests that hitting more home runs alone does not necessarily lead to more wins.
+
+Walks (BB) Alone Have a Weak Impact on Wins:
+The coefficient for TEAM_BATTING_BB is negative (-0.0074) and not statistically significant (p = 0.1387).
+This means that walks alone do not have a strong impact on wins.
+
+The Interaction Term (TEAM_BATTING_HR * TEAM_BATTING_BB) is Highly Significant (p = 3.39e-10)
+Positive Coefficient (+0.000301)
+
+Teams that hit home runs AND get on base with walks tend to win more games.
+This confirms that home runs are more valuable when combined with walks.
+
+##### Visualizing the Interaction Effect:
+We want to see how home runs (TEAM_BATTING_HR) and walks (TEAM_BATTING_BB) impact wins (TARGET_WINS) together.
+
+```{r}
+library(ggplot2)
+
+ggplot(stp75_train_df, aes(x = TEAM_BATTING_HR, y = TARGET_WINS, color = TEAM_BATTING_BB)) +
+  geom_point(alpha = 0.7) + 
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  scale_color_gradient(low = "blue", high = "red") +
+  labs(title = "Interaction Effect of Home Runs and Walks on Wins",
+       x = "Home Runs",
+       y = "Wins",
+       color = "Walks (BB)") +
+  theme_minimal()
+
+
+```
+Red (high walks) teams should have higher wins for the same HRs.
+Blue (low walks) teams may not benefit as much from HRs.
+The trendline is steeper for teams with more walks, confirming that walks amplify HR impact.
+
+#### Model H3 Adding TEAM_BATTING_2B (Doubles) to the Model:
+Doubles (2B) are a strong indicator of offensive power and often correlate with scoring more runs. If a team doesn’t hit home runs, but hits many doubles, it can still score efficiently. 
+
+```{r}
+improved_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_2B + TEAM_BATTING_HR:TEAM_BATTING_BB +  TEAM_PITCHING_SO + TEAM_FIELDING_E, 
+                      data = stp75_train_df)
+
+summary(improved_model)
+
+```
+
+#### Key Findings
+Adding TEAM_BATTING_2B slightly improves model performance 
+
+R² increased from 27.2% → 27.9% (small improvement).
+Residual Standard Error decreased from 13.31 → 13.25 (better fit).
+Unexpected negative coefficient for doubles (-0.0429, p = 3.09e-06) 
+
+Suggests that more doubles lead to fewer wins, which is counterintuitive.
+Possible reasons:
+Multicollinearity with TEAM_BATTING_H (hits).
+Bad teams might hit many doubles but still lose.
+Interaction term (TEAM_BATTING_HR * TEAM_BATTING_BB) remains strong and positive 
+
+
+#### Diagnosing our Model:
+
+##### Multicolinearity:
+
+Our VIF test shows no strong evidence of multicollienarity between our predictors when adjusting for our interactions.
+
+```{r}
+
+# Check Variance Inflation Factor (VIF)
+vif(improved_model, type='predictor')
+    
+```
+
+
+##### Linearity 
+```{r}
+plot(improved_model, which=1)
+```
+
+
+Our diagnostic plots show a fairly linear model. 
+##### Normality Check:
+
+```{r}
+
+plot(improved_model, which=2)
+shapiro.test(residuals(improved_model))
+# Shapiro-Wilk normality test: look for high p-value
+```
+Our QQ plot suggests normality thought there is obvious skewing on the tails, particularly on the right.
+
+A Shapiro Wilk's Test statistic had a value of W = 0.9971  suggesting normality.
+
+However, the p-value (0.0033) is less than < 0.05 suggesting that residuals do not follow a normal distribution.
+
+##### Heterocedasticity:
+
+```{r echo=FALSE}
+
+plot(improved_model, which=3)
+bptest(improved_model)
+# Breusch-Pagan test; look for high p-value
+```
+Test Statistic (BP = 200.46) suggest higher evidence of heteroscedasticity. Additionally, the p-value is extremely small (much less than 0.05), suggesting higher evidence of heteroscedasticity and that we may need to transform the data to meet the Assumption of Homoscedasticity.
+
+##### Independence:
+
+
+```{r}
+
+acf(residuals(improved_model))
+durbinWatsonTest(improved_model)
+# Durbin Watson should be close to 2
+```
+
+Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.03 and an autocorrelation value of -0.0017 which suggest that our model's residuals are independent and do not violate the Independence Assumption.
+
+
+TEAM_BATTING_H,  TEAM_BATTING_2B,  TEAM_PITCHING_SO,  TEAM_FIELDING_E are in the range of (1-5) - No significant multicollinearity (good)
+
+TEAM_BATTING_HR, TEAM_BATTING_HR:TEAM_BATTING_BB are in the range of (> 10) shows Severe multicollinearity (highly problematic).
+
+
+#### Model H4: High-Impact Features Model (Based on Correlation & VIF)
+
+We select variables based on correlation with TARGET_WINS and ensure they are not highly correlated with each other (VIF < 5).
+
+```{r}
+library(car)
+
+# Manually selected high-impact variables
+high_impact_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_HR +
+                        TEAM_PITCHING_HR + TEAM_PITCHING_SO + TEAM_FIELDING_E, data = stp75_train_df)
+
+# View model summary
+summary(high_impact_model)
+
+plot(high_impact_model)
+
+# Check for multicollinearity
+vif(high_impact_model)
+
+```
+
+#### Model H5: Basic Multiple Linear Regression with Key Predictors
+
+Selected based on key offensive and defensive metrics impacting wins
+
+```{r}
+
+# Selected based on key offensive and defensive metrics impacting wins
+target_vars1 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_BATTING_BB", "TEAM_BASERUN_SB", "TEAM_FIELDING_E")
+pj_model1 <- lm(TARGET_WINS ~ ., data = stp75_train_df[, c("TARGET_WINS", target_vars1)])
+summary(pj_model1)
+```
+
+#### Model H6: Adding Interaction Terms
+
+Exploring interaction between hits and home runs as a factor in wins/
+
+```{r}
+# Exploring interaction between hits and home runs as a factor in wins
+target_vars2 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_BATTING_BB", "TEAM_BASERUN_SB", "TEAM_FIELDING_E")
+pj_model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H * TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = stp75_train_df)
+summary(pj_model2)
+```
+
+
+#### Model H7: Incorporating Pitching and Defensive Metrics
+
+Introducing pitching metrics to assess their impact on win prediction
+
+```{r}
+# Introducing pitching metrics to assess their impact on win prediction
+target_vars4 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_PITCHING_SO", "TEAM_PITCHING_BB", "TEAM_FIELDING_E")
+pj_model4 <- lm(TARGET_WINS ~ ., data = stp75_train_df[, c("TARGET_WINS", target_vars4)])
+summary(pj_model4)
+```
+
+#### Model H8: Including Caught Stealing and Doubles
+
+Analyzing the impact of baserunning decisions on team wins
+
+```{r}
+# Analyzing the impact of baserunning decisions on team wins 5
+target_vars5 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_BATTING_2B", "TEAM_BASERUN_CS", "TEAM_FIELDING_E")
+pj_model5 <- lm(TARGET_WINS ~ ., data = stp75_train_df[, c("TARGET_WINS", target_vars5)])
+summary(pj_model5)
+```
+
+#### Model H9: Weighted Batting and Pitching Metrics
+
+Creating composite metric for batting and pitching efficiency
+
+```{r}
+# Creating composite metric for batting and pitching efficiency
+pj_model6 <- lm(TARGET_WINS ~ (TEAM_BATTING_H + TEAM_BATTING_BB) / TEAM_BATTING_SO + (TEAM_PITCHING_SO - TEAM_PITCHING_BB), data = stp75_train_df)
+summary(pj_model6)
+```
+### Models with Applied Transformations
 
 So far, our diagnostic plots show that our model is somewhat linear, independent, heteroschedastic, but our residuals vs leverage indicates the presence of outliers. We will attempt to use transformations to improve our model.
 
-#### 4Ci: Box-Cox Transformation on Dependent Variable
+#### Log transformation
 
-In this section, we apply a Box-Cox Transformation
+Log Transformations reduce the influence of outliers by producing stable regression coefficients with reduced variability and can improves the model fit for non-linear relationships. They can address right-skewed distributions (e.g., extreme HR and SO values) and help meet the linear regression assumption of normality.
+
+##### Model T1: Log-Transformed Model (Handling Skewness & Outliers)
+
+Some baseball statistics (e.g., Home Runs, Strikeouts) have skewed distributions. We apply log transformation to stabilize variance.
+
+```{r}
+
+# Apply log transformation to selected variables
+train_df_log <- stp75_train_df %>%
+  mutate(
+    log_TEAM_BATTING_H = log1p(TEAM_BATTING_H),
+    log_TEAM_BATTING_HR = log1p(TEAM_BATTING_HR),
+    log_TEAM_PITCHING_SO = log1p(TEAM_PITCHING_SO),
+    log_TEAM_PITCHING_BB = log(TEAM_PITCHING_BB),
+  )
+
+test_df_log <- stp25_test_df %>%
+  mutate(
+    log_TEAM_BATTING_H = log1p(TEAM_BATTING_H),
+    log_TEAM_BATTING_HR = log1p(TEAM_BATTING_HR),
+    log_TEAM_PITCHING_SO = log1p(TEAM_PITCHING_SO),
+    log_TEAM_PITCHING_BB = log1p(TEAM_PITCHING_BB),
+  )
+
+train_df_log %>%
+  gather(variable, value, -TARGET_WINS) %>%
+  ggplot(., aes(value, TARGET_WINS)) + 
+  geom_point(fill = "#628B3A", color="#628B3A")  + 
+  geom_smooth(method = "lm", se = FALSE, color = "black") + 
+  facet_wrap(~variable, scales ="free", ncol = 4) +
+  labs(x = element_blank(), y = "Wins")
+```
+
+Our scatterplots show some improvements.
+
+```{r}
+
+# Fit model with transformed variables
+log_model1 <- lm(TARGET_WINS ~ log_TEAM_BATTING_H + log_TEAM_BATTING_HR + log_TEAM_PITCHING_SO + TEAM_FIELDING_E, data = train_df_log)
+
+# View model summary
+summary(log_model1)
+
+```
+
+
+##### Model Diagnostics
+
+###### Multicollinearity
+
+Our VIF Test 
+```{r}
+
+vif(log_model1)
+```
+
+###### Linearity
+
+```{r}
+plot(log_model1, which=1)
+```
+
+Our diagnostic plots show a fairly linear model.
+
+###### Normality
+
+```{r}
+
+plot(log_model1, which=2)
+shapiro.test(residuals(log_model1))
+# Shapiro-Wilk normality test: look for high p-value
+```
+Our QQ plot suggests normality thought there is obvious skewing on the tails, particularly on the right. A Shapiro Wilk's Test statistic restulted in a value of 0.9986 suggesting normality. 
+
+###### Heteroscedasticity:
+
+```{r echo=FALSE}
+
+plot(log_model1, which=3)
+plot(log_model1, which=4)
+bptest(log_model1)
+# Breusch-Pagan test; look for high p-value
+```
+Our Scale-Location plot shows no major improvement than our previous models. While the points appear somewhat evenly distributed above and below the trend line and there is no obvious fan/wedge pattern, there is clustering in the center suggesting underfitting, high leverage outliers or that additional transformation may be needed. As our Cook's Distance plot has no values with a greater than 1, we can rule our the effects of high leverage points.
+
+The Breusch-Page test statistic BP (152.45) and the small p-value (2.2e-16) suggest evidence of heteroscedasticity. Though the values are different that we may need to transform the data to meet the Assumption of Homoscedasticity.
+
+
+###### Independence:
+
+```{r }
+
+acf(residuals(log_model1))
+durbinWatsonTest(log_model1)
+# Durbin Watson should be close to 2
+```
+
+Our Autocorrelation Function and Durbin-Watson test suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
+
+#### Model T2: Applying Log Transformation to Key Predictors
+
+Below is a variation of the above with some minor adjustments that exclude log_PITCHING_SO and include TEAM_BASERUN_SB. 
+
+```{r}
+# Transformation applied to account for skewed distributions in key predictors
+
+target_vars3 <- c("log_TEAM_BATTING_H", "log_TEAM_BATTING_HR", "TEAM_BATTING_BB", "TEAM_BASERUN_SB", "TEAM_FIELDING_E")
+log_model2 <- lm(TARGET_WINS ~ ., data = train_df_log[, c("TARGET_WINS", target_vars3)])
+summary(log_model2)
+```
+
+##### Model Diagnostics
+
+Our VIF Test and diagnostic plots show similar results as the diagnostics for  Model T1.
+
+```{r}
+
+vif(log_model2)
+plot(log_model2)
+```
+
+Our diagnostic plots show a fairly linear model.
+
+
+#### Model T3: Log Transformation on the Dependent Variable (Y)
+
+```{r model4_logy_transform}
+
+stp_logy_model <- lm(log(TARGET_WINS + 1) ~., data = stp75_train_df)
+
+# Backward step-wise regression
+stpb_logy_model <- step(stp_logy_model, direction = "backward")
+
+```
+
+##### Diagnosing our Model
+###### Linearity
+
+```{r}
+plot(stp_logy_model, which=1)
+```
+
+Our Residuals vs. Fitted plot suggests a somewhat linear model but there is visible bowing in the trend line.
+
+###### Normality
+
+```{r }
+
+plot(stp_logy_model, which = 2)
+
+shapiro.test(residuals(stp_logy_model))
+# Shapiro-Wilk normality test: look for high p-value
+
+```
+Our QQ plot suggests normality thought there is obvious skewing on the tails, particularly on the left.
+
+A Shapiro Wilk's Test statistic had a value of 0.980, also suggesting normality. However, since the p-value (1.416e-14) is less than < 0.05 we may still be violating our normality assumption.
+
+###### Heteroscedasticity
+
+```{r  echo=FALSE}
+
+plot(stp_logy_model, which = 3)
+plot(stp_logy_model, which = 4)
+
+bptest(stp_logy_model)
+# Breusch-Pagan test; look for high p-value
+```
+Our Scale-Location plot shows clear bowing in the trend line, suggesting that the variance of the residuals is not constant and therefore heteroschedastic. While there is no obvious fan/wedge pattern, there is clustering in the center suggesting underfitting, high leverage outliers or that additional transformation may be needed. As our Cook's Distance plot has no values with a greater than 1, we can rule our the effects of high leverage points. However, it should be pointed the leverage points appear to be more influential than in our backwards selected model or our Box-Cox transformed model.
+
+The Breusch-Page test statistic BP (383.07) indicates a substantial relationship between the residual variance and the predictors and the small p-value (2.2e-16) suggest evidence of heteroscedasticity. Though the values are different that we may need to transform the data to meet the Assumption of Homoscedasticity.
+
+###### Independence
+
+```{r }
+
+acf(residuals(stp_logy_model))
+durbinWatsonTest(stp_logy_model)
+# Durbin Watson should be close to 2
+```
+
+Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.00 and an autocorrelation value of -0.0041. Furthermore, as our p-value (0.96) is greater than 0.05, we do not have enough evidence to reject the null hypothesis that there is no autocorrelation. In other words, the test results suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
+
+_Conclusion_
+Applying a log transformation the dependent variable in our model appears to inferior to the backward selected model and the Box-Cox transformed model. We should therefore avoid using this model.
+
+#### Model T4: Log Transformation on Independent Variables (X)
+
+Some of our predictors (TEAM_PITCHING_SO, TEAM_PITCHING_BB, & TEAM_PITCHING_H) showed the presence of outliers. We will transform these variables with a log transformation.
+
+##### Backwards Selection
+
+We will use backward step-wise selection to build our model.
+
+```{r model4lg-backward-selection}
+
+stp_logx_model_full <- lm(TARGET_WINS ~ . - TEAM_BATTING_H - TEAM_BATTING_HR - TEAM_PITCHING_SO - TEAM_PITCHING_BB, data = train_df_log)
+
+# Backward step-wise regression
+stp_logx_model <- step(stp_logx_model_full, direction = "backward")
+```
+Looking at the summary for this model shows that all predictors have high statistic significance.
+
+```{r}
+summary(stp_logx_model)
+```
+
+The Residuals vs. Fitted and QQ Plots show a fairly linear pattern, while Scale-Location plot suggest Homoscedasticity. The Residuals vs Leverage plot reveals that our outliers have less leverage than in the pre- log transformed model. 
+
+```{r model-4-diagnostic-ph plots}
+plot(stp_logx_model)
+
+```
+
+##### Multicolinearity 
+
+A VIF Test shows several variables that are highly correlated, including TEAM_PITCHING_H, TEAM_BATTING_BB, TEAM_PITCHING_SO, TEAM_PITCHING_BB, TEAM_FIELDING_E & TEAM_BATTING_H. We may choose to leave these out. 
+
+```{r model4lg-vif}
+vif(stp_logx_model)
+```
+
+##### Diagnosing our Model
+
+###### Linearity
+
+```{r }
+plot(stp_logx_model, which=1)
+```
+
+Our Residuals vs. Fitted plot suggest a fairly linear model.
+
+###### Normality
+
+```{r }
+
+plot(stp_logx_model, which = 2)
+
+# Shapiro-Wilk normality test: look for high p-value
+shapiro.test(residuals(stp_logx_model))
+
+```
+Our QQ plot suggests normality thought there is some skewing on the tails, particularly on the right. The skewing appears to be less pitched than in our backward-selected model or Box-Cox Transformed model.
+
+A Shapiro Wilk's Test statistic had a value of 0.9943, also suggesting normality. However, since the p-value (4.273e-06) is less than < 0.05 we may still be violating our normality assumption.
+
+###### Heteroscedasticity
+
+```{r  echo=FALSE}
+
+plot(stp_logx_model, which = 3)
+plot(stp_logx_model, which = 4)
+
+bptest(stp_logx_model)
+# Breusch-Pagan test; look for high p-value
+```
+Our Scale-Location plot shows that points appear somewhat evenly distributed above and below the trend line but there is clear bowing in the trend line, suggesting that the variance of the residuals is not constant and therefore heteroschedastic. While there is no obvious fan/wedge pattern, there is clustering in the center suggesting underfitting, high leverage outliers or that additional transformation may be needed. As our Cook's Distance plot has no values with a greater than 1, we can rule our the effects of high leverage points.
+
+The Breusch-Page test statistic BP (302.21) and the small p-value (2.2e-16) suggest evidence of heteroscedasticity. Though the values are different that we may need to transform the data to meet the Assumption of Homoscedasticity.
+
+###### Independence
+
+```{r }
+
+acf(residuals(stp_logx_model))
+durbinWatsonTest(stp_logx_model)
+# Durbin Watson should be close to 2
+```
+
+Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.011 and an autocorrelation value of -0.008. Furthermore, as our p-value (0.822) is greater than 0.05, we do not have enough evidence to reject the null hypothesis that there is no autocorrelation. In other words, the test results suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
+
+#### Model T5: Box-Cox Transformation on Dependent Variable
+
+In this section, we apply a Box-Cox Transformation to our backward selected mode and data.
 
 ```{r model4-boxcox}
 
@@ -1214,11 +1194,15 @@ AIC(back_select_model)
 stp_model_inv <- update(stp_model_inv, . ~ . - TEAM_PITCHING_SO)
 summary(stp_model_inv)
 AIC(back_select_model)
+
+stp_model_inv <- update(stp_model_inv, . ~ . - TEAM_BATTING_2B)
+summary(stp_model_inv)
+AIC(back_select_model)
 ```
-##### Testing Our Assumptions
+##### Diagnosing our Model
 ###### Linearity
 
-```{r check-for-multicolinearity-m4bc}
+```{r }
 plot(stp_model_inv, which=1)
 ```
 
@@ -1226,7 +1210,7 @@ Our Residuals vs. Fitted plot suggest a fairly linear model.
 
 ###### Normality
 
-```{r check-for-normality-m4bc}
+```{r }
 
 plot(stp_model_inv, which = 2)
 
@@ -1240,7 +1224,7 @@ A Shapiro Wilk's Test statistic had a value of 0.996, also suggesting normality.
 
 ###### Heteroscedasticity
 
-```{r check-for-homoscedasticity-m4bc echo: false}
+```{r  echo=FALSE}
 
 plot(stp_model_inv, which = 3)
 plot(stp_model_inv, which = 4)
@@ -1254,7 +1238,7 @@ The Breusch-Page test statistic BP (176.76) and the small p-value (2.2e-16) sugg
 
 ###### Independence
 
-```{r check-for-independence-m4bc}
+```{r }
 
 acf(residuals(stp_model_inv))
 durbinWatsonTest(stp_model_inv)
@@ -1266,194 +1250,16 @@ Our Autocorrelation Function shows that there are lags above the blue dashed lin
 _Conclusion_
 Applying a Box-Cox transformation to our model appears does not seem to have improved the results of our backward selected model. This model continues to violate the Homoscedasticity Assumption and has mixed results for our Normality Assumption.
 
-#### 4Cii: Log Transformation on the Dependent Variable (Y)
+### Advanced Techniques
 
-```{r model4_logy_transform}
-
-stp_logy_model <- lm(log(TARGET_WINS + 1) ~., data = stp75_train_df)
-
-# Backward step-wise regression
-stpb_logy_model <- step(stp_logy_model, direction = "backward")
-
-```
-
-##### Testing Our Assumptions
-###### Linearity
-
-```{r check-for-multicolinearity-m4logy}
-plot(stp_logy_model, which=1)
-```
-
-Our Residuals vs. Fitted plot suggests a somewhat linear model but there is visible bowing in the trend line.
-
-###### Normality
-
-```{r check-for-normality-m4logy}
-
-plot(stp_logy_model, which = 2)
-
-shapiro.test(residuals(stp_logy_model))
-# Shapiro-Wilk normality test: look for high p-value
-
-```
-Our QQ plot suggests normality thought there is obvious skewing on the tails, particularly on the left.
-
-A Shapiro Wilk's Test statistic had a value of 0.980, also suggesting normality. However, since the p-value (1.416e-14) is less than < 0.05 we may still be violating our normality assumption.
-
-###### Heteroscedasticity
-
-```{r check-for-homoscedasticity-m4logy echo: false}
-
-plot(stp_logy_model, which = 3)
-plot(stp_logy_model, which = 4)
-
-bptest(stp_logy_model)
-# Breusch-Pagan test; look for high p-value
-```
-Our Scale-Location plot shows clear bowing in the trend line, suggesting that the variance of the residuals is not constant and therefore heteroschedastic. While there is no obvious fan/wedge pattern, there is clustering in the center suggesting underfitting, high leverage outliers or that additional transformation may be needed. As our Cook's Distance plot has no values with a greater than 1, we can rule our the effects of high leverage points. However, it should be pointed the leverage points appear to be more influential than in our backwards selected model or our Box-Cox transformed model.
-
-The Breusch-Page test statistic BP (383.07) indicates a substantial relationship between the residual variance and the predictors and the small p-value (2.2e-16) suggest evidence of heteroscedasticity. Though the values are different that we may need to transform the data to meet the Assumption of Homoscedasticity.
-
-###### Independence
-
-```{r check-for-independence-m4logy}
-
-acf(residuals(stp_logy_model))
-durbinWatsonTest(stp_logy_model)
-# Durbin Watson should be close to 2
-```
-
-Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.00 and an autocorrelation value of -0.0041. Furthermore, as our p-value (0.96) is greater than 0.05, we do not have enough evidence to reject the null hypothesis that there is no autocorrelation. In other words, the test results suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
-
-_Conclusion_
-Applying a log transformation the dependent variable in our model appears to inferior to the backward selected model and the Box-Cox transformed model. We should therefore avoid using this model.
-
-#### 4Ciii: Log Transformation on Independent Variables (X)
-
-Some of our predictors (TEAM_PITCHING_SO, TEAM_PITCHING_BB, & TEAM_PITCHING_H) showed the presence of outliers. We will transform these variables with a log transformation.
-
-```{r model4_log_transform}
-
-stplg75_train_df <- stp75_train_df %>%
-  mutate(
-    TEAM_PITCHING_SO = log(TEAM_PITCHING_SO),
-    TEAM_PITCHING_BB = log(TEAM_PITCHING_BB),
-    TEAM_PITCHING_H = log(TEAM_PITCHING_H),
-  )
-
-stplg25_test_df <- stp25_test_df %>%
-  mutate(
-    TEAM_PITCHING_SO = log1p(TEAM_PITCHING_SO),
-    TEAM_PITCHING_BB = log1p(TEAM_PITCHING_BB),
-    TEAM_PITCHING_H = log1p(TEAM_PITCHING_H),
-  )
-
-stplg75_train_df %>%
-  gather(variable, value, -TARGET_WINS) %>%
-  ggplot(., aes(value, TARGET_WINS)) + 
-  geom_point(fill = "#628B3A", color="#628B3A")  + 
-  geom_smooth(method = "lm", se = FALSE, color = "black") + 
-  facet_wrap(~variable, scales ="free", ncol = 4) +
-  labs(x = element_blank(), y = "Wins")
-
-```
-Our scatter plots show some improvement in our outliers.
-
-
-##### Backwards Selection
-
-We will use backward step-wise selection to build our model.
-
-```{r model4lg-backward-selection}
-
-stp_logx_model_full <- lm(TARGET_WINS ~ ., data = stplg75_train_df)
-
-# Backward step-wise regression
-stp_logx_model <- step(stp_logx_model_full, direction = "backward")
-```
-Looking at the summary for this model shows that all predictors have high statistic significance.
-
-```{r}
-summary(stp_logx_model)
-```
-
-The Residuals vs. Fitted and QQ Plots show a fairly linear pattern, while Scale-Location plot suggest Homoscedasticity. The Residuals vs Leverage plot reveals that our outliers have less leverage than in the pre- log transformed model. 
-
-```{r model-4-diagnostic-ph plots}
-plot(stp_logx_model)
-
-stplg75_train_df <- stplg75_train_df |>
-  mutate(
-    n = row_number()
-  )
-```
-
-##### Multicolinearity 
-
-A VIF Test shows several variables that are highly correlated, including TEAM_PITCHING_H, TEAM_BATTING_BB, TEAM_PITCHING_SO, TEAM_PITCHING_BB, TEAM_FIELDING_E & TEAM_BATTING_H. We may choose to leave these out. 
-
-```{r model4lg-vif}
-vif(stp_logx_model)
-```
-
-##### Testing Our Assumptions
-
-###### Linearity
-
-```{r check-for-multicolinearity-m4logx}
-plot(stp_logx_model, which=1)
-```
-
-Our Residuals vs. Fitted plot suggest a fairly linear model.
-
-###### Normality
-
-```{r check-for-normality-m4logx}
-
-plot(stp_logx_model, which = 2)
-
-# Shapiro-Wilk normality test: look for high p-value
-shapiro.test(residuals(stp_logx_model))
-
-```
-Our QQ plot suggests normality thought there is some skewing on the tails, particularly on the right. The skewing appears to be less pitched than in our backward-selected model or Box-Cox Transformed model.
-
-A Shapiro Wilk's Test statistic had a value of 0.9943, also suggesting normality. However, since the p-value (4.273e-06) is less than < 0.05 we may still be violating our normality assumption.
-
-###### Heteroscedasticity
-
-```{r check-for-homoscedasticity-m4logx echo: false}
-
-plot(stp_logx_model, which = 3)
-plot(stp_logx_model, which = 4)
-
-bptest(stp_logx_model)
-# Breusch-Pagan test; look for high p-value
-```
-Our Scale-Location plot shows that points appear somewhat evenly distributed above and below the trend line but there is clear bowing in the trend line, suggesting that the variance of the residuals is not constant and therefore heteroschedastic. While there is no obvious fan/wedge pattern, there is clustering in the center suggesting underfitting, high leverage outliers or that additional transformation may be needed. As our Cook's Distance plot has no values with a greater than 1, we can rule our the effects of high leverage points.
-
-The Breusch-Page test statistic BP (302.21) and the small p-value (2.2e-16) suggest evidence of heteroscedasticity. Though the values are different that we may need to transform the data to meet the Assumption of Homoscedasticity.
-
-###### Independence
-
-```{r check-for-independence-m4logx}
-
-acf(residuals(stp_logx_model))
-durbinWatsonTest(stp_logx_model)
-# Durbin Watson should be close to 2
-```
-
-Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.011 and an autocorrelation value of -0.008. Furthermore, as our p-value (0.822) is greater than 0.05, we do not have enough evidence to reject the null hypothesis that there is no autocorrelation. In other words, the test results suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
-
-
-### Model 5: Lasso Regression 
+#### Model A1: Lasso Regression 
 
 The Least Absolute Shrinkage and Selection Operator (LASSO) selection method uses a shrinkage approach to determining the optimal predictors by attempting to find a balance between simplicity and accuracy.It applies a penalty to the standard linear regression model to encourage the coefficients of features with weak influence to equal zero to prevent overfitting.
 
 ```{r}
 
-x = model.matrix(TARGET_WINS ~ ., data = stplg75_train_df)
-y = stplg75_train_df$TARGET_WINS
+x = model.matrix(TARGET_WINS ~ ., data = stp75_train_df)
+y = stp75_train_df$TARGET_WINS
 
 fit_lasso = glmnet(x, y, alpha=1)
 plot(fit_lasso, xvar="lambda", label=TRUE)
@@ -1473,7 +1279,7 @@ Performing LASSO on our training subset -- 75% of full training set with log tra
  
 
 ```{r lasso-summary}
-lasso_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_3B + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_PITCHING_HR + TEAM_FIELDING_E + TEAM_FIELDING_DP, data = stplg75_train_df)
+lasso_model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_3B + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_PITCHING_HR + TEAM_FIELDING_E + TEAM_FIELDING_DP, data = stp75_train_df)
 
 summary(lasso_model)
 vif(lasso_model)
@@ -1485,7 +1291,7 @@ Our VIF test shows no strong correlation between predictors.
 
 ###### Linearity
 
-```{r check-for-multicolinearity-lasso}
+```{r}
 plot(lasso_model, which=1)
 ```
 
@@ -1493,7 +1299,7 @@ Our Residuals vs. Fitted plot suggest a fairly linear model.
 
 ###### Normality
 
-```{r check-for-normality-lasso}
+```{r}
 
 plot(lasso_model, which = 2)
 
@@ -1507,7 +1313,7 @@ A Shapiro Wilk's Test statistic had a value of 0.9964, also suggesting normality
 
 ###### Heteroscedasticity
 
-```{r check-for-homoscedasticity-lasso echo: false}
+```{r echo=FALSE}
 
 plot(lasso_model, which = 3)
 plot(lasso_model, which = 4)
@@ -1521,7 +1327,7 @@ The Breusch-Page test statistic BP (209.89) and the small p-value (2.2e-16) sugg
 
 ###### Independence
 
-```{r check-for-independence-lasso}
+```{r}
 
 acf(residuals(lasso_model))
 durbinWatsonTest(lasso_model)
@@ -1530,174 +1336,14 @@ durbinWatsonTest(lasso_model)
 
 Our Autocorrelation Function shows that there are lags above the blue dashed line, suggesting no autocorrelation. This is confirmed through a Durbin-Watson test statistic value of 2.03 and an autocorrelation value of -0.0177. Furthermore, as our p-value (0.504) is greater than 0.05, we do not have enough evidence to reject the null hypothesis that there is no autocorrelation. In other words, the test results suggest that our model's residuals are independent and therefore do not violate the Independence Assumption.
 
-### Model Building Summary
 
-TODO: update based on updated  models
-
-If interpretability is most important → Use base Stats Model.
-
-If statistical optimization is preferred → Use High-Impact Model.
-
-If non-linearity is a concern → Use Log-Transformed Model.
-
-If statistical significance is most important → Log-Transformed Step-wise Model 
-
-## Model Selection
-
-### Testing the Model
-
-In this section, we will use the test dataframe to test the accuracy of our model's predictions
-
-#### Comparing All Models
-
-The "compare_performance" function compares various test results including Adjusted R-Squared, AIC, and BIC. Based on these results, "compare_performance" suggests that our Log Transformed Dependent variable (stp_logy_model_) performed the best. However, this model had the most obvious violations of regression assumptions. Thus we will discard it moving forward. Re-running "compare_performance" without this model shows that 
-
-* Note that we were unable to compare the performance as the scales differ our Step-wise model with transformed independent variables (stp_logx_model)  performs best on the tests above.
-
-```{r lasso-compare-2}
-
-#stp_model_inv - is throwing errors due to difference in scales
-compare_performance(base_model, high_impact_model, log_model, back_select_model, stp_model_sm, stp_logx_model, lasso_model)
-
-```
-
-
-### Puja's Models
-
-```{r}
-# Splitting data into training (75%) and testing (25%)
-set.seed(123)
-train_index <- createDataPartition(train_data$TARGET_WINS, p = 0.75, list = FALSE)
-stp75_train_df <- train_data[train_index, ]
-stp25_test_df <- train_data[-train_index, ]
-
-# Initial data exploration
-str(stp75_train_df)
-summarize(stp75_train_df)
-
-# Model 1: Basic Multiple Linear Regression with Key Predictors
-# Selected based on key offensive and defensive metrics impacting wins
-target_vars1 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_BATTING_BB", "TEAM_BASERUN_SB", "TEAM_FIELDING_E")
-model1 <- lm(TARGET_WINS ~ ., data = stp75_train_df[, c("TARGET_WINS", target_vars1)])
-summary(model1)
-
-# Model 2: Adding Interaction Terms
-# Exploring interaction between hits and home runs as a factor in wins
-target_vars2 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_BATTING_BB", "TEAM_BASERUN_SB", "TEAM_FIELDING_E")
-model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H * TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BASERUN_SB + TEAM_FIELDING_E, data = stp75_train_df)
-summary(model2)
-
-# Model 3: Applying Log Transformation to Key Predictors
-# Transformation applied to account for skewed distributions in key predictors
-stp75_train_df <- stp75_train_df %>% mutate(log_TEAM_BATTING_H = log(TEAM_BATTING_H + 1), log_TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1))
-target_vars3 <- c("log_TEAM_BATTING_H", "log_TEAM_BATTING_HR", "TEAM_BATTING_BB", "TEAM_BASERUN_SB", "TEAM_FIELDING_E")
-model3 <- lm(TARGET_WINS ~ ., data = stp75_train_df[, c("TARGET_WINS", target_vars3)])
-summary(model3)
-
-# Model 4: Incorporating Pitching and Defensive Metrics
-# Introducing pitching metrics to assess their impact on win prediction
-target_vars4 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_PITCHING_SO", "TEAM_PITCHING_BB", "TEAM_FIELDING_E")
-model4 <- lm(TARGET_WINS ~ ., data = stp75_train_df[, c("TARGET_WINS", target_vars4)])
-summary(model4)
-
-# Model 5: Including Caught Stealing and Doubles
-# Analyzing the impact of baserunning decisions on team wins
-target_vars5 <- c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_BATTING_2B", "TEAM_BASERUN_CS", "TEAM_FIELDING_E")
-model5 <- lm(TARGET_WINS ~ ., data = stp75_train_df[, c("TARGET_WINS", target_vars5)])
-summary(model5)
-
-# Model 6: Weighted Batting and Pitching Metrics
-# Creating composite metric for batting and pitching efficiency
-model6 <- lm(TARGET_WINS ~ (TEAM_BATTING_H + TEAM_BATTING_BB) / TEAM_BATTING_SO + (TEAM_PITCHING_SO - TEAM_PITCHING_BB), data = stp75_train_df)
-summary(model6)
-
-# Model Selection Criteria
-models <- list(model1, model2, model3, model4, model5, model6)
-model_names <- c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5", "Model 6")
-
-for (i in 1:length(models)) {
-  cat("\n", model_names[i], "\n")
-  print(AIC(models[[i]]))  # Akaike Information Criterion
-  print(BIC(models[[i]]))  # Bayesian Information Criterion
-}
-
-# Model Evaluation
-model_eval <- function(model, data) {
-  predictions <- predict(model, data)
-  mse <- mse(data$TARGET_WINS, predictions)
-  r2 <- summary(model)$r.squared
-  return(list(MSE = mse, R2 = r2))
-}
-
-eval_results <- lapply(models, model_eval, data = stp75_train_df)
-names(eval_results) <- model_names
-eval_results
-
-# Testing Assumptions of Linear Regression
-par(mfrow = c(2, 2))
-for (i in 1:length(models)) {
-  plot(models[[i]], main = paste("Assumption Checks -", model_names[i]))
-}
-
-# Applying the same log transformation to the evaluation dataset
-eval_df <- eval_df %>%
-  mutate(log_TEAM_BATTING_H = log(TEAM_BATTING_H + 1),
-         log_TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1))
-
-# Using the best model (assumed Model 3 for now) to make predictions
-predictedWins <- predict(model3, eval_df, na.action = na.pass)
-eval_df["PREDICTED_WINS"] <- predictedWins
-
-# Display the first few rows of predictions
-head(eval_df)
-```
-
-
-
-```{r}
-
-#TODO: these should also be compared to the old models
-  
-# Model Evaluation
-model_eval <- function(model, data) {
-  predictions <- predict(model, data)
-  mse <- mse(data$TARGET_WINS, predictions)
-  r2 <- summary(model)$r.squared
-  return(list(MSE = mse, R2 = r2))
-}
-
-eval_results <- lapply(models, model_eval, data = stplg75_train_df_2)
-names(eval_results) <- model_names
-eval_results
-```
-
-
-### Model Building Summary
-
-TODO: update based on updated  models
-
-If interpretability is most important → Use base Stats Model.
-
-If statistical optimization is preferred → Use High-Impact Model.
-
-If non-linearity is a concern → Use Log-Transformed Model.
-
-If statistical significance is most important → Log-Transformed Step-wise Model 
-
-##
+#### Model A2: Elastic Net Regression Model
 
 Elastic Net Regression Model is being tested to balance LASSO and Ridge Regression, helpful when predictors are highly correlated. Adding Random Forest Regression as well as a non-parametric alternative, giving us the ability to capture complex nonlinear relationships and interactions between variables that linear models may miss. 
 
 ```{r}
 #Zachs Models (Elastic Net)
 
-set.seed(000) 
-
-smp_size <- floor(0.75 * nrow(train_df))
-train_ind <- sample(seq_len(nrow(train_df)), size = smp_size)
-
-stp75_train_df <- train_df[train_ind, ]  # 75% training data
-stp25_test_df <- train_df[-train_ind, ]  # 25% testing data
 
 x_train <- model.matrix(TARGET_WINS ~ ., data = stp75_train_df)[, -1]
 y_train <- stp75_train_df$TARGET_WINS
@@ -1736,6 +1382,7 @@ cat("R²:", elastic_net_r2, "\n")
 
 ```
 
+#### Model A3: Random Forest Regression Model
 
 ```{r}
 #Zachs Models (Random Forest Regression)
@@ -1756,33 +1403,140 @@ cat("MAE:", random_forest_mae, "\n")
 cat("RMSE:", random_forest_rmse, "\n")
 cat("R²:", random_forest_r2, "\n")
 ```
+
+
+## Section 4: Model Selection
+
+#### Testing the Model
+
+In this section, we will use the test dataframe to test the accuracy of our model's predictions
+
+```{r model4lg-test}
+
+# Apply predictions for each model
+# Stats Model predictions
+predictedWins = predict(base_model, stp25_test_df)
+stp25_test_df$PREDICTED_WINS = predictedWins
+
+# Improved Model predictions
+predictedWins = predict(improved_model, stp25_test_df)
+stp25_test_df$PREDICTED_WINS_IMP = predictedWins
+
+# High-Impact Model predictions
+predictedWins = predict(high_impact_model, stp25_test_df)
+stp25_test_df$PREDICTED_WINS_HIM = predictedWins
+
+# PJ1 predictions
+predictedWins = predict(pj_model1, stp25_test_df)
+stp25_test_df$PREDICTED_WINS_PJ1 = predictedWins
+
+# PJ2 predictions
+predictedWins = predict(pj_model2, stp25_test_df)
+stp25_test_df$PREDICTED_WINS_PJ2 = predictedWins
+
+# PJ4 predictions
+predictedWins = predict(pj_model4, stp25_test_df)
+stp25_test_df$PREDICTED_WINS_PJ4 = predictedWins
+
+# PJ5 predictions
+predictedWins = predict(pj_model5, stp25_test_df)
+stp25_test_df$PREDICTED_WINS_PJ5 = predictedWins
+
+# PJ6 predictions
+predictedWins = predict(pj_model6, stp25_test_df)
+stp25_test_df$PREDICTED_WINS_PJ6 = predictedWins
+
+# Log-Transformed Model predictions
+predictedWins = predict(log_model1, test_df_log)
+test_df_log$PREDICTED_WINS_LOG1 = predictedWins
+
+# Log-Transformed Model predictions
+predictedWins = predict(log_model2, test_df_log)
+test_df_log$PREDICTED_WINS_LOG2 = predictedWins
+
+# Log-Transformed Step-wise Model predictions
+predictedWins = predict(stp_logx_model, test_df_log)
+test_df_log$PREDICTED_WINS_STP = predictedWins
+
+# Lasso Model predictions
+predictedWins = predict(lasso_model, stp25_test_df)
+test_df_log$PREDICTED_WINS_LASSO = predictedWins
+
+
+# Convert Elastic Net predictions to numeric vector
+predictedWins <- as.numeric(predict(elastic_net_model, newx = x_test, s = best_lambda)[, 1])
+
+# Store the predictions in the dataframe
+stp25_test_df$PREDICTED_WINS_ELASTIC <- predictedWins
+
+
+# Random Forest Model predictions
+stp25_test_df$PREDICTED_WINS_RF <- predict(random_forest_model, newdata = stp25_test_df)
+
+
+```
+
 ```{r}
-elastic_net_results <- data.frame(
-  model_name = "Elastic Net", 
-  MAE = as.numeric(elastic_net_mae), 
-  RMSE = as.numeric(elastic_net_rmse), 
-  RSquared = as.numeric(elastic_net_r2),
-  stringsAsFactors = FALSE  
+#df to store results
+evaluation_metrics <- data.frame(
+  model_name = character(0), 
+  MAE = numeric(0),     
+  RMSE = numeric(0),    
+  RSquared = numeric(0),
+  AIC = numeric(0),
+  BIC = numeric(0)       
 )
 
-colnames(elastic_net_results) <- colnames(evaluation_metrics)
+evalution_plots <- list()
+i <- 1
 
-# Append to evaluation_metrics
-evaluation_metrics <- rbind(evaluation_metrics, elastic_net_results)
-str(evaluation_metrics)
+eval_predictions <- function(model, predicted_col, target_col, model_name) {
+  
+  # Ensure predict_col and target_col are valid vectors
+  if (is.null(predicted_col) || is.null(target_col)) {
+    stop("Error: The prediction or target column is NULL.")
+  }
 
-random_forest_results <- data.frame(
-  model_name = "Random Forest", 
-  MAE = as.numeric(random_forest_mae), 
-  RMSE = as.numeric(random_forest_rmse), 
-  RSquared = as.numeric(random_forest_r2),  
-  stringsAsFactors = FALSE
-)
+  # Residual plot
+  residuals = target_col - predicted_col
+  plot_data <- data.frame(Index = 1:length(residuals), Residuals = residuals)
+  
+  evalution_plots[[i]] <<- ggplot(plot_data, aes(x = Index, y = Residuals)) +
+    geom_point() +
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    labs(title = paste(model_name, "Residual Plot"), x = "Index", y = "Residuals") +
+    theme_minimal()
+  i <<- i + 1
+  
+  # Compute model metrics
+  model_metrics = data.frame(
+    model_name = model_name,
+    MAE = mae(target_col, predicted_col),
+    RMSE = rmse(target_col, predicted_col),
+    RSquared = cor(target_col, predicted_col)^2,
+    AIC = tryCatch(AIC(model), error = function(e) NA),  # Handle AIC for unsupported models
+    BIC = tryCatch(BIC(model), error = function(e) NA)   # Handle BIC for unsupported models
+  )
+  
+  # Append results to global evaluation metrics
+  evaluation_metrics <<- rbind(evaluation_metrics, model_metrics)
+}
 
-# Append Random Forest results
-evaluation_metrics <- rbind(evaluation_metrics, random_forest_results)
-
-print(evaluation_metrics)
+# call eval_predictions for each model
+eval_predictions(base_model, stp25_test_df$PREDICTED_WINS, stp25_test_df$TARGET_WINS, "Stats")
+eval_predictions(improved_model, stp25_test_df$PREDICTED_WINS_IMP, stp25_test_df$TARGET_WINS, "Improved")
+eval_predictions(high_impact_model, stp25_test_df$PREDICTED_WINS_HIM, stp25_test_df$TARGET_WINS, "High-Impact")
+eval_predictions(pj_model1, stp25_test_df$PREDICTED_WINS_PJ1, stp25_test_df$TARGET_WINS, "PJ1")
+eval_predictions(pj_model2, stp25_test_df$PREDICTED_WINS_PJ2, stp25_test_df$TARGET_WINS, "PJ2")
+eval_predictions(pj_model4, stp25_test_df$PREDICTED_WINS_PJ4, stp25_test_df$TARGET_WINS, "PJ4")
+eval_predictions(pj_model5, stp25_test_df$PREDICTED_WINS_PJ5, stp25_test_df$TARGET_WINS, "PJ5")
+eval_predictions(pj_model6, stp25_test_df$PREDICTED_WINS_PJ6, stp25_test_df$TARGET_WINS, "PJ6")
+eval_predictions(log_model1, test_df_log$PREDICTED_WINS_LOG1, test_df_log$TARGET_WINS, "Log-Tranformed 1")
+eval_predictions(log_model2, test_df_log$PREDICTED_WINS_LOG2, test_df_log$TARGET_WINS, "Log-Tranformed 2")
+eval_predictions(stp_logx_model, test_df_log$PREDICTED_WINS_STP, test_df_log$TARGET_WINS, "LT Step-wise")
+eval_predictions(lasso_model, test_df_log$PREDICTED_WINS_LASSO, test_df_log$TARGET_WINS, "Lasso")
+eval_predictions(elastic_net_model, stp25_test_df$PREDICTED_WINS_ELASTIC, stp25_test_df$TARGET_WINS, "Elastic Net")
+eval_predictions(random_forest_model, stp25_test_df$PREDICTED_WINS_RF, stp25_test_df$TARGET_WINS, "Random Forest")
 
 ```
 
@@ -1791,259 +1545,169 @@ evaluation_metrics <- evaluation_metrics[order(evaluation_metrics$MAE), ]
 print(evaluation_metrics)
 ```
 
+
+#### Comparing All Models
+
+
 ```{r}
-model_performance <- compare_performance(base_model, high_impact_model, log_model, 
-                                         back_select_model, stp_model_sm, stp_logx_model, 
-                                         lasso_model, rank = TRUE)
-
-# Computes Elastic Net performance
-elastic_net_predictions <- predict(elastic_net_model, newx = x_test, s = best_lambda)
-elastic_net_mae <- mae(y_test, elastic_net_predictions)
-elastic_net_rmse <- rmse(y_test, elastic_net_predictions)
-elastic_net_r2 <- cor(y_test, elastic_net_predictions)^2
-
-# Computes Random Forest performance
-random_forest_predictions <- predict(random_forest_model, newdata = stp25_test_df)
-random_forest_mae <- mae(y_test, random_forest_predictions)
-random_forest_rmse <- rmse(y_test, random_forest_predictions)
-random_forest_r2 <- cor(y_test, random_forest_predictions)^2
-
-# Stores all results in a data frame
-model_metrics <- data.frame(
-  model_name = c("Elastic Net", "Random Forest"),
-  MAE = c(elastic_net_mae, random_forest_mae),
-  RMSE = c(elastic_net_rmse, random_forest_rmse),
-  RSquared = c(elastic_net_r2, random_forest_r2)
-)
-
-print(model_metrics)
-
-```
-```{r}
-colnames(performance_df)
-colnames(model_metrics)
-
-common_cols <- intersect(colnames(performance_df), colnames(model_metrics))
-
-performance_df <- performance_df[, common_cols, drop = FALSE]
-model_metrics <- model_metrics[, common_cols, drop = FALSE]
-
-full_model_comparison <- rbind(performance_df, model_metrics)
-print(full_model_comparison)
-
-extra_models <- data.frame(
-  model_name = c("Elastic Net", "Random Forest"),
-  RSquared = c(elastic_net_r2, random_forest_r2), 
-  RMSE = c(elastic_net_rmse, random_forest_rmse) 
-)
-
-final_model_comparison <- rbind(performance_df, model_metrics)
-
-final_model_comparison <- final_model_comparison[order(final_model_comparison$RMSE), ]
-
-print(final_model_comparison)
-
-```
+library(patchwork)
+performance_df <- compare_performance(base_model, high_impact_model, pj_model1, pj_model2, pj_model4, pj_model5, pj_model6, log_model1, log_model2, back_select_model, stp_logx_model, lasso_model,  rank = TRUE)
 
 
-## Model Selection
-
-#### Testing the Model
-
-In this section, we will use the test dataframe to test the accuracy of our model's predictions
-
-```{r model4lg-test}
-
-# Do we need to clean eval dataset first?
-
-# Stats Model predictions
-predictedWins = predict(base_model, stp25_test_df)
-stp25_test_df["PREDICTED_WINS"] = predictedWins
-
-# Improved Model predictions
-predictedWins = predict(improved_model, stp25_test_df)
-stp25_test_df["PREDICTED_WINS_IMP"] = predictedWins
-
-# High-Impact Model
-predictedWins = predict(high_impact_model, stp25_test_df)
-stp25_test_df["PREDICTED_WINS_HIM"] = predictedWins
-
-# Log-Transformed Model
-predictedWins = predict(log_model, train_df_log)
-train_df_log["PREDICTED_WINS_LOG"] = predictedWins
-
-# Log-Transformed Step-wise Model
-predictedWins = predict(stp_logx_model, stplg25_test_df)
-stplg25_test_df["PREDICTED_WINS_STP"] = predictedWins
-
-# BoxCox-Transformed Step-wise Model
-### TODO: Backward Tranform
-#predictedWins = predict(stp_mode_inv, train_df_log)
-#train_df_log["PREDICTED_WINS_INV"] = predictedWins
-
-# Elastic Net Model predictions
-stp25_test_df$PREDICTED_WINS_ELASTIC <- predict(elastic_net_model, newx = x_test, s = best_lambda)
-
-# Random Forest Model predictions
-stp25_test_df$PREDICTED_WINS_RF <- predict(random_forest_model, newdata = stp25_test_df)
-
-
-```
-
-```{r MAE test}
-# Create a df to store our results
-evaluation_metrics <- data.frame(
-  model_name = character(0), 
-  MAE = numeric(0),     
-  RMSE = numeric(0),    
-  RSquared = numeric(0)      
-)
+# Loop to print the plots in batches of 4
+for (i in seq(1, length(evalution_plots), by = 4)) {
   
-eval_predictions <- function(model, predict_col, target_col, model_name) {
+  # Create a subset of the plots for the current batch
+  plot_batch <- evalution_plots[i:min(i + 4 - 1, length(evalution_plots))]
   
-  # Fit regression for visualization
-  pred = lm(predict_col ~ target_col)  
-  plot(predict_col, target_col, xlab = "Actual Wins", ylab = "Predicted Wins", main = model_name)
-  abline(pred, col = "red", lwd = 2)
-  
-  # Residual plot
-  residuals = target_col - predict_col
-  plot(residuals, main = paste(model_name, "Residual Plot"), ylab = "Residuals", xlab = "Index")
-  
-  # Compute model metrics
-  model_metrics = data.frame(
-    model_name = model_name,
-    MAE = mae(target_col, predict_col),
-    RMSE = rmse(target_col, predict_col),
-    RSquared = cor(target_col, predict_col)^2
-  )
-  
-  # Append results to global evaluation metrics
-  evaluation_metrics <<- rbind(evaluation_metrics, model_metrics)
+  # Display the current batch of plots
+  print(wrap_plots(plot_batch, ncol = 2, axis_titles='collect'))  
 }
 
-# Evaluate Stats Model predictions
-eval_predictions(base_model, stp25_test_df$PREDICTED_WINS, stp25_test_df$TARGET_WINS, "Stats")
-
 ```
+
+We selected the Lasso model for its balance of predictive performance and simplicity. It automatically performs feature selection through its regularization term, helping us prevent overfitting while identifying the most relevant features for predicting TARGET_WINS. Although the model's R-squared indicates that it doesn't capture all of the variation in the target, its moderate MAE and RMSE provide a reliable baseline. Additionally, Lasso's interpretability allows us to better understand the relationship between predictors and the outcome. By choosing Lasso, we opted for a model that offers good performance, simplicity, and interpretability, making it easier to refine or extend in future iterations.
+
+Below we note our lasso perfomance metrics:
 
 ```{r}
-# Improved Model
-eval_predictions(improved_model, stp25_test_df$PREDICTED_WINS_IMP, stp25_test_df$TARGET_WINS, "Improved")
-```
+lasso_metrics <- evaluation_metrics %>%
+  filter(model_name == "Lasso") %>%
+  distinct(model_name, .keep_all = TRUE)
 
+print(lasso_metrics)
 
-```{r}
-# Evaluate High-Impact Model
-eval_predictions(high_impact_model, stp25_test_df$PREDICTED_WINS_HIM, stp25_test_df$TARGET_WINS, "High-Impact")
-```
-
-
-```{r}
-# Evaluate Log-Transformed Model
-eval_predictions(log_model, train_df_log$PREDICTED_WINS_LOG, train_df_log$TARGET_WINS, "Log-Tranformed")
-```
-
-```{r}
-
-# Evaluate Log-Transformed Step-wise Model
-eval_predictions(stp_logx_model, stplg25_test_df$PREDICTED_WINS_STP, stplg25_test_df$TARGET_WINS, "LT Step-wise")
-```
-```{r}
-tryCatch({
-  eval_predictions(elastic_net_model, stp25_test_df$PREDICTED_WINS_ELASTIC, stp25_test_df$TARGET_WINS, "Elastic Net")
-}, error = function(e) {
-  message("Error caught in eval_predictions for Elastic Net: ", e$message)
-})
-```
-```{r}
-eval_predictions(random_forest_model, stp25_test_df$PREDICTED_WINS_RF, stp25_test_df$TARGET_WINS, "Random Forest")
 
 ```
 
-
-
-```{r}
-print(evaluation_metrics)
-```
-
-
-```{r}
-# TODO: backward transform
-# Evaluate Box-Cox Transformed Step-wise Model
-#eval_predictions(stp_model_inv, train_df_log$PREDICTED_WINS_INV, train_df_log$TARGET_WINS, "Box-Cox")
-```
-
-To evaluate the accuracy of each our model's predictions, we will compare:
-- the Mean Absolute Error (MAE)
-- the Root Mean Squared Error (RMSE)
-- the R-squared (R²)
-
-```{r}
-print(evaluation_metrics)
-```
-A quick examination of these shows the Log-Transformed Step-wise Model has the lowest MAE and RMSE as well as the highest R-squared, suggesting that this model is somewhat more accurate than the other four evaluated. For confirmation we will perform a 5-fold cross-validation below:
-
-```{r model4lg-cross-validation}
-
-selected_model <- stp_logx_model
-formula <- formula(selected_model$finalModel) 
-
-train_control <- trainControl(method = "cv", number = 5)  # 10-fold cross-validation
-
-model_cv <- train(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + 
-    TEAM_BATTING_3B + TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
-    TEAM_BASERUN_SB + TEAM_PITCHING_H + TEAM_PITCHING_BB + TEAM_PITCHING_SO + 
-    TEAM_FIELDING_E + TEAM_FIELDING_DP, data = stplg75_train_df, method = "lm", trControl = train_control)
-
-print(model_cv)
-
-summary(stp_logx_model)
-```
-
-MAE and RMSE is even lower when using cross-validation. Although our R-squared value decreased from 0.3183 to 0.3034024, this value is still higher than the model with second highest R-squared value of 0.2368 for the Log-Tranformed model.
-
-#### Summary
-Our previous test suggest that the Log-Transformed Step-wise Model appears to be the most accurate at predicting wins over a team's season. However, with 12 predictors, this model is fairly complex. Given the audience for our report and the need to clearly describe our model to the coach, we should select a simpler model that is still statistically significant and fairly accurate. Therefore, we will select our Improved model.
-
-Making Predictions Using the Evaluation Dataset:
-
-#### Preparing the Evalulation Dataset  
-
-TODO: imputation/transformations should match whatever we end up deciding
-QUES FOR THE GROUP: Is this the best place for data prep for the eval dataframe? also which are the correct prep steps? do we need to impute the prep set? 
-
-
-
-```{r}
-
-mean_val <- colMeans(eval_df, na.rm = TRUE)
-
-# Impute using Means
-#for(i in colnames(eval_df))
-#    eval_df[,i][is.na(eval_df[,i])] <- mean_val[i]
-```
 
 ### Applying Prediction to Our Evalution
 
-With our models tested and evaluated, we can no apply our model to our final evaluation dataframe.
+With our models tested and evaluated, we can now apply our model to our final evaluation dataframe.
 
-```{r final-predictions}
+#### Preparing the Evalulation Dataset  
 
-# TODO: Apply the model we decide works best
-predictedWins = predict(selected_model, eval_df)
-eval_df["PREDICTED_WINS"] = predictedWins
+First we apply the same imputations and transformation our test dataframe that we applied to our training dataframe.
+
+```{r}
+numeric_cols <- sapply(stp25_test_df, is.numeric)
+
+# Impute missing values for numeric columns only
+stp25_test_df[numeric_cols][is.na(stp25_test_df[numeric_cols])] <- 
+  lapply(stp25_test_df[numeric_cols], function(x) mean(x, na.rm = TRUE))
 
 ```
 
-## Interpretation of Predicted TARGET_WINS Values
+We use the selected model to predict wins on our test dataframe. 
 
+
+```{r test-predictions}
+
+# Apply the Lasso model to the final evaluation dataframe
+predictedWins <- predict(lasso_model, stp25_test_df)
+stp25_test_df$PREDICTED_WINS <- predictedWins
+```
+
+
+We also back transform our predicted wins for ease of comparison.
+
+```{r}
+# Backward transform (inverse Box-Cox) for Box-Cox transformed model
+# Assuming 'best_lambda' is the value of lambda used for Box-Cox transformation
+
+# If 'best_lambda' is zero, use exponential transformation
+if (best_lambda == 0) {
+  predictedWins_inv <- exp(predictedWins)  # Exponential transformation if lambda = 0
+} else {
+  predictedWins_inv <- ((predictedWins * best_lambda) + 1)^(1 / best_lambda)  
+}
+
+# Store the back-transformed predictions in the dataframe
+stp25_test_df$PREDICTED_WINS_INV <- predictedWins_inv
+
+# Evaluate the back-transformed predictions
+eval_predictions(base_model, stp25_test_df$PREDICTED_WINS_INV, stp25_test_df$TARGET_WINS, "Base Model (Back-Transformed)")
+
+```
+
+
+
+
+Below is a plot of our Predicted vs Actual wins.
+
+```{r}
+# Predicted vs Actual plot for the Lasso Model
+ggplot(stp25_test_df, aes(x = TARGET_WINS, y = PREDICTED_WINS)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Predicted vs Actual TARGET_WINS - Lasso Model",
+       x = "Actual TARGET_WINS",
+       y = "Predicted TARGET_WINS") +
+  theme_minimal()
+
+```
+
+
+The Lasso model achieved an MAE of `r lasso_metrics$MAE` which suggests the model has a low average error in predicting TARGET_WINS. The RMSE value of `r 
+lasso_metrics$RMSE` supports this conclusion. The R-squared value of `r lasso_metrics$RSquared` indicates that the Lasso model explains a substantial portion of the variance in the TARGET_WINS.
+
+```
+
+
+### Interpretation of Predicted TARGET_WINS Values
+
+The plot featured above displays predicted wins versus actual values of target wins using a LASSO model. The red dashed line represents a perfect prediction, where the predicted target_wins values would exactly match the actual values. The scattered points around this line indicate that while the model is reasonably accurate, there are deviations. This can be expected with real world data, and the predictions generally cluster around the actual values. The dispersion in the middle of the plot tells us that the model is better at predicting middle range of values than extremes. 
 
 ### Evaluating the Accuracy of Predictions Against Actual TARGET_WINS
 
+#### Interpretation of Model Accuracy Metrics
 
-### Interpretation of Model Accuracy Metrics
-
+The LASSO model's performance metrics provide insights into its accuracy. The Mean Absolute Error (MAE) of 10.03081 indicates that on average, the model's predictions are off by about 10 wins, which is reasonable given the real world context. The RMSE value of 12.94165 supports this as well, displaying that while the model performs relatively well on most predictions, it tends to be a bit further off when the errors are larger. This is expected due to RMSE penalizing larger errors heavier. The R-squared value of 0.2369009 shows that the model explains about 23.7% of the variance in TARGET_WINS, which is a decent amount. However, this also suggests that there is considerable unexplained variance, implying that the model does not capture all the factors that influence TARGET_WINS. Despite this, the model still offers useful predictive power, especially when combined with other techniques or additional data.
 
 #### Final Analysis
 
+The Lasso model was selected for its balance between predictive performance and simplicity. Lasso is particularly well-suited for this problem because it performs automatic feature selection through its regularization term, which helps prevent overfitting while identifying the most influential features. This is crucial when working with many predictors, some of which may not be directly relevant to TARGET_WINS. Although the model's R-squared value suggests that it does not capture all of the variation in the target variable, the moderate MAE and RMSE indicate that it provides a reliable baseline prediction. Moreover, the interpretability of Lasso makes it an ideal choice for understanding the relationship between predictors and the outcome. By selecting Lasso, we chose a model that offers good performance while being simple and interpretable, making it easier to refine or extend in future iterations. In conclusion, while the Lasso model could be improved with additional data or feature engineering, it is a reasonable, interpretable, and effective model for predicting TARGET_WINS based on the available predictors.
+
+### Applying selcted model (Lasso) to the final evaluation data
+
+#### Preparing final evaluation dataset
+
+```{r}
+na_per_column <- colSums(is.na(eval_df))
+print(na_per_column)
+```
+
+```{r}
+eval_df <- eval_df[, !names(eval_df) %in% "TEAM_BATTING_HBP"]
+numeric_cols_eval <- sapply(eval_df, is.numeric)
+
+str(eval_df)
+numeric_cols_eval
+```
+
+```{r}
+# Impute missing values for numeric columns only
+eval_df[numeric_cols_eval] <- 
+  lapply(eval_df[numeric_cols_eval], function(x) {
+    x[is.na(x)] <- mean(x, na.rm = TRUE)
+    return(x)
+  })
+
+# Ensure any transformations match the ones used during training 
+eval_df$log_TEAM_BATTING_H <- log(eval_df$TEAM_BATTING_H + 1) 
+```
+
+#### Predicting Wins using Lasso
+
+```{r final-predictions}
+
+# Apply the Lasso model to the final evaluation dataframe
+predictedWinsEval <- round(predict(lasso_model, eval_df))
+eval_df$PREDICTED_WINS <- predictedWinsEval
+
+glimpse(eval_df)
+```
+
+```{r}
+write.csv(eval_df, "predictions.csv", row.names = F)
+```

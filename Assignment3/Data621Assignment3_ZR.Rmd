@@ -1,0 +1,45 @@
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(corrplot)
+
+train <- read.csv("https://raw.githubusercontent.com/zachrose97/Data621Assignment2/main/crime-training-data_modified.csv")
+eval <- read.csv("https://raw.githubusercontent.com/zachrose97/Data621Assignment2/main/crime-evaluation-data_modified%20(2).csv")
+```
+
+
+```{r}
+dim(train)    
+str(train)            
+summary(train)      
+```
+The training dataset contains 466 observations and 13 variables, including 12 predictor variables and one binary response variable (target). The target variable indicates whether a neighborhood’s crime rate is above the median (1) or not (0). The dataset includes a mix of continuous and categorical features, such as housing characteristics, pollution levels, property taxes, and proximity to employment centers. Understanding the distributions, relationships, and correlations between these features is an essential first step in building an effective predictive model. Summary statistics reveal substantial variability in several features. For instance, the variable tax (full-value property tax rate per $10,000) has a mean of 409.5 but a maximum value of 711, indicating a right-skewed distribution with significant outliers. Similar patterns are observed in zn (zoned residential land), age, and dis (distance to employment centers). These skewed distributions may require transformation to reduce leverage effects during modeling.
+
+
+
+```{r}
+train %>% 
+  pivot_longer(cols = -target, names_to = "variable", values_to = "value") %>%
+  ggplot(aes(x = variable, y = value)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+cor_matrix <- cor(train %>% subset(select=-c(target)))
+corrplot(cor_matrix, method = "color", tl.cex = 0.7)
+
+cor_target <- cor(train %>% subset(select=-c(target)), train$target)
+print(cor_target)
+```
+
+A boxplot of the numeric features further highlights the presence of skewness and outliers in variables such as tax, zn, and age. Many variables, such as chas (a binary indicator for bordering the Charles River), show relatively limited spread, while others, like nox and indus, display more variability across neighborhoods. These differences in scale and distribution suggest that transformation or normalization may be beneficial in the modeling stage. A correlation heatmap was constructed to examine multicollinearity and the relationships between predictors. Strong positive correlations were observed between nox, age, tax, indus, and rad, suggesting that these variables may capture related structural or geographic aspects of the neighborhoods. Several variables also show moderate to strong correlation with the target variable — in particular, nox, age, rad, and tax were positively correlated with higher crime risk, while dis and rm were negatively correlated.
+
+
+```{r}
+train$log_tax <- log(train$tax)
+train$log_dis <- log(train$dis)
+train$log_zn <- log(train$zn + 1)
+train$log_lstat <- log(train$lstat)
+```
+
+No missing values were found in the training dataset. Therefore, no imputation or flagging was necessary at this stage. Several continuous variables demonstrated right-skewed distributions and a high number of extreme values. To reduce the influence of outliers and better align the data with the assumptions of logistic regression, log-transformations were applied to tax, zn, dis, and lstat. This transformation helps normalize the data, reduce variance, and enhance model interpretability. A small constant was added to zn before the transformation to account for zero values.
+
