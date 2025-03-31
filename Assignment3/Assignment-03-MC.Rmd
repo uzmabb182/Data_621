@@ -76,7 +76,7 @@ df_eval <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/h
 
 ```{r}
 #dim(crime_training_df)
-#skim(crime_training_df)
+skim(crime_training_df)
 
 ```
 
@@ -149,7 +149,7 @@ However, they differ in terms of their assumptions, use cases, and how they quan
 
 Pearson Correlation: Suitable for continuous data when you want to measure linear associations.
 
-Spearman Rank Correlation: AAppropriate for both continuous and ordinal data. Particularly useful when the relationship is expected to be monotonic but not necessarily linear.
+Spearman Rank Correlation: Appropriate for both continuous and ordinal data. Particularly useful when the relationship is expected to be monotonic but not necessarily linear.
 
 Kendall’s Tau Rank Correlation: Suitable for both continuous and ordinal (ranked) data. Useful when the data may not follow a linear relationship.
 
@@ -279,19 +279,25 @@ str(crime_training_df)
 numeric_data <- crime_training_df %>% dplyr::select(where(is.numeric), -target)
 spearman_cor <- cor(numeric_data, method = "spearman", use = "pairwise.complete.obs")
 
-# Plot the Spearman correlation matrix with labels
-corrplot::corrplot(spearman_cor, 
-         method = "color",         
-         type = "upper",           
-         tl.cex = 0.8,             
-         addCoef.col = "black",    
-         number.cex = 0.7,         
-         col = colorRampPalette(c("blue", "white", "red"))(200)
+# Plot the upper triangle of the correlation matrix
+corrplot::corrplot(
+  spearman_cor,
+  method = "color",                            # Use colored squares
+  type = "upper",                              # Show only upper triangle
+  tl.cex = 0.7,                                # Text label size
+  tl.col = "black",                            # Text label color
+  addCoef.col = "black",                       # Add correlation coefficients in black
+  number.cex = 0.6,                            # Coefficient number size
+  col = colorRampPalette(c("blue", "white", "red"))(200),  # Custom color scale
+  diag = FALSE,                                # Hide diagonal
+  order = "hclust"                             # Cluster similar variables
 )
 
 
 
 ```
+
+
 ### Checking for Multicollinearity (High Correlation Between Predictors)
 
 A general rule of thumb is that if |𝜌| > 0.7, it indicates strong correlation between variables, which can lead to multicollinearity in the logistic regression model.
@@ -438,8 +444,10 @@ for (param in numeric_cols) {
 Below is series of boxplots for all numeric parameters where target is our dependent variable.
 
 ```{r explore-boxplot}
-dev.off()
-plot_boxplot(df_training, by = "target", title="Boxplots of Target vs Param")
+# No dev.off() needed unless you're saving the plot
+
+plot_boxplot(df_training, by = "target", title = "Boxplots of Target vs Param")
+
 ```
 
 ```{r iqrs}
