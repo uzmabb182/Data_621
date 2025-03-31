@@ -268,13 +268,13 @@ numeric_data <- crime_training_df %>% dplyr::select(where(is.numeric), -target)
 spearman_cor <- cor(numeric_data, method = "spearman", use = "pairwise.complete.obs")
 
 # Plot the Spearman correlation matrix with labels
-corrplot(spearman_cor, 
-         method = "color",         # Color-coded correlation plot
-         type = "upper",           # Show only upper triangle
-         tl.cex = 0.8,             # Adjust text size of axis labels
-         addCoef.col = "black",    # Add correlation values in black
-         number.cex = 0.7,         # Adjust correlation label size
-         col = colorRampPalette(c("blue", "white", "red"))(200) # Color gradient
+corrplot::corrplot(spearman_cor, 
+         method = "color",         
+         type = "upper",           
+         tl.cex = 0.8,             
+         addCoef.col = "black",    
+         number.cex = 0.7,         
+         col = colorRampPalette(c("blue", "white", "red"))(200)
 )
 
 
@@ -450,8 +450,7 @@ Model 3 (Transformed Variables): Use transformed and interaction variables.
 library(MASS)
 
 # Logistic Regression Model 1 (Baseline)
-model1 <- glm(target ~ zn + indus + chas + nox + rm + age + dis + rad + tax + ptratio + lstat + medv +
-                        log_medv + log_lstat + log_dis +
+model1 <- glm(target ~ chas + lstat + medv + log_medv + log_lstat + log_dis +
                         zn_scaled + indus_scaled + nox_scaled + rm_scaled + age_scaled + dis_scaled +
                         rad_scaled + tax_scaled + ptratio_scaled +
                         lstat_medv_interact + tax_rad_interact + age_group,
@@ -557,8 +556,9 @@ print(conf_matrix_model3)
 # Define a function to compute accuracy, precision, recall, and F1-score
 evaluate_model <- function(conf_matrix) {
   accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
-  precision <- conf_matrix[2,2] / sum(conf_matrix[,2])
-  recall <- conf_matrix[2,2] / sum(conf_matrix[2,])
+  precision <- conf_matrix["1", "1"] / sum(conf_matrix[,"1"])
+  recall <- conf_matrix["1", "1"] / sum(conf_matrix["1",])
+
   f1_score <- 2 * ((precision * recall) / (precision + recall))
   
   return(list(Accuracy = accuracy, Precision = precision, Recall = recall, F1_Score = f1_score))
@@ -751,51 +751,84 @@ Highest AUC (0.9787): best ability to distinguish between classes.
 Best McFadden’s R² (0.730): indicates strong model fit.
 Even though AIC/BIC is a bit higher, the gain in performance justifies the complexity, especially in a high-stakes domain like crime prediction.
 
-### Computing Prediction Error and CV Error:
 
-These values represent the Adjusted Cross-Validation Error for each model — the lower, the better.
+Definitions:
+Prediction Error: Usually calculated as the Misclassification Rate on a test set (or the same training set if test set isn't available):
 
-```{r, warning = FALSE, message = FALSE}
-library(boot)
-# CV for Model 1
-cv_model1 <- cv.glm(data = crime_training_df, glmfit = model1, K = 10)
-cv_error_model1 <- cv_model1$delta[2]  # Adjusted CV Error
-
-# CV for Model 2
-cv_model2 <- cv.glm(data = crime_training_df, glmfit = model2, K = 10)
-cv_error_model2 <- cv_model2$delta[2]
-
-# CV for Model 3
-cv_model3 <- cv.glm(data = crime_training_df, glmfit = model3, K = 10)
-cv_error_model3 <- cv_model3$delta[2]
-
-cv_error_model1
-cv_error_model2
-cv_error_model3
+Prediction Error= Number of Incorrect Predictions/Total Prediction
 
 
-```
+Cross-Validation Error (CV Error): Estimated using cv.glm() in R. The function returns:
+
+delta[1]: raw cross-validation error estimate
+delta[2]: adjusted cross-validation error (accounts for model bias, preferred for reporting)
+
+### Calculate Cross-Validation Error and Pridiction Error for all 3 models:
 
 ```{r}
-library(pscl)
-# Final Summary Table
-model_metrics_final <- tibble::tibble(
-  Model = c("Model 1", "Model 2", "Model 3"),
-  AIC = c(AIC(model1), AIC(model2), AIC(model3)),
-  BIC = c(BIC(model1), BIC(model2), BIC(model3)),
-  McFadden_R2 = c(pR2(model1)["McFadden"],
-                  pR2(model2)["McFadden"],
-                  pR2(model3)["McFadden"]),
-  Accuracy = c(0.9334764, 0.9270386, 0.8519313),
-  F1_Score = c(0.9318681, 0.9251101, 0.8463252),
-  AUC = c(0.9787187, 0.9775579, 0.9472297),
-  Prediction_Error = c(1 - 0.9334764, 1 - 0.9270386, 1 - 0.8519313),
-  Adjusted_CV_Error = c(cv_error_model1, cv_error_model2, cv_error_model3)
-)
+library(boot)
 
-print(model_metrics_final)
+
+# Assuming these are your model objects:
+# model1, model2, model3
+
+cv_model1 <- cv.glm(data = crime_training_df, glmfit = model1, K = 10)
+cv_model2 <- cv.glm(data = crime_training_df, glmfit = model2, K = 10)
+cv_model3 <- cv.glm(data = crime_training_df, glmfit = model3, K = 10)
+
+# Extract adjusted CV errors (delta[2] = bias-corrected estimate)
+adjusted_cv_error_model1 <- cv_model1$delta[2]
+adjusted_cv_error_model2 <- cv_model2$delta[2]
+adjusted_cv_error_model3 <- cv_model3$delta[2]
+
+adjusted_cv_error_model1
+adjusted_cv_error_model2
+adjusted_cv_error_model3
 
 ```
+
+
+
+```{r}
+# Model 1
+total1 <- 223 + 17 + 14 + 212
+incorrect1 <- 17 + 14
+prediction_error_model1 <- incorrect1 / total1
+
+# Model 2 (assuming similar structure, update numbers accordingly)
+total2 <- 222 + 19 + 15 + 210
+incorrect2 <- 19 + 15
+prediction_error_model2 <- incorrect2 / total2
+
+# Model 3
+total3 <- 207 + 39 + 30 + 190
+incorrect3 <- 39 + 30
+prediction_error_model3 <- incorrect3 / total3
+
+prediction_error_model1
+prediction_error_model2
+prediction_error_model3
+
+```
+### Best Model Selection
+
+Model 1 is selected because:
+•	Highest Accuracy → Least classification errors overall.
+•	Highest F1 Score → Best balance between Precision & Recall.
+•	Highest AUC → Best at distinguishing high vs. low crime.
+•	Highest McFadden’s R² → Strongest model fit.
+•	Low Prediction & CV Error → Very reliable.
+
+### Trade-off:
+
+•	AIC and BIC slightly higher than Model 2 due to more features.
+•	But performance gain justifies the added complexity, especially for critical domains like crime detection.
+
+### Real-World Importance
+
+•	False Negatives (FN): Predicting a low-crime area when it's actually high-crime.
+•	Can lead to under-policing and increased crime.
+•	Model 1 minimizes False Negatives best, making it ideal for crime prevention
 
 
 ### Apply the Best Model to Evaluation Data
