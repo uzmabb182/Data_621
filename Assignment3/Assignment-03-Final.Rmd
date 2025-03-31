@@ -1686,7 +1686,9 @@ For logistic regression, the "prediction error" is the mean squared error (diffe
 
 ----
 
-#### Checking the Model's Conditions
+## MODEL SELECTION
+
+### Checking the Model's Conditions
 
 We will examine the following key conditions for fitting a logistic model:
 
@@ -1698,25 +1700,39 @@ We will examine the following key conditions for fitting a logistic model:
 6. no outliers in data
 
 
-##### Confidence Interval
 
-```{r confint, echo=FALSE, warning=FALSE, message=FALSE}
-confint(model_full)
+### Apply the Best Model to Evaluation Data
 
+Once the best model is selected, we use it for prediction on crime_evaluation_df.
+
+
+```{r}
+# Apply same transformations as before 
 ```
 
 
-##### Odds Ratio 
-```{r odds-ration, echo=TRUE,  warning=FALSE, message=FALSE}
-exp(coef(model_full))
-```
+
+```{r}
+
+# Predict probabilities using model1
+eval_pred_prob <- predict(pj_model2, newdata = crime_evaluation_df, type = "response")
+
+# Convert probabilities to binary class (0 or 1) using a threshold of 0.5
+eval_pred_class <- ifelse(eval_pred_prob > 0.5, 1, 0)
+
+# Add predictions to the evaluation data
+crime_evaluation_df$predicted_prob <- eval_pred_prob
+crime_evaluation_df$predicted_class <- eval_pred_class
 
 
-#### ANOVA Test
-```{r anova, echo =TRUE,  warning=FALSE, message=FALSE}
-model_summary <- summary(model_full)
-#param_pvalue <- model_summary$coefficients["target", "Pr(>|z|)"]
-anova(model_full, test = "Chisq")
 ```
+```{r}
+# use the predicted_class and predicted_prob values as your final output
+
+head(crime_evaluation_df[, c("predicted_prob", "predicted_class")])
+
+
+```
+
 
 
