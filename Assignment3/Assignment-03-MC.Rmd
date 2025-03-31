@@ -519,41 +519,154 @@ Using a binomial (`target`) for our dependent variable  would violate the common
 To account for these violations, we wil use a Generalized Linear Model (GLM) to conduct logistic regression. 
 
 
-### Backward Selection Model (BIC)
 
-```{r backward-stepwise-}
-# Backward stepwise regression
-backward_model <- stepAIC(model_full, direction = "backward", k=log(nrow(df_training_one_hot)))
+### Mubashira's Models
 
-summary(backward_model)
+### Mubashira Model 1: Baseline (All variables)
+```{r}
+crime_training_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-training-data_modified.csv")
 
-plot(backward_model$residuals, main = "Backward Selection Residuals", ylab = "Residuals")
+crime_training_df <- crime_training_df %>%
+  mutate(across(where(is.character), as.numeric))
+
+# Log transformation
+crime_training_df <- crime_training_df %>%
+  mutate(
+    log_medv = log(medv + 1),  # Avoid log(0)
+    log_lstat = log(lstat + 1),
+    log_dis = log(dis + 1)
+  )
+
+#Standardization (Normalize Continuous Variables)
+#Standardization ensures that variables are on the same scale, improving model stability.
+crime_training_df <- crime_training_df %>%
+  mutate(
+    zn_scaled = as.numeric(scale(zn)),
+    indus_scaled = as.numeric(scale(indus)),
+    nox_scaled = as.numeric(scale(nox)),
+    rm_scaled = as.numeric(scale(rm)),
+    age_scaled = as.numeric(scale(age)),
+    dis_scaled = as.numeric(scale(dis)),
+    rad_scaled = as.numeric(scale(rad)),
+    tax_scaled = as.numeric(scale(tax)),
+    ptratio_scaled = as.numeric(scale(ptratio))
+  )
+
+
+# Create categorical age groups bins
+crime_training_df$age_group <- cut(crime_training_df$age, breaks=c(0, 30, 60, 100), labels=c("Young", "Middle-aged", "Old"))
+
+# Create Interaction Terms
+crime_training_df <- crime_training_df %>%
+  mutate(
+    lstat_medv_interact = log_lstat * log_medv,  # Income & housing price interaction
+    tax_rad_interact = tax * rad                # Tax burden & highway accessibility
+  )
+
 ```
 
-### Backward Selection Model with Log Transformationss (BIC)
 
-```{r backward-log-stepwise}
-# Backward stepwise regression
-backward_log_model <- stepAIC(model_full_log, direction = "backward", k=log(nrow(df_training_1h_log)))
+```{r, warning = FALSE, message = FALSE}
+# Load library
 
-summary(backward_log_model)
+# Logistic Regression Model 1 (Baseline)
+model1 <- glm(target ~ chas + lstat + medv + log_medv + log_lstat + log_dis +
+                        zn_scaled + indus_scaled + nox_scaled + rm_scaled + age_scaled + dis_scaled +
+                        rad_scaled + tax_scaled + ptratio_scaled +
+                        lstat_medv_interact + tax_rad_interact + age_group,
+              data = crime_training_df, family = binomial)
 
-plot(backward_model$residuals, main = "Log Transformed Backward Selection Residuals", ylab = "Residuals")
+# Summary of models
+summary(model1)
+
+AIC(model1)  # Compare AIC
 ```
 
-### Models Cased on Predictor Correlation
 
-These models were guided by the results of our correlation plot. The correlation plot shows strong correlation among predictors in two large clusters suggesting that selecting one variable from each cluster might be sufficient within our model.
+### Mubashira Model 2: Stepwise Selection
 
-```{r correlation-revisited, echo=FALSE}
+```{r}
 
-corrplot(df_training_cor, method="shade", order="hclust", addrect=4)
+# Logistic Regression Model 2 (Stepwise Selection)
+model2 <- stepAIC(glm(target ~ ., data=crime_training_df, family=binomial), direction="both")
 
-model_corr <-  glm(target ~ indus + chas + radq_low + medv, binomial(link = "logit"), data=df_training_one_hot)
-summary(model_corr)
+summary(model2)
+
+AIC(model2)  # Compare AIC
+
 ```
 
-####  Model using Principal Components
+
+### Mubashira Model 3: Transformations & Interactions
+
+```{r}
+
+# Logistic Regression Model 3 (With Transformations & Interactions)
+model3 <- glm(target ~ log_medv + lstat + nox + ptratio + age_group, data=crime_training_df, family=binomial)
+
+summary(model3)
+
+
+
+```
+
+### Puja Model 1: Baseline Logistic Regression
+
+```{r}
+
+### Puja Modified below:
+pj_crime_training_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-training-data_modified.csv")
+
+
+### Data Preparation
+# Log Transformations
+pj_crime_training_df <- pj_crime_training_df %>%
+  mutate(
+    log_zn = log1p(zn),
+    log_indus = log1p(indus),
+    log_tax = log1p(tax),
+    log_rad = log1p(rad),
+    log_lstat = log1p(lstat),
+    log_medv = log1p(medv)
+  )
+
+# Binning 'age' into Categories
+pj_crime_training_df <- pj_crime_training_df %>%
+  mutate(age_group = cut(age, breaks = c(0, 40, 70, 100), labels = c("Young", "Middle-aged", "Old")))
+
+# Normalize 'dis'
+pj_crime_training_df <- pj_crime_training_df %>%
+  mutate(dis_scaled = scale(dis))
+
+```
+
+
+```{r}
+### Model Building
+# Model 1: Baseline Logistic Regression
+pj_model1 <- glm(target ~ zn + indus + chas + nox + rm + age + dis + rad + tax + ptratio + lstat + medv, 
+              data = pj_crime_training_df, family = binomial)
+summary(pj_model1)
+```
+
+
+### Puja Model 2: Stepwise Logistic Regression
+
+```{r}
+#Model 2: Stepwise Logistic Regression
+pj_model2 <- step(glm(target ~ ., data = pj_crime_training_df, family = binomial), direction = "both")
+summary(pj_model2)
+```
+
+#### Puja  Model 3: Logistic Regression with Transformed Variables
+```{r}
+# Model 3: Logistic Regression with Transformed Variables
+pj_model3 <- glm(target ~ log_zn + log_indus + chas + nox + rm + age_group + dis_scaled + log_rad + log_tax + ptratio + log_lstat + log_medv, 
+              data = pj_crime_training_df, family = binomial)
+summary(pj_model3)
+``` 
+
+###  Model using Principal Components
 
 This section uses the correlation plot to perform Principal Component Analysis on the two large variable clusters shown in the plot. We will then substiture the variables in each of the two clusters with their respective PC scores in our model.
 
@@ -619,7 +732,7 @@ summary(model_pca2)
 
 
 
-####  Model based on Variable Clustering
+###  Model based on Variable Clustering
 
 The dendogram is a variable clustering technique that shows how the parameters progressively come together at different levels of similarity. It offers another way to visualize correlations between our parameters. In this model, we will use the dedogram to prune parameters that are similar from the lower branches. In this model, we used the results from a T and Wilcox pairwise test to assist with the parameter selection.
 
@@ -662,8 +775,7 @@ library(vcdExtra)
 library(pscl)
 #models <- list(model_full, model_full_log, backward_model, backward_log_model, model_corr, model_pca, model_dendo)
 
-stats <- LRstats(model_full, model_full_log,
-        backward_model, backward_log_model, model_corr, model_pca, model_dendo)
+stats <- LRstats(model_full, model_pca, model_dendo, model1, model2, model3, pj_model1, pj_model2, pj_model3)
 
 stats$McFaddenR2 <- NA 
 stats$Accuracy <- NA 
@@ -683,8 +795,12 @@ enhanceEvaluationMetrics <- function(df, model_name) {
     model_data <- df_training_1h_log
   } else if (model_name == "model_pca") {
     model_data <- df_training_one_hot_pca
-  } else {
+  } else if (model_name == "model_full" | model_name == "backward_model" | model_name == "model_corr" | model_name == "model_dendo") {
     model_data <- df_training_one_hot
+  } else if (model_name == "pj_model1" | model_name == "pj_model2" | model_name == "pj_model3") {
+    model_data <- pj_crime_training_df
+  } else {
+    model_data <- crime_training_df
   }
   
   df[model_name, "McFaddenR2"] <- pR2(model)["McFadden"]
@@ -692,7 +808,7 @@ enhanceEvaluationMetrics <- function(df, model_name) {
   pred_probs <- predict(model, type = "response")
   
   pred_probs_factor <- as.factor(ifelse(pred_probs > 0.5, 1, 0))
-  conf_matrix <- confusionMatrix(pred_probs_factor, model_data$target)
+  conf_matrix <- confusionMatrix(pred_probs_factor, as.factor(model_data$target))
   df[model_name, "Accuracy"] <- conf_matrix$overall['Accuracy']
   df[model_name, "Precision"] <- conf_matrix$byClass['Precision']
   #df[model_name, "Recall"] <- conf_matrix$byClass['Recall']
