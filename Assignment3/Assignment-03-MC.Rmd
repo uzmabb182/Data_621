@@ -99,7 +99,7 @@ for (param in numeric_cols) {
 Below is series of boxplots for all numeric parameters where target is our dependent variable.
 
 ```{r explore-boxplot}
-dev.off()
+#dev.off()
 plot_boxplot(df_training, by = "target", title="Boxplots of Target vs Param")
 ```
 
@@ -188,13 +188,13 @@ The bargraphs for `rad` are somewhat more revealing. They suggest a strong relat
 
 #### Pairs
 
-Using the pair function, we can print  scatterplots comparing each of the variables to the others. 
+Using the pair function, we can print scatterplots comparing each of the variables to the others. 
 
 ```{r pairs-simple}
 png("scatterplot_matrix.png", width = 800, height = 800)
 
 pairs(df_training, main="")
-dev.off()
+#dev.off()
 ```
 
 GGpairs plots take this a step further and show normal distribution and boxplots to get a fuller sense of how the data parameters relate to one another.
@@ -395,38 +395,6 @@ plot(model_full, which = c(1, 2, 3, 5), col=df_training_one_hot$target,  id.n = 
 Our residual vs fitted, QQ, Scale-Location and Residual vs Leverage plots all confirm that points 280, 338, and 14 should be investigated and could be outliers with high influence. Points 457 appear to have less leverage and does not stand out in these plots. 
 
 Below is the output for the three points identified as potential outliers in our diagnostic plots. A quick review of the data doesn't reveal anything that stands out as being out of the ordinary.
-
-_Partial residual plots_
-
-```{r partial-residual-plots}
-
-for (j in names(coef(model_full))[-1]) {
-  if (j != 'chas1' && j != 'chas2'){
-    plot(
-      x = df_training_one_hot[,j],
-      y = residuals(model_full, "partial")[,j],
-    col = df_training_one_hot$target,
-    main = paste0("Partial residuals by ", j),
-    xlab = j,
-    ylab = "partial residual"
-    )
-  }
-} 
-```
-
-_Binned Residuals Plot_
-
-Below is a Binned Residuals Plot. The binned residuals plot  divide the data into categories (bins) based on their fitted values, then plot the average residual versus the average fitted value for each bin.
-
-```{r binned-plot}
-binnedplot(
-  x = predict(model_full, newdata=df_training_one_hot, type="response"),
-  y = residuals(model_full, type="response")
-)
-
-```
-
-In a Binned Residuals Plot, the gray lines indicate plus and minus 2 standard-error bounds. We would expect about 95% of the binned residuals to fall within these lines. Several points fall outside of the 95% interval, but three points are more obviously outside. 
 
 
 ### Linearity
@@ -686,8 +654,6 @@ model_dendo <- glm(target ~ radq_hi + chas + lstat + indus + age, binomial(link 
 summary(model_dendo)
 ```
 
-### Model Using Quasi-Logit
-
 
 ### Model comparison
 ```{r full-model-lrstats}
@@ -771,27 +737,5 @@ We will examine the following key conditions for fitting a logistic model:
 4. independent (predictor) variables do not correlate too strongly with each other 
 5. linearity of independent variables and log odds
 6. no outliers in data
-
-
-##### Confidence Interval
-
-```{r confint, echo=FALSE, warning=FALSE, message=FALSE}
-confint(model_full)
-
-```
-
-
-##### Odds Ratio 
-```{r odds-ration, echo=TRUE,  warning=FALSE, message=FALSE}
-exp(coef(model_full))
-```
-
-
-#### ANOVA Test
-```{r anova, echo =TRUE,  warning=FALSE, message=FALSE}
-model_summary <- summary(model_full)
-#param_pvalue <- model_summary$coefficients["target", "Pr(>|z|)"]
-anova(model_full, test = "Chisq")
-```
 
 
