@@ -43,3 +43,172 @@ train$log_lstat <- log(train$lstat)
 
 No missing values were found in the training dataset. Therefore, no imputation or flagging was necessary at this stage. Several continuous variables demonstrated right-skewed distributions and a high number of extreme values. To reduce the influence of outliers and better align the data with the assumptions of logistic regression, log-transformations were applied to tax, zn, dis, and lstat. This transformation helps normalize the data, reduce variance, and enhance model interpretability. A small constant was added to zn before the transformation to account for zero values.
 
+```{r}
+model_a <- glm(target ~ nox + dis + tax + rad + ptratio + lstat, data = train, family = binomial)
+```
+
+```{r}
+model_b <- glm(target ~ log_tax + log_dis + log_zn + log_lstat + nox + rm + ptratio + rad + chas + age,
+               data = train, family = binomial)
+
+```
+
+```{r}
+train$age_bin <- cut(train$age, 
+                     breaks = quantile(train$age, probs = c(0, 0.33, 0.66, 1)), 
+                     labels = c("low", "mid", "high"),
+                     include.lowest = TRUE)
+
+train$dis_bin <- cut(train$dis,
+                     breaks = quantile(train$dis, probs = c(0, 0.33, 0.66, 1)), 
+                     labels = c("close", "mid", "far"),
+                     include.lowest = TRUE)
+
+model_c <- glm(target ~ age_bin + dis_bin + tax + rad + ptratio + nox + rm, 
+               data = train, family = binomial)
+summary(model_c)
+
+
+```
+
+
+```{r}
+library(caret)
+library(pROC)
+
+pred_prob_a <- predict(model_a, type = "response")
+pred_class_a <- ifelse(pred_prob_a > 0.5, 1, 0)
+
+cm_a <- confusionMatrix(as.factor(pred_class_a), as.factor(train$target))
+
+roc_a <- roc(train$target, pred_prob_a)
+auc_val <- auc(roc_a)
+
+ll_null <- model_a$null.deviance
+ll_model <- model_a$deviance
+mcfadden_r2 <- 1 - (ll_model / ll_null)
+
+precision <- cm_a$byClass["Precision"]
+recall <- cm_a$byClass["Sensitivity"]
+f1 <- 2 * ((precision * recall) / (precision + recall))
+
+est_pred_error <- mean(pred_class_a != train$target)
+
+set.seed(123) 
+cv_ctrl <- trainControl(method = "cv", number = 5)
+cv_model <- train(as.factor(target) ~ nox + dis + tax + rad + ptratio + lstat, 
+                  data = train, method = "glm", family = "binomial", trControl = cv_ctrl)
+adj_cv_error <- 1 - max(cv_model$results$Accuracy)
+
+model_a_results <- list(
+  AIC = AIC(model_a),
+  BIC = BIC(model_a),
+  LRChisq = ll_null - ll_model,
+  df = model_a$df.residual,
+  McFadden = mcfadden_r2,
+  Accuracy = cm_a$overall["Accuracy"],
+  Precision = precision,
+  Recall = recall,
+  Specificity = cm_a$byClass["Specificity"],
+  F1Score = f1,
+  AUC = auc_val,
+  Estimated_Pred_Error = est_pred_error,
+  Adj_CV_Error = adj_cv_error
+)
+
+print(model_a_results)
+
+```
+```{r}
+
+pred_prob_b <- predict(model_b, type = "response")
+pred_class_b <- ifelse(pred_prob_b > 0.5, 1, 0)
+
+cm_b <- confusionMatrix(as.factor(pred_class_b), as.factor(train$target))
+
+roc_b <- roc(train$target, pred_prob_b)
+auc_b <- auc(roc_b)
+
+ll_null_b <- model_b$null.deviance
+ll_model_b <- model_b$deviance
+mcfadden_b <- 1 - (ll_model_b / ll_null_b)
+
+precision_b <- cm_b$byClass["Precision"]
+recall_b <- cm_b$byClass["Sensitivity"]
+f1_b <- 2 * ((precision_b * recall_b) / (precision_b + recall_b))
+
+pred_err_b <- mean(pred_class_b != train$target)
+
+set.seed(123)
+cv_ctrl <- trainControl(method = "cv", number = 5)
+cv_model_b <- train(as.factor(target) ~ log_tax + log_dis + log_zn + log_lstat + nox + rm + ptratio + rad + chas + age,
+                    data = train, method = "glm", family = "binomial", trControl = cv_ctrl)
+cv_err_b <- 1 - max(cv_model_b$results$Accuracy)
+
+model_b_results <- list(
+  AIC = AIC(model_b),
+  BIC = BIC(model_b),
+  LRChisq = ll_null_b - ll_model_b,
+  df = model_b$df.residual,
+  McFadden = mcfadden_b,
+  Accuracy = cm_b$overall["Accuracy"],
+  Precision = precision_b,
+  Recall = recall_b,
+  Specificity = cm_b$byClass["Specificity"],
+  F1Score = f1_b,
+  AUC = auc_b,
+  Estimated_Pred_Error = pred_err_b,
+  Adj_CV_Error = cv_err_b
+)
+
+print(model_b_results)
+
+```
+```{r}
+model_c <- glm(target ~ age_bin + dis_bin + tax + rad + ptratio + nox + rm, 
+               data = train, family = binomial)
+
+pred_prob_c <- predict(model_c, type = "response")
+pred_class_c <- ifelse(pred_prob_c > 0.5, 1, 0)
+
+cm_c <- confusionMatrix(as.factor(pred_class_c), as.factor(train$target))
+
+roc_c <- roc(train$target, pred_prob_c)
+auc_c <- auc(roc_c)
+
+ll_null_c <- model_c$null.deviance
+ll_model_c <- model_c$deviance
+mcfadden_c <- 1 - (ll_model_c / ll_null_c)
+
+precision_c <- cm_c$byClass["Precision"]
+recall_c <- cm_c$byClass["Sensitivity"]
+f1_c <- 2 * ((precision_c * recall_c) / (precision_c + recall_c))
+
+pred_err_c <- mean(pred_class_c != train$target)
+
+set.seed(123)
+cv_model_c <- train(as.factor(target) ~ age_bin + dis_bin + tax + rad + ptratio + nox + rm, 
+                    data = train, method = "glm", family = "binomial", trControl = cv_ctrl)
+cv_err_c <- 1 - max(cv_model_c$results$Accuracy)
+
+model_c_results <- list(
+  AIC = AIC(model_c),
+  BIC = BIC(model_c),
+  LRChisq = ll_null_c - ll_model_c,
+  df = model_c$df.residual,
+  McFadden = mcfadden_c,
+  Accuracy = cm_c$overall["Accuracy"],
+  Precision = precision_c,
+  Recall = recall_c,
+  Specificity = cm_c$byClass["Specificity"],
+  F1Score = f1_c,
+  AUC = auc_c,
+  Estimated_Pred_Error = pred_err_c,
+  Adj_CV_Error = cv_err_c
+)
+
+print(model_c_results)
+
+
+```
+
