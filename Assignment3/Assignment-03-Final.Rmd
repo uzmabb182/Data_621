@@ -8,23 +8,6 @@ output:
     df_print: paged
 ---
 
-
-### Variables in the Dataset:
-
-• zn: proportion of residential land zoned for large lots (over 25000 square feet) (predictor variable)  
-• indus: proportion of non-retail business acres per suburb (predictor variable)  
-• chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) (predictor variable)  
-• nox: nitrogen oxides concentration (parts per 10 million) (predictor variable)  
-• rm: average number of rooms per dwelling (predictor variable)  
-• age: proportion of owner-occupied units built prior to 1940 (predictor variable)  
-• dis: weighted mean of distances to five Boston employment centers (predictor variable)  
-• rad: index of accessibility to radial highways (predictor variable)  
-• tax: full-value property-tax rate per $10,000 (predictor variable)  
-• ptratio: pupil-teacher ratio by town (predictor variable)  
-• lstat: lower status of the population (percent) (predictor variable)  
-• medv: median value of owner-occupied homes in $1000s (predictor variable)  
-• target: whether the crime rate is above the median crime rate (1) or not (0) (response variable)  
-
 ```{r global_options, include=FALSE}
 knitr::opts_chunk$set(eval = TRUE, message = FALSE, warning = FALSE)
 library(tidyverse)
@@ -65,38 +48,77 @@ require(Metrics)
 
 ```{r import-data, echo=FALSE}
 
-df_training  <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-training-data_modified.csv")
+
 
 crime_training_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-training-data_modified.csv")
 
 crime_evaluation_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-evaluation-data_modified.csv")
 
+df_training  <- crime_training_df
+
 ```
 
 ## DATA EXPLORATION
 
-### Exploratory Data Analysis
+
+The training dataset contains 466 observations and 13 variables, including 12 predictor variables and one binary response variable (target). The target variable indicates whether a neighborhood’s crime rate is above the median (1) or not (0). The dataset includes a mix of continuous and categorical features, such as housing characteristics, pollution levels, property taxes, and proximity to employment centers. Understanding the distributions, relationships, and correlations between these features is an essential first step in building an effective predictive model. 
 
 ```{r}
-#dim(crime_training_df)
-#skim(crime_training_df)
+dim(df_training)    
+str(df_training)           
+
+column_types <- sapply(df_training, class)
+print(column_types)
+```
+
+The following three columns were imported as numerical but should be considered for converting to factors: 
+- chas: binomial 
+- rad: ordinal 
+- target: binomial
+
+```{r explore-summary}
+
+# convert to factor
+df_training <- df_training |>
+  mutate(
+    chas = as.factor(chas),
+    rad = as.factor(rad),
+    target = as.factor(target),
+  )
+
+numeric_cols <- c('zn', 'indus', 'nox', 'rm', 'age', 'dis', 'tax', 'ptratio', 'lstat', 'medv')
+
+factor_cols <- c('chas', 'rad', 'target')
+
+glimpse(df_training)
 
 ```
 
-1. Missing Values & Completeness Rate
-The n_missing column shows that there are no missing values (0) for any variable, meaning we don’t need to perform imputation.
-The complete_rate column confirms this, as all variables have a completeness rate of 1, meaning every row has a value for these variables.
+A closer examination of the `rad` data shows that that our observations have a rad index value of 1-8 or 24 in this column. Below are the counts: 
 
-2. Descriptive Statistics
+```{r count-rads, echo=FALSE}
 
-Mean (mean): The average value of each variable.
-Standard Deviation (sd): Measures the spread of values.
-Minimum (p0): The lowest observed value (0th percentile).
-First Quartile (p25): The 25th percentile, where 25% of the values are below this number.
-Median (p50): The 50th percentile (the middle value).
-Third Quartile (p75): The 75th percentile, where 75% of the values are below this number.
+rad_counts <- table(df_training$rad)
 
-Key Observations:
+# Print the result
+print(rad_counts) 
+```
+
+
+### Summary Statistics
+
+Summary statistics reveal substantial variability in several features. For instance, the variable tax (full-value property tax rate per $10,000) has a mean of 409.5 but a maximum value of 711, indicating a right-skewed distribution with significant outliers. Similar patterns are observed in zn (zoned residential land), age, and dis (distance to employment centers). These skewed distributions may require transformation to reduce leverage effects during modeling.
+
+```{r explore-means-medians}
+
+# only show summary stats for numeric values
+for (param in numeric_cols) {
+  cat("\nSummary for", param, ":\n")
+  print(describe(df_training[[param]]))
+}
+```
+
+#### Key Observations:
 
 Crime Rate Target (target)
 
@@ -136,308 +158,24 @@ zn, indus, tax, rad, lstat, and medv show skewness, so applying a log transforma
 age can be categorized into bins (e.g., young, middle-aged, old) since it ranges from 2.9 to 94.1.
 dis has a wide range, so normalization might be needed.
 
-### Checking Binary Logistic Regression Assumptions
+### Missing data
 
-Before interpreting results from a binary logistic regression, we must verify three key assumptions:
+No missing values were found in the training dataset. Therefore, no imputation or flagging was necessary at this stage. Several continuous variables demonstrated right-skewed distributions and a high number of extreme values. To reduce the influence of outliers and better align the data with the assumptions of logistic regression, log-transformations were applied to tax, zn, dis, and lstat. This transformation helps normalize the data, reduce variance, and enhance model interpretability. A small constant was added to zn before the transformation to account for zero values.
 
-Independence of Observations
-Linearity of the Logit
-No Multicollinearity
+```{r explore-missing}
 
-Now, let's discuss how to check these assumptions and which correlation method is best for your data (which contains both ordinal and continuous variables).
+#introduce(df_training, echo=FALSE)
+missing_values_count <- sapply(data, function(x) sum(is.na(x)))
+print(missing_values_count)
 
-Pearson Correlation, Spearman Rank Correlation, and Kendall’s Tau Rank Correlation are all methods used to measure the strength and direction of relationships between variables.
-
-However, they differ in terms of their assumptions, use cases, and how they quantify relationships.
-
-Pearson Correlation: Suitable for continuous data when you want to measure linear associations.
-
-Spearman Rank Correlation: AAppropriate for both continuous and ordinal data. Particularly useful when the relationship is expected to be monotonic but not necessarily linear.
-
-Kendall’s Tau Rank Correlation: Suitable for both continuous and ordinal (ranked) data. Useful when the data may not follow a linear relationship.
-
-### Final Choice: Spearman's Rank Correlation
-Since your data has both ordinal and continuous variables, Spearman's correlation is the best choice because:
-
-It does not assume normality (unlike Pearson).
-It can handle ordinal variables (like chas, rad).
-It is more robust against outliers than Pearson.
-
-### Checking Independence Assumption Using Spearman's Correlation in Binary Logistic Regression
-
-#### What is the Independence Assumption?
-The independence assumption in binary logistic regression states that each observation (row) in the dataset should be independent of the others. This means:
-
-No duplicated data points (e.g., same neighborhood appearing multiple times).
-No clustered observations (e.g., observations grouped by region, time, or other factors).
-No strong correlations between residuals of observations, meaning observations do not systematically affect each other.
-
-### Why Use Spearman’s Correlation?
-Spearman's correlation measures monotonic relationships between variables, making it suitable when we have a mix of ordinal and continuous predictors.
-If there is high correlation between observations, it suggests possible dependence (e.g., neighborhoods with similar crime rates).
-
-### Compute Spearman's Correlation Between Observations
-We calculate the Spearman correlation matrix for all numeric variables (excluding target), which tells us if some variables are highly dependent (correlated).
-
-### 1. Independence (Visual Inspection)
-
-```{r, warning = FALSE, message = FALSE}
-library(ggplot2)
-library(tidyr)
-library(dplyr)
-
-# Exclude categorical columns before pivoting
-crime_long <- crime_training_df %>%
-  dplyr::select(where(is.numeric)) %>%  # Keep only numeric columns
-  pivot_longer(cols = -target, names_to = "Variable", values_to = "Value")
-
-# Create scatter plots for each predictor vs target with a fitted line
-ggplot(crime_long, aes(x = Value, y = target)) +
-  geom_point(alpha = 0.5, color = "blue") +  # Scatter plot
-  geom_smooth(method = "lm", color = "red", se = FALSE) +  # Linear fit
-  facet_wrap(~Variable, scales = "free") +  # Multiple plots for each variable
-  theme_minimal() +
-  labs(title = "Independence Check: Scatter Plots of Predictors vs Target",
-       x = "Predictor Value",
-       y = "Crime Rate (Binary Target)")
-
-
-
-```
-
-
-```{r}
-# Load necessary library
-library(dplyr)
-
-# Initialize an empty data frame to store results
-independence_results <- data.frame(Variable = character(),
-                                   Correlation = numeric(),
-                                   P_Value = numeric(),
-                                   stringsAsFactors = FALSE)
-
-# Loop through each predictor variable (excluding the target)
-for (var in colnames(crime_training_df)[colnames(crime_training_df) != "target"]) {
-  
-  # Ensure the variable is numeric before computing Spearman correlation
-  if (is.numeric(crime_training_df[[var]])) {
-    
-    # Perform Spearman correlation test
-    test_result <- cor.test(crime_training_df[[var]], crime_training_df$target, method = "spearman")
-    
-    # Store results in a data frame
-    independence_results <- rbind(independence_results, 
-                                  data.frame(Variable = var, 
-                                             Correlation = test_result$estimate, 
-                                             P_Value = test_result$p.value))
-  }
-}
-
-# View results in tabular format
-print(independence_results)
-
-```
-### Checking for Independence:
-In Spearman’s method, we check the correlation between:
-
-Each independent variable and the dependent variable (target)
-If correlation is too low (|𝜌| < 0.1) and p-value > 0.05, the variable might not be useful in predicting the target.
-
-Variables to Consider Removing:
-
-chas (ρ = 0.0800, p = 0.0843) → No meaningful correlation with crime.
-Possibly rm (ρ = -0.1772, p = 0.00012) → Weak correlation but could check its importance in the model.
-
-Variables to Keep (for now, but monitor multicollinearity):
-
-nox (ρ = 0.7547)
-age (ρ = 0.6457)
-dis (ρ = -0.6591)
-indus (ρ = 0.6192)
-rad, tax, ptratio (moderate correlation)
-Transform / Create Interaction Terms:
-
-Log transform: dis (since it has a strong negative correlation)
-Categorize: age into "Young", "Middle-aged", "Old"
-Interaction term: tax * rad (both impact crime)
-
-
-```{r}
-# Load necessary library
-library(corrplot)
-library(dplyr)
-
-crime_training_df <- crime_training_df %>%
-  mutate(across(where(is.character), as.numeric))
-
-crime_evaluation_df <- crime_evaluation_df %>%
-  mutate(across(where(is.character), as.numeric))
-
-# Verify again
-str(crime_training_df)
-
-###  Visualize Correlation Matrix
-
-# Compute Spearman correlation matrix
-numeric_data <- crime_training_df %>% dplyr::select(where(is.numeric), -target)
-spearman_cor <- cor(numeric_data, method = "spearman", use = "pairwise.complete.obs")
-
-# Plot the Spearman correlation matrix with labels
-corrplot::corrplot(spearman_cor, 
-         method = "color",         
-         type = "upper",           
-         tl.cex = 0.8,             
-         addCoef.col = "black",    
-         number.cex = 0.7,         
-         col = colorRampPalette(c("blue", "white", "red"))(200)
-)
-
-
-
-```
-### Checking for Multicollinearity (High Correlation Between Predictors)
-
-A general rule of thumb is that if |𝜌| > 0.7, it indicates strong correlation between variables, which can lead to multicollinearity in the logistic regression model.
-
-From the matrix:
-indus & nox (𝜌 = 0.79) → Strong positive correlation, meaning they provide redundant information.
-tax & rad (𝜌 = 0.70) → These variables are highly correlated, indicating one may be removed.
-lstat & medv (𝜌 = -0.85) → Very strong negative correlation; keeping both might be problematic.
-log_medv & medv (𝜌 = 1.00) → Perfect correlation (since log transformation was applied), meaning one must be removed to prevent redundancy.
-
-Final Takeaways:
-
-High correlation between predictors (|𝜌| > 0.7) indicates potential multicollinearity. Consider removing indus, rad, or medv to improve model stability.
-No evidence of entire rows/columns being highly correlated, suggesting no major independence violations.
-Use VIF for confirmation and decide on variable selection accordingly.
-
-
-### Checking Multicollinearity Using Variance Inflation Factor (VIF)
-
-Variance Inflation Factor (VIF) helps quantify multicollinearity by measuring how much the variance of regression coefficients is inflated due to correlation among predictors. 
-A VIF > 5 (or more conservatively, VIF > 10) suggests severe multicollinearity.
-
-### Check VIF (Variance Inflation Factor)
-
-Variance Inflation Factor (VIF) – Measures how much variance in regression coefficients is inflated due to multicollinearity
-ANd helps confirm whether these high correlations affect regression coefficients.
-
-```{r}
-library(car)
-vif(glm(target ~ nox + age + rad + tax + dis + zn + medv, family = binomial, data = crime_training_df))
-
-```
-Conclusion
- There is NO severe multicollinearity (all VIF values are below 5).
- No immediate need to drop variables based on VIF.
- The variable dis (VIF = 3.58) shows moderate correlation with other predictors, but it's not problematic.
- 
- Next Steps:
-
-Keep all predictors in the model.
-If we suspect redundancy, check pairwise correlations again or test removing dis to see if model performance improves.
-
-### Checking the Assumption of Linearity of the Logit for Binary Logistic Regression
-
-In logistic regression, we assume that each continuous predictor has a linear relationship with the log-odds (logit) of the target variable. 
-If this assumption is violated, the model may be misleading or inaccurate.
-
-```{r, warning = FALSE, message = FALSE}
-# Load necessary libraries
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-
-# Fit the logistic regression model
-model <- glm(target ~ nox + age + rad + tax + dis + zn + medv, 
-             family = binomial, data = crime_training_df)
-
-# Compute predicted probabilities
-crime_training_df$predicted_prob <- predict(model, type = "response")
-
-# Compute logit (log-odds) transformation
-crime_training_df$logit <- log(crime_training_df$predicted_prob / 
-                              (1 - crime_training_df$predicted_prob))
-
-# Reshape data for faceting
-plot_data <- crime_training_df %>%
-  dplyr::select(logit, nox, age, rad, tax, dis, zn, medv) %>%
-  pivot_longer(cols = -logit, names_to = "Predictor", values_to = "Value")
-
-# Create faceted scatter plot
-ggplot(plot_data, aes(x = Value, y = logit)) +
-  geom_point(alpha = 0.5, color = "blue") + 
-  geom_smooth(method = "loess", color = "red", se = FALSE) + 
-  facet_wrap(~ Predictor, scales = "free") +
-  theme_minimal() +
-  labs(title = "Linearity of Logit Check for Binary Logistic Regression",
-       x = "Predictor Variable",
-       y = "Logit of Predicted Probability")
-
-```
-### Interpretation of the Linearity of Logit Check for Binary Logistic Regression
-
-This faceted scatter plot assesses the assumption of linearity of the logit for binary logistic regression. 
-The blue dots represent the relationship between each predictor variable and the logit of the predicted probability, 
-while the red LOESS (Locally Estimated Scatterplot Smoothing) curve helps visualize patterns.
-
-### Overall Conclusion
-Several predictors (e.g., dis, medv, tax, zn) violate the linearity of logit assumption.
-
-### Summary Stats
-
-```{r explore-cols}
-
-column_types <- sapply(df_training, class)
-print(column_types)
-```
-
-The following three columns were imported as numerical but should be factors: - chas: binomial - rad: ordinal - target: binomial
-
-```{r explore-summary}
-
-# convert to factor
-df_training <- df_training |>
-  mutate(
-    chas = as.factor(chas),
-    rad = as.factor(rad),
-    target = as.factor(target),
-  )
-
-numeric_cols <- c('zn', 'indus', 'nox', 'rm', 'age', 'dis', 'tax', 'ptratio', 'lstat', 'medv')
-
-factor_cols <- c('chas', 'rad', 'target')
-
-glimpse(df_training)
-
-```
-
-A closer examination of the `rad` data shows that that our observations have a rad index value of 1-8 or 24 in this column. Below are the counts: 
-
-```{r count-rads, echo=FALSE}
-
-rad_counts <- table(df_training$rad)
-
-# Print the result
-print(rad_counts) 
-```
-
-#### Means
-
-We can now calculate the summary statistics for the numeric parameters in our dataframe, including our mean, median, min/max, and standard deviations.
-
-```{r explore-means-medians}
-
-# only show summary stats for numeric values
-for (param in numeric_cols) {
-  cat("\nSummary for", param, ":\n")
-  print(describe(df_training[[param]]))
-}
 ```
 
 ### Plots of data
 
 #### Boxplots
+
+A boxplot of the numeric features further highlights the presence of skewness and outliers in variables such as tax, zn, and age. Many variables, such as chas (a binary indicator for bordering the Charles River), show relatively limited spread, while others, like nox and indus, display more variability across neighborhoods. These differences in scale and distribution suggest that transformation or normalization may be beneficial in the modeling stage. A correlation heatmap was constructed to examine multicollinearity and the relationships between predictors. Strong positive correlations were observed between nox, age, tax, indus, and rad, suggesting that these variables may capture related structural or geographic aspects of the neighborhoods. Several variables also show moderate to strong correlation with the target variable — in particular, nox, age, rad, and tax were positively correlated with higher crime risk, while dis and rm were negatively correlated.
+
 Below is series of boxplots for all numeric parameters where target is our dependent variable.
 
 ```{r explore-boxplot}
@@ -546,42 +284,220 @@ ggpairs(df_training)
 
 ```
 
-### Missing data
 
-The training set contains no missing values.
+### Checking Binary Logistic Regression Assumptions
 
-```{r explore-missing}
+Before interpreting results from a binary logistic regression, we must verify three key assumptions:
 
-introduce(df_training)
+- Independence of Observations
+- Linearity of the Logit
+- No Multicollinearity
 
-missing_values_count <- sapply(data, function(x) sum(is.na(x)))
-print(missing_values_count)
+Spearman's correlation measures monotonic relationships between variables, making it suitable when we have a mix of ordinal and continuous predictors. Unlike the Pearson test, it does not assume normality. Additionally, it is more robust against outliers than Pearson.
 
-```
+#### Checking Independence Assumption
+
+The independence assumption in binary logistic regression states that each observation (row) in the dataset should be independent of the others. This means:
+
+No duplicated data points (e.g., same neighborhood appearing multiple times).
+No clustered observations (e.g., observations grouped by region, time, or other factors).
+No strong correlations between residuals of observations, meaning observations do not systematically affect each other.
+
+##### Visual Inspection
+
+```{r, warning = FALSE, message = FALSE}
+
+# Exclude categorical columns before pivoting
+crime_long <- crime_training_df %>%
+  dplyr::select(where(is.numeric)) %>%  # Keep only numeric columns
+  pivot_longer(cols = -target, names_to = "Variable", values_to = "Value")
+
+# Create scatter plots for each predictor vs target with a fitted line
+ggplot(crime_long, aes(x = Value, y = target)) +
+  geom_point(alpha = 0.5, color = "blue") +  # Scatter plot
+  geom_smooth(method = "lm", color = "red", se = FALSE) +  # Linear fit
+  facet_wrap(~Variable, scales = "free") +  # Multiple plots for each variable
+  theme_minimal() +
+  labs(title = "Independence Check: Scatter Plots of Predictors vs Target",
+       x = "Predictor Value",
+       y = "Crime Rate (Binary Target)")
 
 
-### Distribution
-Scatterplots of y=`target` plotted against each of the parameters confirm that the dependent variable is binomial. Therefore, linear regression is not be the best fit for this data and we should explore logistic regression such as logit and probit. 
 
-```{r explore-scatterplot}
-# scatter plot doesn't show much
-# plot_scatterplot(df_training, by = "target")
-# plot_qq(df_training, sampled_rows = 1000L)
 ```
 
 
 ```{r}
-plot_qq(df_training, by="target", sampled_rows = 1000L)
+
+# Initialize an empty data frame to store results
+independence_results <- data.frame(Variable = character(),
+                                   Correlation = numeric(),
+                                   P_Value = numeric(),
+                                   stringsAsFactors = FALSE)
+
+# Loop through each predictor variable (excluding the target)
+for (var in colnames(crime_training_df)[colnames(crime_training_df) != "target"]) {
+  
+  # Ensure the variable is numeric before computing Spearman correlation
+  if (is.numeric(crime_training_df[[var]])) {
+    
+    # Perform Spearman correlation test
+    test_result <- cor.test(crime_training_df[[var]], crime_training_df$target, method = "spearman")
+    
+    # Store results in a data frame
+    independence_results <- rbind(independence_results, 
+                                  data.frame(Variable = var, 
+                                             Correlation = test_result$estimate, 
+                                             P_Value = test_result$p.value))
+  }
+}
+
+# View results in tabular format
+print(independence_results)
 
 ```
+##### Checking for Independence Using Spearman's Correlation
+In Spearman’s method, we check the correlation between:
 
-### Correlation
+Each independent variable and the dependent variable (target)
+If correlation is too low (|p| < 0.1) and p-value > 0.05, the variable might not be useful in predicting the target.
 
+Variables to Consider Removing:
+
+chas (p = 0.0800, p = 0.0843) → No meaningful correlation with crime.
+Possibly rm (p = -0.1772, p = 0.00012) → Weak correlation but could check its importance in the model.
+
+Variables to Keep (for now, but monitor multicollinearity):
+
+nox (p = 0.7547)
+age (p = 0.6457)
+dis (p = -0.6591)
+indus (p = 0.6192)
+rad, tax, ptratio (moderate correlation)
+Transform / Create Interaction Terms:
+
+Log transform: dis (since it has a strong negative correlation)
+Categorize: age into "Young", "Middle-aged", "Old"
+Interaction term: tax * rad (both impact crime)
+
+
+```{r}
+
+crime_training_df <- crime_training_df %>%
+  mutate(across(where(is.character), as.numeric))
+
+crime_evaluation_df <- crime_evaluation_df %>%
+  mutate(across(where(is.character), as.numeric))
+
+# Verify again
+str(crime_training_df)
+
+###  Visualize Correlation Matrix
+
+# Compute Spearman correlation matrix
+numeric_data <- crime_training_df %>% dplyr::select(where(is.numeric), -target)
+spearman_cor <- cor(numeric_data, method = "spearman", use = "pairwise.complete.obs")
+
+# Plot the Spearman correlation matrix with labels
+corrplot::corrplot(spearman_cor, 
+         method = "color",         
+         type = "upper",           
+         tl.cex = 0.8,             
+         addCoef.col = "black",    
+         number.cex = 0.7,         
+         col = colorRampPalette(c("blue", "white", "red"))(200)
+)
+
+
+
+```
+#### Checking for Multicollinearity (High Correlation Between Predictors)
+
+A general rule of thumb is that if |p| > 0.7, it indicates strong correlation between variables, which can lead to multicollinearity in the logistic regression model.
+
+From the matrix:
+indus & nox (p = 0.79) → Strong positive correlation, meaning they provide redundant information.
+tax & rad (p = 0.70) → These variables are highly correlated, indicating one may be removed.
+lstat & medv (p = -0.85) → Very strong negative correlation; keeping both might be problematic.
+log_medv & medv (p = 1.00) → Perfect correlation (since log transformation was applied), meaning one must be removed to prevent redundancy.
+
+Final Takeaways:
+
+High correlation between predictors (|p| > 0.7) indicates potential multicollinearity. Consider removing indus, rad, or medv to improve model stability.
+No evidence of entire rows/columns being highly correlated, suggesting no major independence violations.
+Use VIF for confirmation and decide on variable selection accordingly.
+
+##### Visual Inspection
 ```{r correlation-predictors}
 df_training |>
   subset(select=-c(target, chas)) |>
   plot_correlation(type = "all")
 ```
+
+
+##### Variance Inflation Factor (VIF)
+
+Variance Inflation Factor (VIF) helps quantify multicollinearity by measuring how much the variance of regression coefficients is inflated due to correlation among predictors. 
+A VIF > 5 (or more conservatively, VIF > 10) suggests severe multicollinearity.
+
+```{r}
+car::vif(glm(target ~ nox + age + rad + tax + dis + zn + medv, family = binomial, data = crime_training_df))
+
+```
+
+Conclusion
+ There is NO severe multicollinearity (all VIF values are below 5).
+ No immediate need to drop variables based on VIF.
+ The variable dis (VIF = 3.58) shows moderate correlation with other predictors, but it's not problematic.
+ 
+
+Keep all predictors in the model.
+If we suspect redundancy, check pairwise correlations again or test removing dis to see if model performance improves.
+
+#### Checking the Assumption of Linearity of the Logit for Binary Logistic Regression
+
+In logistic regression, we assume that each continuous predictor has a linear relationship with the log-odds (logit) of the target variable. 
+If this assumption is violated, the model may be misleading or inaccurate.
+
+```{r, warning = FALSE, message = FALSE}
+# Load necessary libraries
+
+# Fit the logistic regression model
+model <- glm(target ~ nox + age + rad + tax + dis + zn + medv, 
+             family = binomial, data = crime_training_df)
+
+# Compute predicted probabilities
+crime_training_df$predicted_prob <- predict(model, type = "response")
+
+# Compute logit (log-odds) transformation
+crime_training_df$logit <- log(crime_training_df$predicted_prob / 
+                              (1 - crime_training_df$predicted_prob))
+
+# Reshape data for faceting
+plot_data <- crime_training_df %>%
+  dplyr::select(logit, nox, age, rad, tax, dis, zn, medv) %>%
+  pivot_longer(cols = -logit, names_to = "Predictor", values_to = "Value")
+
+# Create faceted scatter plot
+ggplot(plot_data, aes(x = Value, y = logit)) +
+  geom_point(alpha = 0.5, color = "blue") + 
+  geom_smooth(method = "loess", color = "red", se = FALSE) + 
+  facet_wrap(~ Predictor, scales = "free") +
+  theme_minimal() +
+  labs(title = "Linearity of Logit Check for Binary Logistic Regression",
+       x = "Predictor Variable",
+       y = "Logit of Predicted Probability")
+
+```
+##### Interpretation of the Linearity of Logit Check for Binary Logistic Regression
+
+This faceted scatter plot assesses the assumption of linearity of the logit for binary logistic regression. 
+The blue dots represent the relationship between each predictor variable and the logit of the predicted probability, 
+while the red LOESS (Locally Estimated Scatterplot Smoothing) curve helps visualize patterns.
+
+#### Overall Conclusion
+Several predictors (e.g., dis, medv, tax, zn) violate the linearity of logit assumption.
+
 
 
 ## DATA PREPARATION
