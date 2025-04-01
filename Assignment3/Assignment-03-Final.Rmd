@@ -1,6 +1,6 @@
 ---
 title: "D621 - Assignment 3"
-author: "Marco Castro"
+author: "Marco Castro, Mubashira Qari, Puja Roy, Zach Rose & Erick Hadi"
 date: "2025-03-07"
 output:
   pdf_document: default
@@ -1302,6 +1302,13 @@ We will examine the following key conditions for fitting a logistic model:
 5. linearity of independent variables and log odds
 6. no outliers in data
 
+As a result, Model 2: Stepwise Logistic Regression was selected as the best binary logistic regression model due to achieving a trade-off between model simplicity and performance. The optimal model not only has to perform excellently in prediction but also be interpretable and extendable to new data. Although a complicated model will provide marginally better performance, it will overfit if too many extraneous parameters are introduced. Therefore, we selected Model 2 since it achieves a balance between parsimony and performance as it retains the strongest predictors only. Stepwise logistic regression (direction = "both") reduced the model by selecting the optimal subset of features and hence giving a more efficient and stable model.
+
+To compare Model 2, we employed a range of statistical measures that assess different aspects of performance. Akaike Information Criterion (AIC), on which the model fit will be judged, was 176.81, reflecting high performance compared to other models. Area Under the Curve (AUC) of 0.9843 reflects that the model was working very well to distinguish between the two classes. Accuracy (0.9372) also reflects that the model is correctly classifying the majority of the cases and classification error rate (0.0644) is low, reflecting high reliability.
+
+Accuracy, recall or sensitivity, and specificity also act to define Model 2's performance. The accuracy of the model at 0.9451 means that whenever it is positive, it is correct 94.51% of the time. The sensitivity at 0.9356 means that it identifies 93.56% of real positive cases correctly, and the specificity at 0.9295 means 92.95% of non-positive cases are identified correctly. The 0.9372 F1 score as a compromise between the recall and precision measures how good the model is at predicting things correctly. The confusion matrix also confirms that the false positives and false negatives are zero, yet again proving correct.
+
+Lastly, Model 2 was chosen since it is the optimal compromise among predictiveness, interpretability, and model fit. It has very high AUC value, good specificity and sensitivity, and very low classification error, and hence very dependable in binary classification. Stepwise selection of removing extraneous predictors avoids overfitting but not super-predictiveness. Due to its low AIC, good performance on a range of measures of evaluation, and relatively well-scaled set of predictors, Model 2 is optimal to be utilized in this analysis.
 
 
 ### Apply the Best Model to Evaluation Data
@@ -1311,6 +1318,14 @@ Once the best model is selected, we use it for prediction on crime_evaluation_df
 
 ```{r}
 # Apply same transformations as before 
+# Apply the same transformations to the evaluation dataset as used in training
+crime_evaluation_df$log_tax <- log(crime_evaluation_df$tax)
+crime_evaluation_df$log_lstat <- log(crime_evaluation_df$lstat)
+crime_evaluation_df$log_medv <- log(crime_evaluation_df$medv)
+
+# If scaling or categorical transformations were applied, replicate them here
+crime_evaluation_df$age_group <- cut(crime_evaluation_df$age, breaks = c(0, 35, 70, 100), labels = c("young", "middle-aged", "old"))
+crime_evaluation_df$dis_scaled <- scale(crime_evaluation_df$dis)
 ```
 
 
@@ -1329,6 +1344,7 @@ crime_evaluation_df$predicted_class <- eval_pred_class
 
 
 ```
+
 ```{r}
 # use the predicted_class and predicted_prob values as your final output
 
@@ -1337,5 +1353,6 @@ head(crime_evaluation_df[, c("predicted_prob", "predicted_class")])
 
 ```
 
+This ensures that Model 2: Stepwise Logistic Regression is applied consistently and provides accurate predictions on the evaluation dataset.
 
 
