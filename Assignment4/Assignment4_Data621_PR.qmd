@@ -1,0 +1,392 @@
+---
+title: "Assignment4_Data621"
+author: "Mubashira Qari, Puja Roy"
+date: "2025-03-23"
+output: html_document
+---
+
+### Load Libraries
+
+```{r, warning = FALSE, message = FALSE}
+# Load required packages
+library(htmltools)
+library(caret)
+library(pROC)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(skimr)
+require(DataExplorer)
+require(miscTools)
+require(MASS)
+require(performance)
+require(lmtest)
+require(mice)
+require(glmnet)
+require(Metrics) 
+```
+
+### DATA EXPLORATION 
+
+### Variables in the Dataset:
+
+
+###  load the dataset and understand its structure.
+### Load Data and Check Structure
+
+```{r}
+
+# Load datasets from GitHub
+training_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment4/insurance_training_data.csv")
+
+testing_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment4/insurance-evaluation-data.csv")
+
+# Check the structure of the dataset
+str(training_df)
+summary(training_df)
+
+```
+
+We checked the overview of the dataset's structure while, summary() provided statistical summaries for each variable. The dataset contains 26 columns and 8161 rows. 
+
+
+### Summary Statistics
+
+```{r}
+# Calculate summary statistics for numerical variables
+summary_stats <- training_df %>% 
+  summarise(across(where(is.numeric), list(mean = mean, sd = sd, median = median), na.rm = TRUE))
+print(summary_stats)
+```
+
+We computed the mean, standard deviation, and median for all numeric variables, helping us understand the data distribution and central tendencies.
+
+### Visualizing Data Distributions
+
+```{r}
+# Bar chart of TARGET_FLAG
+ggplot(training_df, aes(x = as.factor(TARGET_FLAG))) +
+  geom_bar(fill = "blue") +
+  labs(title = "Distribution of TARGET_FLAG", x = "Crash (1 = Yes, 0 = No)", y = "Count")
+
+# Box plot of BLUEBOOK values
+ggplot(training_df, aes(y = BLUEBOOK)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Box Plot of BLUEBOOK", y = "Vehicle Value")
+```
+
+
+The first visualization is a bar chart displaying the distribution of TARGET_FLAG, helping to assess the proportion of crashes vs. non-crashes. The second visualization is a box plot for BLUEBOOK, showing the distribution and identifying potential outliers in vehicle values. TARGET_FLAG ratio of having more 0s than 1s indicates that most of the customers in the dataset did not have a crash. It's class imbalance, and it impacts the accuracy of classification models. The BLUEBOOK boxplot indicates that the variable has a strongly dominant majority of values or is long-tailed by outliers. There could be a chance that the data is non-representative, i.e., the majority of the cars have low values with few cars of high value on the tail end of the distribution. 
+
+
+### Correlation Analysis
+
+```{r}
+# Compute correlation matrix for numeric variables
+numeric_vars <- training_df %>% select_if(is.numeric)
+corr_matrix <- cor(numeric_vars, use = "complete.obs")
+corrplot(corr_matrix, method = "circle")
+```
+
+The correlation plot provides a graphical impression of the relationship between different numerical variables of the data set. The size and color of the circles convey the strength of the relationship. Dark blue circles indicate strong positive relationships, which predict that if one variable is increasing, so will the other. Dark red circles on the other hand produce negative high correlations, where the rise of one variable is accompanied by a fall in the other. Light-colored circles show weak or no correlation.
+
+Plots suggest that TARGET_FLAG is not strongly correlated with most of the numeric features. Hence, no numeric feature is particularly useful to a customer to make a claim. What it says is perhaps claims will be predicted more accurately with a more advanced method, i.e., interactions, categorical features, or non-linear models.
+
+Moreover, some variables such as MVR_PTS (Motor Vehicle Record Points) and CLM_FREQ (Claim Frequency) show high positive correlation. As would be expected—more holders of violations file more claims. Also, correlations such as AGE and HOMEKIDS or KIDSDRIV reflect older people with children at home, a typical demographic pattern.
+
+Knowledge of such relationships is helpful in model building and data preparation. Correlated variables cause multicollinearity in regression models, necessitating extra work in the form of variance inflation factor (VIF) testing to eliminate redundant information. Target_FLAG correlations also imply that other transformations, engineered features, or other sources of data might be helpful in enhancing predictiveness.
+
+
+### Missing Value Analysis
+
+```{r}
+# Check for missing values
+missing_values <- colSums(is.na(training_df))
+print(missing_values[missing_values > 0])
+```
+
+Missing values show that the data have missing values in relatively high counts of major variables, and most missing values exist in JOB (526 missing), CAR_AGE (510 missing), HOME_VAL (464 missing), INCOME (445 missing), YOJ (454 missing), and AGE (6 missing). Missing values may produce bias or weaken the ability of the model to predict unless appropriately handled.
+
+Missing values for large numbers for variables like JOB and HOME_VAL mean the work details weren't reported for certain customers or home values weren't reported. Missing values for YOJ and INCOME may be for self-employed or the ones having the wrong job history. For CAR_AGE, missing values may be for new acquisitions or lease of automobiles where the age wasn't reported.
+
+Depending on the count of missing values, different imputation methods will be needed. Quantitative features like AGE, INCOME, and CAR_AGE can be imputed with median to remove the impact of outliers, while features like JOB may require one extra "Unknown" value. Additionally, making missing value indicators for features like HOME_VAL will enable the model to learn missing value patterns and enhance the predictive power. Closing gaps like these in an efficient way is vital to achieve model reliability and precision.
+
+
+### DATA PREPARATION
+
+### Handling Missing Values
+
+Missing values in key numeric columns (AGE, YOJ, INCOME, HOME_VAL, and CAR_AGE) are replaced with their respective medians. Data is preserved and no biased. We then convert YOJ, INCOME, HOME_VAL, and CAR_AGE into numeric to make it easier for managing in the list of upcoming transformations.
+
+In addition, binary flags (YOJ_MISSING, INCOME_MISSING, HOME_VAL_MISSING, CAR_AGE_MISSING, JOB_MISSING) are built to indicate missing values in variables. This allows for models to detect missingness as a predictor.
+
+```{r}
+training_df$AGE[is.na(training_df$AGE)] <- median(training_df$AGE, na.rm = TRUE)
+training_df$YOJ[is.na(training_df$YOJ)] <- median(training_df$YOJ, na.rm = TRUE)
+training_df$INCOME[is.na(training_df$INCOME)] <- median(training_df$INCOME, na.rm = TRUE)
+training_df$HOME_VAL[is.na(training_df$HOME_VAL)] <- median(training_df$HOME_VAL, na.rm = TRUE)
+training_df$CAR_AGE[is.na(training_df$CAR_AGE)] <- median(training_df$CAR_AGE, na.rm = TRUE)
+
+```
+
+```{r}
+str(training_df)
+```
+
+```{r}
+training_df$YOJ <- as.numeric(training_df$YOJ)
+training_df$INCOME <- as.numeric(training_df$INCOME)
+training_df$HOME_VAL <- as.numeric(training_df$HOME_VAL)
+training_df$CAR_AGE <- as.numeric(training_df$CAR_AGE)
+```
+
+```{r}
+training_df$YOJ[is.na(training_df$YOJ)] <- median(training_df$YOJ, na.rm = TRUE)
+training_df$INCOME[is.na(training_df$INCOME)] <- median(training_df$INCOME, na.rm = TRUE)
+training_df$HOME_VAL[is.na(training_df$HOME_VAL)] <- median(training_df$HOME_VAL, na.rm = TRUE)
+training_df$CAR_AGE[is.na(training_df$CAR_AGE)] <- median(training_df$CAR_AGE, na.rm = TRUE)
+
+```
+
+
+```{r}
+colSums(is.na(training_df))
+
+```
+
+### Feature Engineering
+
+Some of the new features aim to capture meaningful relationships in the data:
+
+CLAIMS_PER_YEAR: This is the feature that is created by dividing OLDCLAIM by CAR_AGE so as to be able to interpret frequency of claims over a car's lifetime. A safety factor is included so that division by zero will not be encountered.
+
+TOTAL_KIDS: This is a combination of HOMEKIDS and KIDSDRIV to create a feature of total kids number of the household.
+
+HIGH_RISK_CAR: Certain types of cars (e.g., "Sports Car", "Luxury SUV") are designated as high-risk by encoding them with a binary value of 1.
+
+```{r}
+# Convert CAR_AGE and OLDCLAIM to numeric to avoid errors
+training_df$CAR_AGE <- as.numeric(training_df$CAR_AGE)
+training_df$OLDCLAIM <- as.numeric(training_df$OLDCLAIM)
+
+# Ensure no division by zero when creating CLAIMS_PER_YEAR
+training_df <- training_df %>%
+  mutate(
+    CLAIMS_PER_YEAR = ifelse(!is.na(CAR_AGE) & CAR_AGE > 0, OLDCLAIM / CAR_AGE, OLDCLAIM)
+  )
+
+# Convert HOMEKIDS and KIDSDRIV to numeric if they are not already
+training_df$HOMEKIDS <- as.numeric(training_df$HOMEKIDS)
+training_df$KIDSDRIV <- as.numeric(training_df$KIDSDRIV)
+
+# Create a new feature: Total number of kids (home + driving)
+training_df <- training_df %>%
+  mutate(
+    TOTAL_KIDS = ifelse(!is.na(HOMEKIDS) & !is.na(KIDSDRIV), HOMEKIDS + KIDSDRIV, NA)
+  )
+
+# Convert CAR_TYPE to character to ensure proper comparison
+training_df$CAR_TYPE <- as.character(training_df$CAR_TYPE)
+
+# Create a binary flag for high-risk car types
+training_df <- training_df %>%
+  mutate(
+    HIGH_RISK_CAR = ifelse(CAR_TYPE %in% c("Sports Car", "Luxury SUV"), 1, 0)
+  )
+```
+
+
+### Create Flags
+```{r}
+# Create binary flags for missing values (1 = missing, 0 = not missing)
+training_df <- training_df %>%
+  mutate(
+    YOJ_MISSING = ifelse(is.na(YOJ), 1, 0),
+    INCOME_MISSING = ifelse(is.na(INCOME), 1, 0),
+    HOME_VAL_MISSING = ifelse(is.na(HOME_VAL), 1, 0),
+    CAR_AGE_MISSING = ifelse(is.na(CAR_AGE), 1, 0),
+    JOB_MISSING = ifelse(is.na(JOB), 1, 0)
+  )
+
+```
+
+
+### Transform data
+
+Categorical groupings are created to reduce numerical variables:
+AGE_GROUP: Four age groups—Young (≤25), Adult (26-40), Middle-Aged (41-60), and Senior (>60)—categorize individuals.
+
+INCOME_GROUP: Income is divided into four quantile-based groups (Low, Medium, High, Very High) such that there is an equal share of income levels.
+
+```{r}
+# Transform data by putting it into buckets using case_when
+training_df <- training_df %>%
+  mutate(
+    AGE_GROUP = case_when(
+      AGE <= 25 ~ "Young",
+      AGE > 25 & AGE <= 40 ~ "Adult",
+      AGE > 40 & AGE <= 60 ~ "Middle-Aged",
+      AGE > 60 ~ "Senior",
+      TRUE ~ NA_character_  # Handle missing values
+    ),
+    INCOME_GROUP = case_when(
+      INCOME <= quantile(INCOME, 0.25, na.rm = TRUE) ~ "Low",
+      INCOME > quantile(INCOME, 0.25, na.rm = TRUE) & INCOME <= quantile(INCOME, 0.50, na.rm = TRUE) ~ "Medium",
+      INCOME > quantile(INCOME, 0.50, na.rm = TRUE) & INCOME <= quantile(INCOME, 0.75, na.rm = TRUE) ~ "High",
+      INCOME > quantile(INCOME, 0.75, na.rm = TRUE) ~ "Very High",
+      TRUE ~ NA_character_
+    )
+  )
+
+```
+
+
+Skewed numerical attributes are log-transformed to stabilize their distributions:
+
+LOG_BLUEBOOK (log-transformed value of the vehicle),
+
+LOG_OLDCLAIM (log-transformed old claims),
+
+LOG_INCOME (log-transformed income).
+NA values are substituted with a small positive constant (0.01) before applying the log transformation to prevent computation errors.
+
+
+Creating New Features:
+
+To capture relationships between features more effectively, new ratio-based features are formed:
+
+CLAIMS_INCOME_RATIO: Indicates the proportion of old claims relative to income.
+
+VEHICLE_VALUE_TO_INCOME: Indicates how cheap the vehicle is relative to income.
+
+CLAIMS_TO_MVR_PTS: Prior claims quantity per vehicle record to indicate the severity of prior offenses.
+
+Also an estimated risk score by averaging important risk indicators (MVR_PTS, CLM_FREQ, HIGH_RISK_CAR, and REVOKED). The risk score forms a composite measure of the subject's risk level.
+
+```{r}
+# Ensure necessary columns are numeric
+training_df <- training_df %>%
+  mutate(
+    CAR_AGE = as.numeric(CAR_AGE),
+    OLDCLAIM = as.numeric(OLDCLAIM),
+    HOMEKIDS = as.numeric(HOMEKIDS),
+    KIDSDRIV = as.numeric(KIDSDRIV),
+    INCOME = as.numeric(INCOME),
+    AGE = as.numeric(AGE),
+    BLUEBOOK = as.numeric(BLUEBOOK),
+    CLM_FREQ = as.numeric(CLM_FREQ),
+    MVR_PTS = as.numeric(MVR_PTS),
+    REVOKED = as.numeric(as.character(REVOKED)),
+    YOJ = as.numeric(YOJ),
+    HOME_VAL = as.numeric(HOME_VAL)
+  )
+
+# Handle NA values before log transformation
+training_df <- training_df %>%
+  mutate(
+    BLUEBOOK = ifelse(is.na(BLUEBOOK), 0.01, BLUEBOOK),
+    OLDCLAIM = ifelse(is.na(OLDCLAIM), 0.01, OLDCLAIM),
+    INCOME = ifelse(is.na(INCOME), 0.01, INCOME)
+  )
+
+# Apply log transformation
+training_df <- training_df %>%
+  mutate(
+    LOG_BLUEBOOK = log1p(BLUEBOOK),
+    LOG_OLDCLAIM = log1p(OLDCLAIM),
+    LOG_INCOME = log1p(INCOME)
+  )
+
+# Fix Income Grouping - Ensure proper quantile calculation
+income_quantiles <- quantile(training_df$INCOME, probs = seq(0, 1, 0.25), na.rm = TRUE)
+
+training_df <- training_df %>%
+  mutate(
+    INCOME_GROUP = case_when(
+      INCOME <= income_quantiles[2] ~ "Low",
+      INCOME > income_quantiles[2] & INCOME <= income_quantiles[3] ~ "Medium",
+      INCOME > income_quantiles[3] & INCOME <= income_quantiles[4] ~ "High",
+      INCOME > income_quantiles[4] ~ "Very High",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Ensure no division by zero when creating ratios
+training_df <- training_df %>%
+  mutate(
+    CLAIMS_INCOME_RATIO = ifelse(INCOME > 0, OLDCLAIM / INCOME, NA),
+    VEHICLE_VALUE_TO_INCOME = ifelse(INCOME > 0, BLUEBOOK / INCOME, NA),
+    CLAIMS_TO_MVR_PTS = ifelse(MVR_PTS > 0, OLDCLAIM / MVR_PTS, NA)
+  )
+
+# Create a risk score by combining various indicators
+training_df <- training_df %>%
+  mutate(
+    RISK_SCORE = (MVR_PTS * 0.4) + (CLM_FREQ * 0.3) + (HIGH_RISK_CAR * 0.2) + (REVOKED * 0.1)
+  )
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
