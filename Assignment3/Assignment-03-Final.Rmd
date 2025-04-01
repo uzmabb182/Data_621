@@ -441,7 +441,6 @@ for (param in numeric_cols) {
 Below is series of boxplots for all numeric parameters where target is our dependent variable.
 
 ```{r explore-boxplot}
-dev.off()
 plot_boxplot(df_training, by = "target", title="Boxplots of Target vs Param")
 ```
 
@@ -877,6 +876,45 @@ pj_crime_training_df <- pj_crime_training_df %>%
 
 ```
 
+### Log Transformation (Zach)
+
+```{r}
+crime_training_zr <- crime_training_df
+```
+
+To address skewness and improve model interpretability, the following features were log transformed: tax, dis, zn, and lstat. These variables exhibited non normal distributions with long tails and outliers. Applying a log transformation reduces variance, brings extreme values closer to the center, and better satisfies the assumptions of logistic regression.
+
+```{r}
+crime_training_zr <- crime_training_zr %>%
+  mutate(
+    zr_log_tax = log(tax),
+    zr_log_dis = log(dis),
+    zr_log_zn = log(zn + 1),
+    zr_log_lstat = log(lstat)
+  )
+
+```
+
+
+### Binned Transformation (Zach)
+
+To simplify the effects of age and distance while preserving interpretability, these two variables were transformed into categorical bins using quantiles. This can help reduce the influence of extreme values and better capture non-linear effects in logistic regression.
+
+```{r}
+# Create age and dis bins 
+crime_training_zr$zr_age_bin <- cut(crime_training_zr$age, 
+                                    breaks = quantile(crime_training_zr$age, probs = c(0, 0.33, 0.66, 1)), 
+                                    labels = c("Young", "Middle-aged", "Old"),
+                                    include.lowest = TRUE)
+
+crime_training_zr$zr_dis_bin <- cut(crime_training_zr$dis, 
+                                    breaks = quantile(crime_training_zr$dis, probs = c(0, 0.33, 0.66, 1)), 
+                                    labels = c("Near", "Mid-range", "Far"),
+                                    include.lowest = TRUE)
+
+```
+
+
 ####  Outliers
 
 Applying the log transformation didn't make too much of a difference with our questionable points (280, 338, and 14)
@@ -1020,6 +1058,41 @@ pj_model3 <- glm(target ~ log_zn + log_indus + chas + nox + rm + age_group + dis
 summary(pj_model3)
 ``` 
 
+#### Zach Model 1: Baseline Predictions
+
+This model includes six variables identified through exploratory data analysis and correlation inspection:
+nox, dis, tax, rad, ptratio, and lstat. These were selected based on their relatively strong correlation with the binary crime outcome and theoretical reasoning. For example, higher pollution (nox) and tax rates (tax) may be indicative of urban density, which could correlate with higher crime, while greater distance to employment centers (dis) might have a protective effect. This model provides a straightforward process using untransformed, raw features.
+
+```{r}
+zr_model_a <- glm(target ~ nox + dis + tax + rad + ptratio + lstat, 
+                  data = crime_training_zr, family = binomial)
+```
+
+
+#### Zach  Model 2: Log-Transformed Predictors
+
+This model includes a broader set of variables, with several of them log-transformed:
+log_tax, log_dis, log_zn, log_lstat, as well as nox, rm, ptratio, rad, chas, and age.
+This method retains the core features from Model 1 but adjusts for non-normality and skewness observed in variables like tax, zn, dis, and lstat. These features exhibited right-skewed distributions and extreme values, which could affect model stability. Applying log transformation helps to reduce the impact of outliers, normalize distributions, and potentially improve model performance.
+
+```{r}
+zr_model_b <- glm(target ~ zr_log_tax + zr_log_dis + zr_log_zn + zr_log_lstat + nox + rm + ptratio + rad + chas + age,
+                  data = crime_training_zr, family = binomial)
+```
+
+
+#### Zach  Model 3: Binned Variables Logistic Regression
+
+This model includes age and distance as categorical bins based on quantiles, plus tax, rad, ptratio, nox, and rm. These features were selected based on exploratory analysis and their correlation with the target. Binning helps reduce skewness and simplify interpretation.
+
+```{r}
+zr_model_c <- glm(target ~ zr_age_bin + zr_dis_bin + tax + rad + ptratio + nox + rm, 
+                  data = crime_training_zr, family = binomial)
+```
+
+
+
+
 ###  Model using Principal Components
 
 This section uses the correlation plot to perform Principal Component Analysis on the two large variable clusters shown in the plot. We will then substiture the variables in each of the two clusters with their respective PC scores in our model.
@@ -1131,7 +1204,7 @@ library(vcdExtra)
 library(pscl)
 #models <- list(model_full, model_full_log, backward_model, backward_log_model, model_corr, model_pca, model_dendo)
 
-stats <- LRstats(model_full, model_pca, model_dendo, model1, model2, model3, pj_model1, pj_model2, pj_model3)
+stats <- LRstats(model_full, model_pca, model_dendo, model1, model2, model3, pj_model1, pj_model2, pj_model3, zr_model_a, zr_model_b, zr_model_c)
 
 stats$McFaddenR2 <- NA 
 stats$Accuracy <- NA 
@@ -1155,6 +1228,8 @@ enhanceEvaluationMetrics <- function(df, model_name) {
     model_data <- df_training_one_hot
   } else if (model_name == "pj_model1" | model_name == "pj_model2" | model_name == "pj_model3") {
     model_data <- pj_crime_training_df
+  } else if (model_name == "zr_model_a" | model_name == "zr_model_b" | model_name == "zr_model_c") {
+    model_data <- crime_training_zr
   } else {
     model_data <- crime_training_df
   }
