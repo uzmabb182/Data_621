@@ -1,6 +1,6 @@
 ---
 title: "D621 - Assignment 3"
-author: "Marco Castro, Mubashira Qari, Puja Roy, Zach Rose & Erick Hadi"
+author: "Mubashira Qari, Marco Castro, Puja Roy, Zach Rose & Erick Hadi"
 date: "2025-03-07"
 output:
   pdf_document: default
@@ -44,6 +44,11 @@ require(mice)
 require(glmnet)
 require(Metrics) 
 
+# new 
+
+library(factoextra)
+library(gridExtra)
+
 ```
 
 ```{r import-data, echo=FALSE}
@@ -55,6 +60,7 @@ crime_training_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_
 crime_evaluation_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment3/crime-evaluation-data_modified.csv")
 
 df_training  <- crime_training_df
+crime_training_zr <- crime_training_df
 
 ```
 
@@ -89,7 +95,26 @@ numeric_cols <- c('zn', 'indus', 'nox', 'rm', 'age', 'dis', 'tax', 'ptratio', 'l
 
 factor_cols <- c('chas', 'rad', 'target')
 
-glimpse(df_training)
+```
+
+```{r bin-rads-hidden, include=FALSE}
+# one hot encode rad, but explain later for readibility 
+quantile_breaks <- quantile(as.numeric(df_training$rad), probs = c(0, 1/3, 2/3, 1))
+
+df_training$radq <- cut(as.numeric(df_training$rad),
+                  breaks = quantile_breaks,  
+                  labels = c('_low', '_mid', '_hi'),
+                   include.lowest = TRUE, 
+                   right = TRUE)  
+
+# one-hot encode rad values 
+rad_one_hot <- model.matrix(~ radq - 1, data = df_training)
+
+# combine new columns
+df_training_one_hot <- cbind(df_training[ , !names(df_training) %in% "rad"], rad_one_hot) |>
+  subset(select=-c(radq, radq_mid))
+
+model_full <- glm(target ~., binomial(link = "logit"), data=df_training_one_hot)
 
 ```
 
@@ -118,6 +143,7 @@ for (param in numeric_cols) {
 ```
 
 #### Key Observations:
+
 
 Crime Rate Target (target)
 
@@ -219,8 +245,8 @@ _Categorical Variables_
 For our categorical variables, we can use barglaphs to get a sense of the parameter's impact on `target`. 
 
 
-```{r chas-bargraphs}
-df_training |>
+```{r chas-bargraphs, echo=FALSE}
+chas_bargraph <- df_training |>
   group_by(
     target,chas
   ) |>
@@ -234,16 +260,13 @@ df_training |>
     label = paste0(round(percent),"%")
   ) |>
   ggplot() +
-  aes(x = chas, y = count, label = label, fill=target) +
-  geom_col() +
-  geom_text(position = position_stack(0.5))
-```
+    aes(x = chas, y = count, label = label, fill=target) +
+    geom_col() +
+    geom_text(position = position_stack(0.5)) +
+    theme(legend.position = "bottom")
 
-The bargraph for `chas` shows fairly equal values for 0 and 1 accross the `chas` values. This suggests that the variable will may have low impact on our model and we should consider removing it.
-
-```{r rad-bargraphs}
 ### rad
-df_training |>
+rad_bargraphs <- df_training |>
   group_by(
     target,rad
   ) |>
@@ -257,31 +280,18 @@ df_training |>
     label = paste0(round(percent),"%")
   ) |>
   ggplot() +
-  aes(x = rad, y = count, label = label, fill=target) +
-  geom_col() +
-  geom_text(position = position_stack(0.5))
-```
+    aes(x = rad, y = count, label = label, fill=target) +
+    geom_col() +
+    geom_text(size = 3, position = position_stack(0.5)) +
+    theme(legend.position = "bottom")
 
-The bargraphs for `rad` are somewhat more revealing. They suggest a strong relationship between low `rad` index values of 1-3 and below median crime rate, while an index value of 24 (the highest rad index) has a strong relationship with above median crime rate.
-
-#### Pairs
-
-Using the pair function, we can print  scatterplots comparing each of the variables to the others. 
-
-```{r pairs-simple}
-png("scatterplot_matrix.png", width = 800, height = 800)
-
-pairs(df_training, main="")
-dev.off()
-```
-
-GGpairs plots take this a step further and show normal distribution and boxplots to get a fuller sense of how the data parameters relate to one another.
-
-```{r ggpairs}
-
-ggpairs(df_training)
+grid.arrange(chas_bargraph, rad_bargraphs, ncol = 2, nrow = 1)
 
 ```
+
+The bargraph for `chas` on the left shows fairly equal values for 0 and 1 accross the `chas` values. This suggests that the variable will may have low impact on our model and we should consider removing it.
+
+The bargraphs for `rad` on the right are somewhat more revealing. They suggest a strong relationship between low `rad` index values of 1-3 and below median crime rate, while an index value of 24 (the highest rad index) has a strong relationship with above median crime rate.
 
 
 ### Checking Binary Logistic Regression Assumptions
@@ -302,7 +312,6 @@ No duplicated data points (e.g., same neighborhood appearing multiple times).
 No clustered observations (e.g., observations grouped by region, time, or other factors).
 No strong correlations between residuals of observations, meaning observations do not systematically affect each other.
 
-##### Visual Inspection
 
 ```{r, warning = FALSE, message = FALSE}
 
@@ -320,7 +329,6 @@ ggplot(crime_long, aes(x = Value, y = target)) +
   labs(title = "Independence Check: Scatter Plots of Predictors vs Target",
        x = "Predictor Value",
        y = "Crime Rate (Binary Target)")
-
 
 
 ```
@@ -408,11 +416,33 @@ corrplot::corrplot(spearman_cor,
          col = colorRampPalette(c("blue", "white", "red"))(200)
 )
 
-
-
 ```
 
+
+
 #### Checking for Multicollinearity (High Correlation Between Predictors)
+
+
+To test if correlation exists between the dependent and independent variables, we used a Pearson's Correlation test. The function below loops through each of our columns and prints out the correlation of the dependent variable `target` with each of the predictors. For predictors where Pearson's Correlation coefficient is close to zero, we can determine that collinearity does not exist.
+
+
+
+```{r check-for-correlation}
+# is above .7 would be too highly correlated
+cor_results <- data.frame(name = character(0), value = numeric(0))
+for (param in colnames(df_training_one_hot)) {
+  cat("\nPearson Test score for", param, ":\n")
+  x <- as.numeric(df_training_one_hot$target)
+  y <- as.numeric(df_training_one_hot[[param]])
+  pearsons <- cor.test(x, y, method = "pearson")
+  print(pearsons)
+  # calc pearson cor value only
+  cor_object <-  data.frame(name = param, value = cor(x, y))
+  assign("cor_results", rbind(cor_results, cor_object), envir = .GlobalEnv)
+}
+
+print(cor_results)
+```
 
 A general rule of thumb is that if |p| > 0.7, it indicates strong correlation between variables, which can lead to multicollinearity in the logistic regression model.
 
@@ -428,8 +458,11 @@ High correlation between predictors (|p| > 0.7) indicates potential multicolline
 No evidence of entire rows/columns being highly correlated, suggesting no major independence violations.
 Use VIF for confirmation and decide on variable selection accordingly.
 
-##### Visual Inspection
-```{r correlation-predictors}
+
+
+```{r correlation-predictors, echo=FALSE}
+layout(1)
+par(mfrow = c(1, 1))
 df_training |>
   subset(select=-c(target, chas)) |>
   plot_correlation(type = "all")
@@ -491,6 +524,49 @@ ggplot(plot_data, aes(x = Value, y = logit)) +
 
 ```
 
+
+#### Checking for Possible Outliers
+
+We can examine our diagnostic plots to find potential outliers and leverage. First we will examine the Cook’s Distance and Cook’s Distance vs Leverage plots. Cook’s Distance measures the influence of an observation on the fitted values of the model.  
+
+```{r cooks-d, echo=FALSE}
+
+# use augment to get .cooksd and .str.resid values from our model
+potential_outliers <- augment(model_full) |>
+  mutate(
+    index = 1:n(),
+    target = if_else(target == 0, 'Lo', 'Hi')
+  ) |>
+  relocate(index, .before=target) |>
+  top_n(5, .cooksd) |>
+  arrange(desc(.cooksd))
+
+glimpse(potential_outliers)
+```
+
+The calculation above shows that points 14, 457, 280, 338, and 54 have the highest Cook's distance values (ordered from highest to lowest) and should be investigated as potential outliers.
+
+```{r cooksd-leverage, fig.width=6, fig.height=8, echo=FALSE}
+layout(matrix(1:6, nrow = 3, byrow = TRUE))
+plot(model_full, which = c(4, 6, 1, 2, 3, 5), col=df_training_one_hot$target,  id.n = 5)
+par(mfrow = c(1, 1))
+```
+
+We see on the Cook's dist vs Leverage plot that points 280 and 338 may have very high leverage on our model, followed by point 14. Point 457 also stand out and should be investigated but appears to have less leverage.
+
+
+```{r cooksd-influential-points}
+# print influential points using cooks-distance
+cooksd <- cooks.distance(model_full)
+influential <- which(cooksd > (4 / length(cooksd)))
+print(influential)
+
+```
+The formula above is used to idential influential points defined as points Cook's Distance value is greater than 4 / length of cooksd. This contains all three points (280, 338, and 14) as being influential.
+
+A quick review of the data doesn't reveal anything that stands out as being out of the ordinary.
+
+
 ##### Interpretation of the Linearity of Logit Check for Binary Logistic Regression
 
 This faceted scatter plot assesses the assumption of linearity of the logit for binary logistic regression. 
@@ -509,7 +585,24 @@ This step involves cleaning and transforming data to improve model performance.
 ### Fixing missing values
 Luckily, there are no missing values in the training set.
 
-### Transforming data by bucketing and combining variables
+### Binned Transformation 
+
+To simplify the effects of age and distance while preserving interpretability, these two variables were transformed into categorical bins using quantiles. This can help reduce the influence of extreme values and better capture non-linear effects in logistic regression.
+
+```{r}
+# Create age and dis bins 
+crime_training_zr$zr_age_bin <- cut(crime_training_zr$age, 
+                                    breaks = quantile(crime_training_zr$age, probs = c(0, 0.33, 0.66, 1)), 
+                                    labels = c("Young", "Middle-aged", "Old"),
+                                    include.lowest = TRUE)
+
+crime_training_zr$zr_dis_bin <- cut(crime_training_zr$dis, 
+                                    breaks = quantile(crime_training_zr$dis, probs = c(0, 0.33, 0.66, 1)), 
+                                    labels = c("Near", "Mid-range", "Far"),
+                                    include.lowest = TRUE)
+
+```
+
 
 The variable `rad` contains an ordinal factor that represents an index of accessibility to radial highways with values ranging from 1-24. A count of the rad values reveals that the `rad` column contains only values 1-8 and 24. This data set does not include any rows with a `rad` value of 9-23. 
 
@@ -547,7 +640,6 @@ glimpse(df_training_one_hot)
 We will use the one-hot encoded dataframe to diagnose a preliminary model with all of the predictors.
 
 ```{r full-model}
-model_full <- glm(target ~., binomial(link = "logit"), data=df_training_one_hot)
 summary(model_full)
 
 ```
@@ -557,162 +649,31 @@ Reviewing the summary statistics for full model indicates that the variable `ind
 __Note: had we one-hot encoded all of the values for `rad` instead of binning them first, all `rad` params would have very weak statistical significance, as their p-values are nearly 1.0.__ 
 
 
-### Multicollinearity
-
-To test if correlation exists between the dependent and independent variables, we used a Pearson's Correlation test. The function below loops through each of our columns and prints out the correlation of the dependent variable `target` with each of the predictors. For predictors where Pearson's Correlation coefficient is close to zero, we can determine that collinearity does not exist.
-
-
-
-```{r check-for-correlation}
-# is above .7 would be too highly correlated
-cor_results <- data.frame(name = character(0), value = numeric(0))
-for (param in colnames(df_training_one_hot)) {
-  cat("\nPearson Test score for", param, ":\n")
-  x <- as.numeric(df_training_one_hot$target)
-  y <- as.numeric(df_training_one_hot[[param]])
-  pearsons <- cor.test(x, y, method = "pearson")
-  print(pearsons)
-  # calc pearson cor value only
-  cor_object <-  data.frame(name = param, value = cor(x, y))
-  assign("cor_results", rbind(cor_results, cor_object), envir = .GlobalEnv)
-}
-
-print(cor_results)
-```
-
-#### Correlation Clusters
-
-Next we can visualize the correlations in clusters.
-
-```{r check-for-correlation-clusters, echo=FALSE}
-
-df_training_subset <- df_training_one_hot |>
-  subset(select = -c(target)) |>
-  mutate(chas = as.numeric(chas))
-
-df_training_cor <- round(cor(df_training_subset, method = c("spearman")), 3)
-
-par(mar = c(5, 4, 4, 2) + 0.1)
-corrplot(df_training_cor, method="shade", order="hclust", addrect=4)
-
-#df_training_cor |>  plot_correlation(type = "all")
-```
-
-Using "hclust", our corrplot shows four distinct groups, each with strong correlation between the parameters within each group. This suggests that we may want to select specific parameters from within these groups or conduct principal component analysis on each of these groups.
-
-
-#### Variance Inflation Factor
-```{r}
-car::vif(model_full) |> sort()
-```
-
-A VIF test suggests that we should remove nox and medv.
-
-### Presence of Outliers
-
-We can examine our diagnostic plots to find potential outliers and leverage. First we will examine the Cook’s Distance and Cook’s Distance vs Leverage plots. Cook’s Distance measures the influence of an observation on the fitted values of the model.  
-
-```{r cooks-d, echo=FALSE}
-
-# use augment to get .cooksd and .str.resid values from our model
-potential_outliers <- augment(model_full) |>
-  mutate(
-    index = 1:n(),
-    target = if_else(target == 0, 'Lo', 'Hi')
-  ) |>
-  relocate(index, .before=target) |>
-  top_n(5, .cooksd) |>
-  arrange(desc(.cooksd))
-
-glimpse(potential_outliers)
-```
-
-The calculation above shows that points 14, 457, 280, 338, and 54 have the highest Cook's distance values (ordered from highest to lowest) and should be investigated as potential outliers.
-
-```{r cooksd-leverage}
-par(mar = c(5, 4, 4, 2) + 0.1)
-plot(model_full, which = c(4, 6), col=df_training_one_hot$target,  id.n = 5)
-```
-
-We see on the Cook's dist vs Leverage plot that points 280 and 338 may have very high leverage on our model, followed by point 14. Point 457 also stand out and should be investigated but appears to have less leverage.
-
-
-```{r cooksd-influential-points}
-# print influential points using cooks-distance
-cooksd <- cooks.distance(model_full)
-influential <- which(cooksd > (4 / length(cooksd)))
-print(influential)
-
-```
-The formula above is used to idential influential points defined as points Cook's Distance value is greater than 4 / length of cooksd. This contains all three points (280, 338, and 14) as being influential.
-
-```{r residuals-v-fitted, echo=FALSE}
-
-plot(model_full, which = c(1, 2, 3, 5), col=df_training_one_hot$target,  id.n = 5)
-
-```
-
-Our residual vs fitted, QQ, Scale-Location and Residual vs Leverage plots all confirm that points 280, 338, and 14 should be investigated and could be outliers with high influence. Points 457 appear to have less leverage and does not stand out in these plots. 
-
-Below is the output for the three points identified as potential outliers in our diagnostic plots. A quick review of the data doesn't reveal anything that stands out as being out of the ordinary.
-
-
-### Linearity
-
-To check this condition, I created a scatterplot with a loess line to check that there is a linear relationship between the logit of the dependent variable and the independent variables. 
-
-
-```{r check-for-linearity-full-model, fig.width=7, fig.height=12, echo = FALSE}
-
-# predict the probability of high crime rate
-predicted_probs <- predict(model_full, newdata=df_training_one_hot, type = "response")
-
-df_full_model_logit <- df_training_one_hot |>
-  subset(select = -c(target)) |>
-  mutate(
-    chas = as.numeric(chas),
-    logit = log(predicted_probs/(1-predicted_probs))
-  ) |>
-  gather(
-    key = "predictor", 
-    value = "predictor_value", 
-    -logit
-  )
-
-ggplot(df_full_model_logit, aes(x = predictor_value, y = logit)) +
-  geom_point(alpha = 0.5, color = "blue") + 
-  geom_smooth(method = "loess", color = "red", se = FALSE) + 
-  facet_wrap(~predictor, scales = "free") +
-  theme_minimal() +
-  labs(title = "Linearity of Logit Check for Binary Logistic Regression",
-       x = "Predictor Variable",
-       y = "Logit of Predicted Probability")
-
-
-
-```
 
 ### Using mathematical transformations
 
 To reduce the influence of outliers and better align the data with the assumptions of logistic regression, log-transformations were applied to tax, zn, dis, and lstat. This transformation helps normalize the data, reduce variance, and enhance model interpretability. A small constant was added to zn before the transformation to account for zero values.
 
+#### Log Transformation
 
-```{r log-transform}
-df_training_1h_log <- df_training_one_hot |>
+
+
+To address skewness and improve model interpretability, the following features were log transformed: tax, dis, zn, and lstat. These variables exhibited non normal distributions with long tails and outliers. Applying a log transformation reduces variance, brings extreme values closer to the center, and better satisfies the assumptions of logistic regression.
+
+```{r}
+crime_training_zr <- crime_training_zr %>%
   mutate(
     log_tax = log(tax),
     log_dis = log(dis),
     log_zn = log(zn + 1),
-    log_lstat = log(lstat),
-  ) |>
-  subset(select = -c(tax, dis, zn, lstat))
+    log_lstat = log(lstat)
+  ) 
 
-
-model_full_log <- glm(target ~., binomial(link = "logit"), data=df_training_1h_log)
+model_full_log <- glm(target ~. - tax - dis - zn - lstat, binomial(link = "logit"), data=crime_training_zr)
 summary(model_full_log)
 ```
 
-### Alternate Transformation
+#### Alternate Transformation
 Log transformations: medv, lstat, and dis might benefit from log transformations to reduce skewness.
 Binning: Convert age into categorical buckets (e.g., young, middle-aged, old).
 Interactions: Create new features (e.g., lstat*medv to capture relationships between income and home values).
@@ -761,7 +722,7 @@ crime_training_df <- crime_training_df %>%
 colnames(crime_training_df)
 ```
 
-### Alternate Transformation
+x#### Alternate Transformation
 
 ```{r}
 
@@ -791,52 +752,18 @@ pj_crime_training_df <- pj_crime_training_df %>%
 
 ```
 
-### Log Transformation
-
-```{r}
-crime_training_zr <- crime_training_df
-```
-
-To address skewness and improve model interpretability, the following features were log transformed: tax, dis, zn, and lstat. These variables exhibited non normal distributions with long tails and outliers. Applying a log transformation reduces variance, brings extreme values closer to the center, and better satisfies the assumptions of logistic regression.
-
-```{r}
-crime_training_zr <- crime_training_zr %>%
-  mutate(
-    zr_log_tax = log(tax),
-    zr_log_dis = log(dis),
-    zr_log_zn = log(zn + 1),
-    zr_log_lstat = log(lstat)
-  )
-
-```
 
 
-### Binned Transformation 
-
-To simplify the effects of age and distance while preserving interpretability, these two variables were transformed into categorical bins using quantiles. This can help reduce the influence of extreme values and better capture non-linear effects in logistic regression.
-
-```{r}
-# Create age and dis bins 
-crime_training_zr$zr_age_bin <- cut(crime_training_zr$age, 
-                                    breaks = quantile(crime_training_zr$age, probs = c(0, 0.33, 0.66, 1)), 
-                                    labels = c("Young", "Middle-aged", "Old"),
-                                    include.lowest = TRUE)
-
-crime_training_zr$zr_dis_bin <- cut(crime_training_zr$dis, 
-                                    breaks = quantile(crime_training_zr$dis, probs = c(0, 0.33, 0.66, 1)), 
-                                    labels = c("Near", "Mid-range", "Far"),
-                                    include.lowest = TRUE)
-
-```
 
 
 ####  Outliers
 
 Applying the log transformation didn't make too much of a difference with our questionable points (280, 338, and 14)
 
-```{r cooksd-leverage-log}
-par(mar = c(5, 4, 4, 2) + 0.1)
-plot(model_full_log, which = c(4, 6, 1, 2, 3, 5), col=df_training_1h_log$target,  id.n = 5)
+```{r cooksd-leverage-log, fig.width=6, fig.height=8, echo=FALSE}
+par(mfrow = c(3,2), mar = c(5, 4, 4, 2) + 0.1)
+plot(model_full_log, which = c(4, 6, 1, 2, 3, 5), col=crime_training_zr$target,  id.n = 5)
+par(mfrow = c(1, 1))
 ```
 
 
@@ -848,9 +775,9 @@ Applying the log transformation helped the linearity for some of the variables. 
 ```{r check-for-linearity-log-model, fig.width=7, fig.height=12, echo = FALSE}
 
 # predict the probability of high crime rate
-predicted_probs <- predict(model_full_log, newdata=df_training_1h_log, type = "response")
+predicted_probs <- predict(model_full_log, newdata=crime_training_zr, type = "response")
 
-df_full_model_logit <- df_training_1h_log |>
+df_full_model_logit <- crime_training_zr |>
   subset(select = -c(target)) |>
   mutate(
     chas = as.numeric(chas),
@@ -996,12 +923,12 @@ log_tax, log_dis, log_zn, log_lstat, as well as nox, rm, ptratio, rad, chas, and
 This method retains the core features from Model 1 but adjusts for non-normality and skewness observed in variables like tax, zn, dis, and lstat. These features exhibited right-skewed distributions and extreme values, which could affect model stability. Applying log transformation helps to reduce the impact of outliers, normalize distributions, and potentially improve model performance.
 
 ```{r}
-zr_model_b <- glm(target ~ zr_log_tax + zr_log_dis + zr_log_zn + zr_log_lstat + nox + rm + ptratio + rad + chas + age,
+zr_model_b <- glm(target ~ log_tax + log_dis + log_zn + log_lstat + nox + rm + ptratio + rad + chas + age,
                   data = crime_training_zr, family = binomial)
 ```
 
 
-#### Zach  Model 3: Binned Variables Logistic Regression
+#### Model 3: Binned Variables Logistic Regression
 
 This model includes age and distance as categorical bins based on quantiles, plus tax, rad, ptratio, nox, and rm. These features were selected based on exploratory analysis and their correlation with the target. Binning helps reduce skewness and simplify interpretation.
 
@@ -1013,9 +940,27 @@ zr_model_c <- glm(target ~ zr_age_bin + zr_dis_bin + tax + rad + ptratio + nox +
 
 ###  Model using Principal Components
 
-This section uses the correlation plot to perform Principal Component Analysis on the two large variable clusters shown in the plot. We will then substiture the variables in each of the two clusters with their respective PC scores in our model.
+This section uses the correlation plot to perform Principal Component Analysis on the two large variable clusters shown in the plot. We will then substitute the variables in each of the two clusters with their respective PC scores in our model.
 
-```{r principal-component-model}
+First we use a correlation plot to visualize the possible clusters that could be used to select variables for our principle components.
+
+```{r check-for-correlation-clusters, echo=FALSE}
+
+df_training_subset <- df_training_one_hot |>
+  subset(select = -c(target)) |>
+  mutate(chas = as.numeric(chas))
+
+df_training_cor <- round(cor(df_training_subset, method = c("spearman")), 3)
+
+par(mar = c(5, 4, 4, 2) + 0.1)
+corrplot(df_training_cor, method="shade", order="hclust", addrect=4)
+
+#df_training_cor |>  plot_correlation(type = "all")
+```
+
+Using "hclust", our corrplot shows four distinct groups, each with strong correlation between the parameters within each group. This suggests that we may want to select indus, tax, lstat, ptratio, and radq_hi for one set of our principal component analysis and rm, medv, zn, dis.
+
+```{r principal-component-analysis, echo=FALSE}
 
 # Create PCA from first cluster in our correlation plot
 df_pca_subset1 <- df_training_one_hot |>
@@ -1023,12 +968,6 @@ df_pca_subset1 <- df_training_one_hot |>
 
 # calculate PCA
 df_training_pca1 <- prcomp(df_pca_subset1, scale=TRUE)
-
-# use eigen vectors to plot % of data explained by PCA1
-fviz_eig(df_training_pca1, addlabels=TRUE, ylim=c(0, 70))
-
-# plot PCA biplot
-fviz_pca_biplot(df_training_pca1, label="var", habillage =  df_training_one_hot$target)
 
 # Create PCA from second cluster in our correlation plot
 df_pca_subset2 <- df_training_one_hot |>
@@ -1038,10 +977,34 @@ df_pca_subset2 <- df_training_one_hot |>
 df_training_pca2 <- prcomp(df_pca_subset2, scale=TRUE)
 
 # use eigen vectors to plot % of data explained by PCA1
-fviz_eig(df_training_pca2, addlabels=TRUE, ylim=c(0, 70))
+eig_plot1 <- fviz_eig(df_training_pca1, addlabels=TRUE, ylim=c(0, 70)) + 
+  theme(text = element_text(size = 8),
+        axis.title = element_text(size = 7),
+        axis.text = element_text(size = 7),
+        plot.title = element_text(size = 10))
 
 # plot PCA biplot
-fviz_pca_biplot(df_training_pca2, label="var", habillage =  df_training_one_hot$target)
+pca_biplot1 <- fviz_pca_biplot(df_training_pca1, label="var", habillage =  df_training_one_hot$target) + 
+  theme(text = element_text(size = 8),
+        axis.title = element_text(size = 7),
+        axis.text = element_text(size = 7),
+        plot.title = element_text(size = 10))
+
+# use eigen vectors to plot % of data explained by PCA2
+eig_plot2 <- fviz_eig(df_training_pca2, addlabels=TRUE, ylim=c(0, 70)) + 
+  theme(text = element_text(size = 8),
+        axis.title = element_text(size = 7),
+        axis.text = element_text(size = 7),
+        plot.title = element_text(size = 10))
+
+# plot PCA biplot
+pca_biplot2 <- fviz_pca_biplot(df_training_pca2, label="var", habillage =  df_training_one_hot$target) + 
+  theme(text = element_text(size = 8),
+        axis.title = element_text(size = 7),
+        axis.text = element_text(size = 7),
+        plot.title = element_text(size = 10))
+
+grid.arrange(eig_plot1, pca_biplot1, eig_plot2, pca_biplot2, ncol = 2, nrow = 2)
 
 # add pca's to our dataset
 df_training_one_hot_pca <- df_training_one_hot |>
@@ -1053,8 +1016,11 @@ df_training_one_hot_pca <- df_training_one_hot |>
     group2_pc2 = df_training_pca2$x[,"PC2"],
   ) 
 
-#ggpairs(df_training_one_hot_pca |> subset(select = -c(target)))
+```
 
+The Scree plots on the left use Eigenvalues to show percentage of explained variance for each principle component  from each of our selected groups, while the Biplot shows the positions of observations and how the original variables contribute to the first two principal components. Based on these plots, we see the first principal component makes up 61% of the variance for group 1 (indus, tax, lstat, ptratio, and radq_hi), while the second principal component makes up only 14.3%. The first principal component makes up 56.6% of the variance for group 2 (rm, medv, zn, dis) and the second 27.9% .
+
+```{r principal-component-model}
 model_pca <- glm(target ~., binomial(link = "logit"), data=df_training_one_hot_pca)
 summary(model_pca)
 ```
@@ -1063,55 +1029,16 @@ Interestingly, only the primary principal component from group1 and the secondar
 
 ```{r pca2}
 model_pca2 <- update(model_pca, . ~ . - radq_low)
-summary(model_pca2)
 
 model_pca2 <- update(model_pca2, . ~ . - chas)
-summary(model_pca2)
 
 model_pca2 <- update(model_pca2, . ~ . - group1_pc2)
-summary(model_pca2)
 
 model_pca2 <- update(model_pca2, . ~ . - group2_pc1)
 summary(model_pca2)
 ```
 
 
-###  Model based on Variable Clustering
-
-The dendogram is a variable clustering technique that shows how the parameters progressively come together at different levels of similarity. It offers another way to visualize correlations between our parameters. In this model, we will use the dedogram to prune parameters that are similar from the lower branches. In this model, we used the results from a T and Wilcox pairwise test to assist with the parameter selection.
-
-```{r}
-
-dist_one_hot = as.dist(m = 1 - abs(df_training_cor))
-par(mar = c(5, 4, 4, 2) + 0.1)
-plot(hclust(dist_one_hot))
-
-
-sapply(numeric_cols, function(param) {
-  pairwise.t.test(
-    x = df_training_one_hot[, param],
-    g = df_training_one_hot$target,
-    pool.sd = FALSE,
-    paired = FALSE,
-    alternative = "two.sided"
-  )$p.value
-}) |> sort()
-
-sapply(numeric_cols, function(param) {
-  pairwise.wilcox.test(
-    x = df_training_one_hot[, param],
-    g = df_training_one_hot$target,
-    pool.sd = FALSE,
-    paired = FALSE,
-    alternative = "two.sided"
-  )$p.value
-}) |> sort()
-
-model_dendo <- glm(target ~ radq_hi + chas + lstat + indus + age, binomial(link = "logit"), data=df_training_one_hot)
-summary(model_dendo)
-```
-
-### Model Using Quasi-Logit
 
 ### Model comparison
 
@@ -1119,9 +1046,9 @@ summary(model_dendo)
 
 library(vcdExtra)
 library(pscl)
-#models <- list(model_full, model_full_log, backward_model, backward_log_model, model_corr, model_pca, model_dendo)
+#models <- list(model_full, model_full_log, backward_model, backward_log_model, model_corr, model_pca)
 
-stats <- LRstats(model_full, model_pca, model_dendo, model1, model2, model3, pj_model1, pj_model2, pj_model3, zr_model_a, zr_model_b, zr_model_c)
+stats <- LRstats(model_full, model_pca, model1, model2, model3, pj_model1, pj_model2, pj_model3, zr_model_a, zr_model_b, zr_model_c)
 
 stats$McFaddenR2 <- NA 
 stats$Accuracy <- NA 
@@ -1137,11 +1064,9 @@ stats$CV_adj_est <- NA
 enhanceEvaluationMetrics <- function(df, model_name) {
   model <- get(model_name)
   
-  if (model_name == "model_full_log" | model_name == "backward_log_model") {
-    model_data <- df_training_1h_log
-  } else if (model_name == "model_pca") {
+  if (model_name == "model_pca") {
     model_data <- df_training_one_hot_pca
-  } else if (model_name == "model_full" | model_name == "backward_model" | model_name == "model_corr" | model_name == "model_dendo") {
+  } else if (model_name == "model_full" | model_name == "backward_model") {
     model_data <- df_training_one_hot
   } else if (model_name == "pj_model1" | model_name == "pj_model2" | model_name == "pj_model3") {
     model_data <- pj_crime_training_df
