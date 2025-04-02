@@ -1,0 +1,482 @@
+---
+title: "Assignment4_Data621"
+author: "Mubashira Qari"
+date: "2025-03-23"
+output: html_document
+---
+
+### Load Libraries
+
+```{r, warning = FALSE, message = FALSE}
+# Load required packages
+library(htmltools)
+library(caret)
+library(pROC)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(skimr)
+require(DataExplorer)
+require(miscTools)
+require(MASS)
+require(performance)
+require(lmtest)
+require(mice)
+require(glmnet)
+require(Metrics) 
+library(patchwork)  # for combining ggplots
+library(e1071)
+library(car)
+
+```
+
+###  load the dataset and understand its structure.
+
+```{r}
+
+insurance_training_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment4/insurance_training_data.csv")
+
+insurance_evaluation_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment4/insurance-evaluation-data.csv")
+
+head(insurance_training_df)
+#head(insurance_evaluation_df)
+
+
+```
+
+### Clean Currency Columns and Prepare Data
+
+Cleaning financial variables (e.g., income, car value) often include symbols
+
+```{r}
+#skim(insurance_training_df)
+colnames(insurance_training_df)
+```
+
+### Check for Missing Values
+
+```{r}
+# Visualize missing data as a heatmap
+plot_missing(insurance_training_df)
+
+```
+
+### Handling Missing Values
+
+```{r}
+# Remove rows where key predictors are missing
+insurance_training_df <- insurance_training_df %>% filter(!is.na(INCOME) & !is.na(YOJ))
+
+```
+
+
+```{r}
+# Remove $ and , from currency columns
+# Function to clean dollar values
+clean_money <- function(x) {
+  as.numeric(gsub("[$,]", "", x))
+}
+
+# Apply to relevant columns
+money_vars <- c("INCOME", "HOME_VAL", "BLUEBOOK", "OLDCLAIM", "TARGET_AMT")
+insurance_training_df[money_vars] <- lapply(insurance_training_df[money_vars], clean_money)
+insurance_evaluation_df[money_vars] <- lapply(insurance_evaluation_df[money_vars], clean_money)
+
+head(insurance_training_df)
+```
+
+### Convert categorical variables to factors
+
+GLMs require categorical predictors to be in factor form so R knows to create dummy variables internally.
+
+```{r}
+# GLMs support categorical predictors through factors. Without converting, R won’t treat these as categories
+
+cat_vars <- c("PARENT1", "MSTATUS", "SEX", "EDUCATION", "JOB",
+              "CAR_USE", "CAR_TYPE", "RED_CAR", "REVOKED", "URBANICITY")
+
+insurance_training_df[cat_vars] <- lapply(insurance_training_df[cat_vars], as.factor)
+insurance_evaluation_df[cat_vars] <- lapply(insurance_evaluation_df[cat_vars], as.factor)
+
+insurance_training_df[cat_vars]
+```
+
+### Check Skewness and Apply Log Transformations
+
+```{r}
+# INCOME plot
+p1 <- ggplot(insurance_training_df, aes(x = INCOME)) +
+  geom_histogram(fill = "#2c7fb8", bins = 30) +
+  labs(title = "Distribution of INCOME")
+
+# HOME_VAL plot
+p2 <- ggplot(insurance_training_df, aes(x = HOME_VAL)) +
+  geom_histogram(fill = "#41ab5d", bins = 30) +
+  labs(title = "Distribution of HOME_VAL")
+
+# OLDCLAIM plot
+p3 <- ggplot(insurance_training_df, aes(x = OLDCLAIM)) +
+  geom_histogram(fill = "#f03b20", bins = 30) +
+  labs(title = "Distribution of OLDCLAIM")
+
+# BLUEBOOK plot
+p4 <- ggplot(insurance_training_df, aes(x = BLUEBOOK)) +
+  geom_histogram(fill = "#ffbf00", bins = 30) +
+  labs(title = "Distribution of BLUEBOOK")
+
+# Combine all four using patchwork
+(p1 | p2) / (p3 | p4)
+
+
+```
+
+### Quantify Skewness
+
+```{r}
+
+# Values > 1 or < -1 are highly skewed
+
+skewness(insurance_training_df$INCOME, na.rm = TRUE)  
+
+skewness(insurance_training_df$HOME_VAL, na.rm = TRUE)  
+
+skewness(insurance_training_df$OLDCLAIM, na.rm = TRUE) 
+
+skewness(insurance_training_df$BLUEBOOK, na.rm = TRUE)  
+
+```
+
+
+Skewness distorts relationships in regression.
+
+Log transformation reduces skewness by compressing extreme values.
+
+We use +1 to avoid log(0) errors.
+
+### Remove or impute missing values + transform variables
+
+GLMs are sensitive to missing values and skewed data. Log transforms help normalize heavily skewed predictors.
+
+```{r}
+insurance_training_clean <- insurance_training_df %>%
+  filter(!is.na(INCOME) & !is.na(YOJ)) %>%
+  mutate(
+    INCOME_LOG = log(INCOME + 1),
+    HOME_VAL_LOG = log(HOME_VAL + 1),
+    OLDCLAIM_LOG = log(OLDCLAIM + 1),
+    BLUEBOOK_LOG = log(BLUEBOOK + 1)
+  )
+
+
+```
+
+### Compare Before and After Transformation
+
+Helps ensure variables are treated as discrete categories, not continuous numbers.
+
+```{r}
+# Set layout to plot side-by-side
+par(mfrow = c(1, 2))
+
+# INCOME
+hist(insurance_training_clean$INCOME, 
+     main = "Original INCOME", 
+     col = "salmon", 
+     xlab = "insurance_training_clean$INCOME")
+
+hist(insurance_training_clean$INCOME_LOG, 
+     main = "Log Transformed INCOME", 
+     col = "seagreen", 
+     xlab = "insurance_training_clean$INCOME_LOG")
+
+
+# HOME_VAL
+par(mfrow = c(1, 2))
+hist(insurance_training_clean$HOME_VAL, 
+     main = "Original HOME_VAL", 
+     col = "tomato", 
+     xlab = "insurance_training_clean$HOME_VAL")
+
+hist(insurance_training_clean$HOME_VAL_LOG, 
+     main = "Log Transformed HOME_VAL", 
+     col = "forestgreen", 
+     xlab = "insurance_training_clean$HOME_VAL_LOG")
+
+
+# OLDCLAIM
+par(mfrow = c(1, 2))
+hist(insurance_training_clean$OLDCLAIM, 
+     main = "Original OLDCLAIM", 
+     col = "lightskyblue", 
+     xlab = "insurance_training_clean$OLDCLAIM")
+
+hist(insurance_training_clean$OLDCLAIM_LOG, 
+     main = "Log Transformed OLDCLAIM", 
+     col = "darkgreen", 
+     xlab = "insurance_training_clean$OLDCLAIM_LOG")
+
+
+# BLUEBOOK
+par(mfrow = c(1, 2))
+hist(insurance_training_clean$BLUEBOOK, 
+     main = "Original BLUEBOOK", 
+     col = "khaki3", 
+     xlab = "insurance_training_clean$BLUEBOOK")
+
+hist(insurance_training_clean$BLUEBOOK_LOG, 
+     main = "Log Transformed BLUEBOOK", 
+     col = "darkolivegreen4", 
+     xlab = "insurance_training_clean$BLUEBOOK_LOG")
+
+```
+
+### Visualize Category Distributions
+
+Helps ensure variables are treated as discrete categories, not continuous numbers.
+
+```{r}
+# Example: Education levels
+ggplot(insurance_training_clean, aes(x = EDUCATION)) +
+  geom_bar(fill = "dodgerblue") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Distribution of EDUCATION Levels")
+
+```
+### Check Variable Correlations (Multicollinearity Insight)
+
+Correlation Matrix for Numeric Variables
+
+```{r}
+# Select only numeric columns
+numeric_vars <- insurance_training_clean %>% dplyr::select(where(is.numeric))
+
+# Remove rows with NAs
+numeric_vars <- na.omit(numeric_vars)
+
+# Compute correlation matrix
+cor_matrix <- cor(numeric_vars)
+
+# Visualize correlation matrix
+corrplot(cor_matrix, method = "color", type = "lower", tl.cex = 0.8)
+
+```
+Interpretation:
+
+Dark blue/red squares indicate strong positive/negative correlation.
+
+Look for variable pairs with |correlation| > 0.8 to watch out for multicollinearity.
+
+### Visualize Distributions
+
+Using DataExplorer for All Numeric Distributions
+
+```{r}
+plot_histogram(insurance_training_clean)
+
+```
+Purpose:
+This gives mini-histograms for all numeric variables, so we can quickly:
+
+Spot skewness
+
+Check ranges
+
+Identify variables with spikes or unusual spread
+
+### Density Plot for a Few Variables
+
+```{r}
+# Example: BLUEBOOK
+ggplot(insurance_training_clean, aes(x = BLUEBOOK)) +
+  geom_density(fill = "lightgreen") +
+  labs(title = "Density of BLUEBOOK (Vehicle Value)")
+
+```
+
+
+### Binary Logistic Regression (TARGET_FLAG)
+
+### Fit the Initial Logistic Regression Model
+
+We use glm() with family = binomial for logistic regression. This model predicts the probability of a crash (1).
+We are predicting TARGET_FLAG (binary: 1 = made a claim, 0 = no claim).
+
+```{r}
+logit_model <- glm(
+  TARGET_FLAG ~ KIDSDRIV + YOJ + INCOME_LOG + PARENT1 +
+    MSTATUS + EDUCATION + JOB + TRAVTIME + CAR_USE + TIF +
+    CAR_TYPE + OLDCLAIM_LOG + REVOKED + MVR_PTS + URBANICITY,
+  data = insurance_training_clean,
+  family = binomial
+)
+
+
+summary(logit_model)
+
+
+```
+Interpreting the Output: Significant p-values (< 0.05) indicate variables that are strong predictors of making a claim.
+
+### Model Significance with Deviance Test
+
+```{r}
+null_dev <- logit_model$null.deviance
+resid_dev <- logit_model$deviance
+df_diff <- logit_model$df.null - logit_model$df.residual
+p_val <- 1 - pchisq(null_dev - resid_dev, df_diff)
+
+cat("Model significance p-value:", p_val)
+
+# Check each variable
+anova(logit_model, test = "Chisq")
+
+```
+
+### Run Assumption Tests Using Residuals
+
+### Assumption Testing – Logistic
+
+### Multicollinearity: Variance Inflation Factor
+
+```{r}
+vif(logit_model)
+
+```
+Explanation: VIF > 5 or 10 indicates multicollinearity. Remove or combine correlated variables.
+
+### ROC Curve + AUC
+
+```{r}
+identical(length(pred_probs), length(insurance_training_clean$TARGET_FLAG))  # Should return TRUE
+
+```
+
+
+```{r}
+# Step 1: Load the library
+library(pROC)
+
+# Step 2: Generate predicted probabilities from your logistic model
+pred_probs <- predict(logit_model, newdata = insurance_training_clean, type = "response")
+
+# Step 3: Create the ROC object
+roc_obj <- roc(response = insurance_training_clean$TARGET_FLAG,
+               predictor = pred_probs)
+
+# Step 4: Plot the ROC Curve
+plot(roc_obj, main = "ROC Curve")
+
+# Step 5: Get the AUC
+pROC::auc(roc_obj)
+
+
+
+
+```
+
+Explanation: Measures model's ability to distinguish crashers vs. non-crashers. AUC closer to 1 = better.
+
+### Confusion Matrix
+
+```{r}
+pred_class <- ifelse(pred_probs > 0.5, 1, 0)
+confusionMatrix(as.factor(pred_class), as.factor(insurance_training_clean$TARGET_FLAG))
+
+```
+Explanation: Helps evaluate accuracy, sensitivity, specificity using 0.5 as threshold.
+
+### Multiple Linear Regression (TARGET_AMT)
+
+### Subset Only Crashers
+
+Explanation: Only those who crashed (TARGET_FLAG = 1) have claim amounts > 0. Others are always 0.
+
+```{r}
+claims_only <- insurance_training_clean %>% filter(TARGET_FLAG == 1)
+
+```
+
+### Fit Linear Model
+
+```{r}
+lm_model <- lm(
+  TARGET_AMT ~ KIDSDRIV + YOJ + INCOME_LOG + PARENT1 +
+    MSTATUS + EDUCATION + JOB + TRAVTIME + CAR_USE + TIF +
+    CAR_TYPE + OLDCLAIM_LOG + REVOKED + MVR_PTS + URBANICITY + BLUEBOOK_LOG,
+  data = claims_only
+)
+summary(lm_model)
+
+```
+
+### Assumption Testing – Linear
+
+### Linearity & Residual Plots
+
+Explanation: p > 0.05 = residuals are normally distributed (good!)
+
+```{r}
+
+par(mfrow = c(2,2))
+plot(lm_model)
+
+```
+Explanation:
+
+Residuals vs. Fitted: should show no pattern (linearity)
+
+Q-Q Plot: points should fall along diagonal (normality)
+
+### Normality of Residuals
+
+```{r}
+shapiro.test(residuals(lm_model))
+
+```
+### Multicollinearity
+
+```{r}
+
+vif(lm_model)
+
+```
+### Make Predictions on Evaluation Data
+
+Predict Crash Probability & Classification
+
+```{r}
+eval_probs <- predict(logit_model, newdata = insurance_evaluation_df, type = "response")
+eval_flag_pred <- ifelse(eval_probs > 0.5, 1, 0)
+
+```
+### Predict Cost for Crashers Only
+
+```{r}
+eval_amt_pred <- rep(0, nrow(eval))
+eval_crash_idx <- which(eval_flag_pred == 1)
+eval_amt_pred[eval_crash_idx] <- predict(lm_model, newdata = insurance_evaluation_df[eval_crash_idx, ])
+
+```
+
+### Final Combined Output
+
+```{r}
+final_predictions <- eval %>%
+  select(INDEX) %>%
+  mutate(
+    PRED_TARGET_FLAG = eval_flag_pred,
+    PRED_TARGET_AMT = eval_amt_pred
+  )
+
+head(final_predictions)
+write_csv(final_predictions, "insurance_predictions.csv")
+
+```
+Explanation:
+
+Everyone gets a binary prediction (crash or not).
+
+Only predicted crashers get a dollar amount predicted.
+
+Others remain at zero.
