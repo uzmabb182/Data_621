@@ -60,7 +60,6 @@ df_training  <- crime_training_df
 
 ## DATA EXPLORATION
 
-
 The training dataset contains 466 observations and 13 variables, including 12 predictor variables and one binary response variable (target). The target variable indicates whether a neighborhood’s crime rate is above the median (1) or not (0). The dataset includes a mix of continuous and categorical features, such as housing characteristics, pollution levels, property taxes, and proximity to employment centers. Understanding the distributions, relationships, and correlations between these features is an essential first step in building an effective predictive model. 
 
 ```{r}
@@ -356,6 +355,7 @@ for (var in colnames(crime_training_df)[colnames(crime_training_df) != "target"]
 print(independence_results)
 
 ```
+
 ##### Checking for Independence Using Spearman's Correlation
 In Spearman’s method, we check the correlation between:
 
@@ -411,6 +411,7 @@ corrplot::corrplot(spearman_cor,
 
 
 ```
+
 #### Checking for Multicollinearity (High Correlation Between Predictors)
 
 A general rule of thumb is that if |p| > 0.7, it indicates strong correlation between variables, which can lead to multicollinearity in the logistic regression model.
@@ -489,6 +490,7 @@ ggplot(plot_data, aes(x = Value, y = logit)) +
        y = "Logit of Predicted Probability")
 
 ```
+
 ##### Interpretation of the Linearity of Logit Check for Binary Logistic Regression
 
 This faceted scatter plot assesses the assumption of linearity of the logit for binary logistic regression. 
@@ -690,9 +692,6 @@ ggplot(df_full_model_logit, aes(x = predictor_value, y = logit)) +
 
 ```
 
----
-
-
 ### Using mathematical transformations
 
 To reduce the influence of outliers and better align the data with the assumptions of logistic regression, log-transformations were applied to tax, zn, dis, and lstat. This transformation helps normalize the data, reduce variance, and enhance model interpretability. A small constant was added to zn before the transformation to account for zero values.
@@ -713,7 +712,7 @@ model_full_log <- glm(target ~., binomial(link = "logit"), data=df_training_1h_l
 summary(model_full_log)
 ```
 
-### Alternate Transformation (Mubashira)
+### Alternate Transformation
 Log transformations: medv, lstat, and dis might benefit from log transformations to reduce skewness.
 Binning: Convert age into categorical buckets (e.g., young, middle-aged, old).
 Interactions: Create new features (e.g., lstat*medv to capture relationships between income and home values).
@@ -762,7 +761,7 @@ crime_training_df <- crime_training_df %>%
 colnames(crime_training_df)
 ```
 
-### Alternate Transformation (Puja)
+### Alternate Transformation
 
 ```{r}
 
@@ -792,7 +791,7 @@ pj_crime_training_df <- pj_crime_training_df %>%
 
 ```
 
-### Log Transformation (Zach)
+### Log Transformation
 
 ```{r}
 crime_training_zr <- crime_training_df
@@ -812,7 +811,7 @@ crime_training_zr <- crime_training_zr %>%
 ```
 
 
-### Binned Transformation (Zach)
+### Binned Transformation 
 
 To simplify the effects of age and distance while preserving interpretability, these two variables were transformed into categorical bins using quantiles. This can help reduce the influence of extreme values and better capture non-linear effects in logistic regression.
 
@@ -896,9 +895,9 @@ To account for these violations, we wil use a Generalized Linear Model (GLM) to 
 
 
 
-### Mubashira's Models
+### Approach 1:
 
-### Mubashira Model 1: Baseline (All variables)
+### Model 1: Baseline (All variables)
 
 ```{r, warning = FALSE, message = FALSE}
 # Load library
@@ -917,7 +916,7 @@ AIC(model1)  # Compare AIC
 ```
 
 
-### Mubashira Model 2: Stepwise Selection
+### Model 2: Stepwise Selection
 
 ```{r}
 
@@ -931,7 +930,7 @@ AIC(model2)  # Compare AIC
 ```
 
 
-### Mubashira Model 3: Transformations & Interactions
+### Model 3: Transformations & Interactions
 
 ```{r}
 
@@ -944,7 +943,9 @@ summary(model3)
 
 ```
 
-### Puja Model 1: Baseline Logistic Regression
+### Approach 2:
+
+### Model 1: Baseline Logistic Regression
 
 
 
@@ -958,7 +959,7 @@ summary(pj_model1)
 ```
 
 
-### Puja Model 2: Stepwise Logistic Regression
+### Model 2: Stepwise Logistic Regression
 
 ```{r}
 #Model 2: Stepwise Logistic Regression
@@ -966,7 +967,8 @@ pj_model2 <- step(glm(target ~ ., data = pj_crime_training_df, family = binomial
 summary(pj_model2)
 ```
 
-#### Puja  Model 3: Logistic Regression with Transformed Variables
+#### Model 3: Logistic Regression with Transformed Variables
+
 ```{r}
 # Model 3: Logistic Regression with Transformed Variables
 pj_model3 <- glm(target ~ log_zn + log_indus + chas + nox + rm + age_group + dis_scaled + log_rad + log_tax + ptratio + log_lstat + log_medv, 
@@ -974,7 +976,9 @@ pj_model3 <- glm(target ~ log_zn + log_indus + chas + nox + rm + age_group + dis
 summary(pj_model3)
 ``` 
 
-#### Zach Model 1: Baseline Predictions
+### Approach 3:
+
+#### Model 1: Baseline Predictions
 
 This model includes six variables identified through exploratory data analysis and correlation inspection:
 nox, dis, tax, rad, ptratio, and lstat. These were selected based on their relatively strong correlation with the binary crime outcome and theoretical reasoning. For example, higher pollution (nox) and tax rates (tax) may be indicative of urban density, which could correlate with higher crime, while greater distance to employment centers (dis) might have a protective effect. This model provides a straightforward process using untransformed, raw features.
@@ -985,7 +989,7 @@ zr_model_a <- glm(target ~ nox + dis + tax + rad + ptratio + lstat,
 ```
 
 
-#### Zach  Model 2: Log-Transformed Predictors
+#### Model 2: Log-Transformed Predictors
 
 This model includes a broader set of variables, with several of them log-transformed:
 log_tax, log_dis, log_zn, log_lstat, as well as nox, rm, ptratio, rad, chas, and age.
@@ -1005,8 +1009,6 @@ This model includes age and distance as categorical bins based on quantiles, plu
 zr_model_c <- glm(target ~ zr_age_bin + zr_dis_bin + tax + rad + ptratio + nox + rm, 
                   data = crime_training_zr, family = binomial)
 ```
-
-
 
 
 ###  Model using Principal Components
@@ -1074,7 +1076,6 @@ summary(model_pca2)
 ```
 
 
-
 ###  Model based on Variable Clustering
 
 The dendogram is a variable clustering technique that shows how the parameters progressively come together at different levels of similarity. It offers another way to visualize correlations between our parameters. In this model, we will use the dedogram to prune parameters that are similar from the lower branches. In this model, we used the results from a T and Wilcox pairwise test to assist with the parameter selection.
@@ -1112,8 +1113,8 @@ summary(model_dendo)
 
 ### Model Using Quasi-Logit
 
-
 ### Model comparison
+
 ```{r full-model-lrstats}
 
 library(vcdExtra)
@@ -1186,7 +1187,6 @@ for (model_name in rownames(stats)) {
 stats 
 ```
 
-
 ### Model Evaluation:
 
 Evaluate model performance and select the best model based on multiple criteria.
@@ -1200,10 +1200,7 @@ F1 Score: 2 * (Precision * Recall) / (Precision + Recall)
 AUC-ROC Curve: Evaluate model discrimination.
 
 
-
 For logistic regression, the "prediction error" is the mean squared error (difference between the predicted probabilities and the actual outcomes).
-
-----
 
 ## MODEL SELECTION
 
@@ -1245,7 +1242,6 @@ crime_evaluation_df$dis_scaled <- scale(crime_evaluation_df$dis)
 ```
 
 
-
 ```{r}
 
 # Predict probabilities using model1
@@ -1260,6 +1256,7 @@ crime_evaluation_df$predicted_class <- eval_pred_class
 
 
 ```
+
 
 ```{r}
 # use the predicted_class and predicted_prob values as your final output
