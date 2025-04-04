@@ -1193,4 +1193,10 @@ head(crime_evaluation_df[, c("predicted_prob", "predicted_class")])
 
 This ensures that Model 2: Stepwise Logistic Regression is applied consistently and provides accurate predictions on the evaluation dataset.
 
+## CONCLUSION
 
+Applying the selected Stepwise Logistic Regression model (Model 2) to the test dataset allows us to experiment with its performance in real life. The model provides us with predicted probabilities and binary classification and allows us to determine the probability of an observation to belong to a particular class. Since Model 2 has been performing well on the training set—indicated by its high AUC (0.9843), high precision, and well-balanced sensitivity and specificity—we can anticipate the same in the case of the evaluation set.
+
+However, despite the fact that the model generalized perfectly in training, it is of the utmost importance to check whether the model generalizes perfectly to novel data. In case the performance in testing has a high correlation with the performance in training, we could be certain that the model does an excellent job in identifying the patterns of data. In case we encounter a steep drop in accuracy or precision and other key statistics, it could be an indication of potential overfitting.
+
+In general, if Model 2 shows high predictive accuracy on test data, then we are content with its performance. Further testing, e.g., investigation of miss-classified cases or adjusting the probability cut-off point, would most likely be performed in actual releases. The next thing to do is then to look at the confusion table and key measures on the test data to check whether this model still performs better.
