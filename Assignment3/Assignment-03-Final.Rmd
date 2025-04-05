@@ -656,8 +656,6 @@ To reduce the influence of outliers and better align the data with the assumptio
 
 #### Log Transformation
 
-
-
 To address skewness and improve model interpretability, the following features were log transformed: tax, dis, zn, and lstat. These variables exhibited non normal distributions with long tails and outliers. Applying a log transformation reduces variance, brings extreme values closer to the center, and better satisfies the assumptions of logistic regression.
 
 ```{r}
@@ -752,10 +750,6 @@ pj_crime_training_df <- pj_crime_training_df %>%
 
 ```
 
-
-
-
-
 ####  Outliers
 
 Applying the log transformation didn't make too much of a difference with our questionable points (280, 338, and 14)
@@ -765,7 +759,6 @@ par(mfrow = c(3,2), mar = c(5, 4, 4, 2) + 0.1)
 plot(model_full_log, which = c(4, 6, 1, 2, 3, 5), col=crime_training_zr$target,  id.n = 5)
 par(mfrow = c(1, 1))
 ```
-
 
 
 #### Linearity 
@@ -873,8 +866,6 @@ summary(model3)
 ### Approach 2:
 
 ### Model 1: Baseline Logistic Regression
-
-
 
 
 ```{r}
@@ -1037,8 +1028,6 @@ model_pca2 <- update(model_pca2, . ~ . - group1_pc2)
 model_pca2 <- update(model_pca2, . ~ . - group2_pc1)
 summary(model_pca2)
 ```
-
-
 
 ### Model comparison
 
