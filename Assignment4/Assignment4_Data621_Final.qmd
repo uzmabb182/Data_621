@@ -126,10 +126,10 @@ summary(training_df[numeric_vars])
 
 cat('\nStandard Deviviations for Numeric Variables')
 # Calculate SD for numerical variables
-summary_stats <- training_df %>% 
-  summarise(across(where(is.numeric), list(sd = sd), na.rm = TRUE))
-summary_stats[1:7]
-summary_stats[8:14]
+#summary_stats <- training_df %>% 
+#  summarise(across(where(is.numeric), list(sd = sd), na.rm = TRUE))
+#summary_stats[1:7]
+#summary_stats[8:14]
 
 
 cat('\nSummary Stats for Categorical Variables')
@@ -143,18 +143,19 @@ summary(training_df[factor_vars])
 
 The first visualization is a bar chart displaying the distribution of TARGET_FLAG, helping to assess the proportion of crashes vs. non-crashes. The second visualization is a box plot for BLUEBOOK, showing the distribution and identifying potential outliers in vehicle values. TARGET_FLAG ratio of having more 0s than 1s indicates that most of the customers in the dataset did not have a crash. It's class imbalance, and it impacts the accuracy of classification models. The BLUEBOOK boxplot indicates that the variable has a strongly dominant majority of values or is long-tailed by outliers. There could be a chance that the data is non-representative, i.e., the majority of the cars have low values with few cars of high value on the tail end of the distribution.
 
-```{r distribution-viz,  fig.width=6, fig.height=2, echo=FALSE}
+```{r distribution-viz,  fig.width=6, fig.height=2.5, echo=FALSE}
 # Bar chart of TARGET_FLAG
 viz1 <-ggplot(training_df, aes(x = as.factor(TARGET_FLAG))) +
   geom_bar(fill = "blue") +
   labs(title = "Distribution of TARGET_FLAG", x = "Crash (1 = Yes, 0 = No)", y = "Count")
 
+  
 # Box plot of BLUEBOOK values
 viz2 <- ggplot(training_df, aes(x = BLUEBOOK)) +
   geom_boxplot(fill = "lightblue") +
   labs(title = "Box Plot of BLUEBOOK", y = "Vehicle Value")
 
-(viz1 | viz2)
+(viz1 | viz2 )
 ```
 
 \newpage
@@ -770,12 +771,12 @@ The log transformed model includes 19 our original variables and uses four log t
 
 ```{r log_transformed_model, echo=FALSE}
 
-model_1 <- glm(TARGET_FLAG ~ AGE + LOG_BLUEBOOK + CAR_AGE + CAR_TYPE + CAR_USE + CLM_FREQ + EDUCATION + HOMEKIDS + LOG_HOME_VAL + LOG_INCOME + JOB + KIDSDRIV  + MSTATUS + MVR_PTS + LOG_OLDCLAIM + PARENT1  + RED_CAR + REVOKED + SEX + TIF + TRAVTIME + URBANICITY + YOJ,
+model1 <- glm(TARGET_FLAG ~ AGE + LOG_BLUEBOOK + CAR_AGE + CAR_TYPE + CAR_USE + CLM_FREQ + EDUCATION + HOMEKIDS + LOG_HOME_VAL + LOG_INCOME + JOB + KIDSDRIV  + MSTATUS + MVR_PTS + LOG_OLDCLAIM + PARENT1  + RED_CAR + REVOKED + SEX + TIF + TRAVTIME + URBANICITY + YOJ,
   data = training_df,
   family = binomial
 )
 
-summary(model_1)
+summary(model1)
 ```
 
 \newpage
@@ -783,7 +784,7 @@ summary(model_1)
 
 ```{r model_1_diagnostics, fig.width=6, fig.height=7, echo=FALSE}
 layout(matrix(1:6, nrow = 3, byrow = TRUE))
-plot(model_1, col=training_df$TARGET_FLAG,  id.n = 5)
+plot(model1, col=training_df$TARGET_FLAG,  id.n = 5)
 par(mfrow = c(1, 1))
 
 ```
@@ -820,7 +821,7 @@ summary(model3)
 AIC(model3) 
 ```
 
-#### Model 4: Using One-Hot Encoded Params
+#### Model 4: Using One-Hot Encoded Parameters
 
 Building off of the predictors we obtained in model 3, uses one-hot encoded predictors for AGE_GROUP, INCOME_GROUP, EDUCATION, and JOB to remove predictors with little statistical significance from our model. Our AIC value has increased a bit to 7354.6 but our model is slightly simpler.
 
@@ -900,7 +901,7 @@ summary(logit_model)
 
 Interpreting the Output: Significant p-values (\< 0.05) indicate variables that are strong predictors of making a claim.
 
-#### Model Significance with Deviance Test
+##### Model Significance with Deviance Test
 
 ```{r}
 null_dev <- logit_model$null.deviance
@@ -915,11 +916,11 @@ anova(logit_model, test = "Chisq")
 
 ```
 
-### Run Assumption Tests Using Residuals
+##### Run Assumption Tests Using Residuals
 
-### Assumption Testing – Logistic
+##### Assumption Testing – Logistic
 
-### Multicollinearity: Variance Inflation Factor
+##### Multicollinearity: Variance Inflation Factor
 
 ```{r}
 vif(logit_model)
@@ -928,7 +929,7 @@ vif(logit_model)
 
 Explanation: VIF \> 5 or 10 indicates multicollinearity. Remove or combine correlated variables.
 
-### ROC Curve + AUC
+##### ROC Curve + AUC
 
 ```{r mq-roc}
 # Step 1: Load the library
@@ -954,7 +955,7 @@ identical(length(pred_probs), length(insurance_training_clean$TARGET_FLAG))  # S
 
 Explanation: Measures model's ability to distinguish crashers vs. non-crashers. AUC closer to 1 = better.
 
-### Confusion Matrix
+##### Confusion Matrix
 
 ```{r mq-confusion-matrix}
 pred_class <- ifelse(pred_probs > 0.5, 1, 0)
@@ -964,19 +965,209 @@ confusionMatrix(as.factor(pred_class), as.factor(insurance_training_clean$TARGET
 
 Explanation: Helps evaluate accuracy, sensitivity, specificity using 0.5 as threshold.
 
-### Multiple Linear Regression (TARGET_AMT)
+#### Crash Model comparison
+```{r model-comp-1}
 
-### Subset Only Crashers
+library(vcdExtra)
+library(pscl)
 
-Explanation: Only those who crashed (TARGET_FLAG = 1) have claim amounts \> 0. Others are always 0.
+stats <- LRstats(model1, model2, model3, model4, model5, logit_model)
 
-```{r mq-}
-claims_only <- insurance_training_clean %>% filter(TARGET_FLAG == 1)
+stats$McFaddenR2 <- NA 
+stats$Accuracy <- NA 
+stats$Precision <- NA 
+#stats$Recall <- NA 
+stats$Sensitivity <- NA 
+stats$Specificity <- NA 
+stats$F1_score <- NA 
+stats$AUC <- NA 
+stats$CV_est_predict_err <- NA 
+stats$CV_adj_est <- NA 
 
+enhanceEvaluationMetrics <- function(df, model_name) {
+  model <- get(model_name)
+  
+  if (model_name == 'logit_model') {
+    model_data <- insurance_training_clean
+  } else if (model_name == 'model4') {
+    model_data <- df_training_one_hot
+  } else  {
+    model_data <- training_df
+  }
+  
+  df[model_name, "McFaddenR2"] <- pR2(model)["McFadden"]
+  #pred_probs <- predict(model, type = "response")
+  #pred_probs_factor <- as.factor(ifelse(pred_probs > 0.5, 1, 0))
+  #conf_matrix <- confusionMatrix(pred_probs_factor, as.factor(model_data$TARGET_FLAG))
+  #df[model_name, "Accuracy"] <- conf_matrix$overall['Accuracy']
+  #df[model_name, "Precision"] <- conf_matrix$byClass['Precision']
+  #df[model_name, "Recall"] <- conf_matrix$byClass['Recall']
+  #df[model_name, "F1_score"] <- conf_matrix$byClass['F1']
+  #df[model_name, "Sensitivity"] <- conf_matrix$byClass["Sensitivity"] 
+  #df[model_name, "Specificity"] <- conf_matrix$byClass["Specificity"]
+
+  #df[model_name, "AUC"] <- MLmetrics::AUC(y_true = model_data$target, y_pred = pred_probs) 
+  
+  # Cross-Validation using 10 folsds
+  cv_result <- boot::cv.glm(model_data, model, K= 10)
+  df[model_name, "CV_est_predict_err"] <- cv_result$delta[1]
+  df[model_name, "CV_adj_est"] <- cv_result$delta[2]
+  
+  return(df) 
+}
+
+
+# Loop through the list of models and update the dataframe for each
+for (model_name in rownames(stats)) {
+  
+ #stats <- enhanceEvaluationMetrics(stats, model_name)
+}
+
+stats 
 ```
-### Linear Regression Models for TARGET_AMT
 
-### MQ: Fit Linear Model
+### Models for TARGET_AMT
+
+#### Subset of Crashers
+
+Since payouts can't happen without a crash event, we will create a subset where TARGET_FLAG = 1 to avoid biasing our payout predictions towards zero. We will also look at the distribution and review our IQR values. We see that the payouts are highly skewed to the right with a long tail to the right. The median payout is $4,104 and the maximum payout is $107,586. Applying a log transformation to TARGET_AMT gives a normal distribution.
+
+```{r subset_claims_only, echo=FALSE}
+claims_only <- insurance_training_clean %>% 
+  filter(TARGET_FLAG == 1) %>%
+  subset(select = -c(TARGET_FLAG, YOJ_MISSING, INCOME_MISSING, HOME_VAL_MISSING, CAR_AGE_MISSING, JOB_MISSING, CAR_AGE_MISSING, HIGH_RISK_CAR, RISK_SCORE, TOTAL_KIDS)) %>%
+  mutate(
+    TARGET_AMT_LOG = log1p(TARGET_AMT)
+  )
+
+# Histogram of TARGET_AMT
+p3 <- ggplot(claims_only, aes(x = TARGET_AMT)) +
+  geom_histogram(bins = 25)
+
+p4 <- ggplot(claims_only, aes(x = TARGET_AMT_LOG)) +
+  geom_histogram(bins = 25)
+
+summary(claims_only$TARGET_AMT)
+(p3 | p4)
+```
+
+
+#### Payout Model 1
+
+Since Blue Book values are used to determine the market rate value of a used car, we can assume that it will affect payout amount. Blue Book values are derived from various attributes, including car age, type, mileage and condition. We will use the logged transformed variable BLUEBOOK_LOG since we had identified that the distribution for original BLUEBOOK was right-skewed.
+
+
+```{r amt_model1, echo=FALSE}
+
+amt_model1 <- lm(TARGET_AMT ~ BLUEBOOK_LOG, claims_only)
+summary(amt_model1)
+AIC(amt_model1)
+```
+
+Our model summary indicates that BLUEBOOK_LOG is statistically significant.
+
+##### Diagnostic Plots
+
+Out diagnostic plots show that our model fails our assumptions for linear regression. In particular, our Residuals vs. Fitted plot shows possible funneling in the positive values, suggesting that our model fails the linearity assumption. Our Q-Q plot shows clear high skewing on the right tail, suggesting that our model fails the normality assumption. The  Scale-Location plot does not show evenly scattered points, suggesting we fail our assumption of Homoscedasticity. Our Residual vs. Leverage plot shows some extreme values but they don't appear to have high leverage. A Durbin-Watson value of 1.9844 suggests that our model meets our independence assumption.
+
+
+```{r diagnose_amt_model1, echo=FALSE}
+par(mfrow = c(2,2))
+plot(amt_model1)
+
+#library(lmtest)
+#dwtest(amt_model1)
+```
+
+#### Payout Model 2
+
+As our Target Amount value is highly skewed to the right, we will update our model with a log transformed dependent variable (TARGET_AMT_LOG). 
+ 
+```{r amt_model2, echo=FALSE}
+
+amt_model2 <- lm(TARGET_AMT_LOG ~ BLUEBOOK_LOG, claims_only)
+summary(amt_model2)
+
+par(mfrow = c(2,2))
+plot(amt_model2)
+dwtest(amt_model2)
+bptest(amt_model2)
+shapiro.test(residuals(amt_model2))
+AIC(amt_model2, amt_model1)
+```
+
+Using the log transformed dependent variable improves our diagnostic plots. Our Residuals vs. Fitted plot shows points fairly evenly scattered around the y-axis, suggesting that our model meets the linearity assumption. The Scale-Location plot shows a fairly even cloud of points around the horizontal line; while the points above the line have a greater spread than those below, the plot suggests that our model is mostly homoscedastic. A Breusch-Pagan test shows that there is evidence of constant variance, supporting that we meet homoscedasticity assumption. A Durbin-Watson value of 1.9844 suggests that our model meets our independence assumption. 
+
+ Our Q-Q plot shows skewing at the tails suggesting that our model may not meet our normality assumption. A Shapiro-Wilk normality test with a very low p-value supports this assessment. However, this violation may be acceptable, as we know that our payout values will be right skewed due to lower payouts for lesser accidents such as minor "fender-benders;" there will be some edge cases with higher payouts for accidents with greater damage, such as those involving multiple-vehicles or personal injuries. This is evident in the Residual vs. Leverage plot which shows the presence of extreme values although they don't appear to have high leverage.
+
+
+#### Payout Model 3
+
+This model introduces MVR_PTS (Motor Vehicle Record Points) as a predictor under the assumption that drivers with MVR_PTS may be involved in accidents resulting in greater damage or may face a greater share of the financial liability if insurance companies have policies that restrict payout amounts for drivers with higher MVR_PTS. Our corresponding diagnostic plots show similar results as amt_model2.
+
+```{r amt_model3, echo=FALSE}
+
+amt_model3 <- lm(TARGET_AMT_LOG ~ BLUEBOOK_LOG + MVR_PTS, claims_only)
+summary(amt_model3)
+par(mfrow = c(2,2))
+plot(amt_model3)
+AIC(amt_model3, amt_model2)
+```
+
+
+#### Payout Model 4
+
+This Model introduces CAR_TYPE as an interaction predictor for BLUEBOOK_LOG to identify if type of car impacts payout amount. Our corresponding diagnostic plots show similar results as amt_model2.
+
+```{r amt_model4, echo=FALSE}
+
+amt_model4 <- lm(TARGET_AMT_LOG ~ BLUEBOOK_LOG * CAR_TYPE + MVR_PTS, claims_only)
+summary(amt_model4)
+par(mfrow = c(2,2))
+plot(amt_model4)
+AIC(amt_model4, amt_model3)
+```
+
+#### Payout Model 5: Gamma GLM
+
+Given that our dependent payout variable TARGET_AMT is highly right skewed and that out OLS models fail the linearity assumption, we can attempt a Gamma GLM with a Log link. This will also mean that we won't need to retransform the predicted payout amounts if we use a Gamma GLM model as our selected model.
+
+
+```{r gamma-model1, fig.width=6, fig.height=8, echo=FALSE}
+
+library(boot)
+library(faraway)
+
+amt_model5 <- glm(TARGET_AMT ~ BLUEBOOK_LOG,
+                     family = Gamma(link = "log"),
+                     data = claims_only)
+summary(amt_model5)
+
+
+par(mfrow = c(3,2))
+#glm.diag.plots(amt_model5, glm.diag(amt_model5))
+plot(amt_model5, which = c(1,3,4,5))
+plot(residuals(amt_model5, type = "deviance"))
+halfnorm(residuals(amt_model5, type = "deviance"))
+abline(0, 1, col = "red", lty = 2) 
+AIC(amt_model5, amt_model2)
+```
+
+
+Our Residual vs fitted plot shows some funneling suggesting that our data is heteroschedastic; however, this may be acceptable for our payout predictions when using GLM's. Our Scale-Location plot shows a roughly horizontal plot. Additionally, three observations are moderately influential (2038, 2063, and 1430). Our Residuals vs Leverage highlights the same points but they don't appear to exert much leverage on our model. Our deviance residuals show a random scatter around the 0, which suggests the gamma model is a good fit for our data. Our half-normal plot of the absolute deviance residuals shows points generally following the slope line, though we do see flaring on the right tail and note points 2038 and 1430 deviating from the line.
+
+```{r echo=FALSE}
+
+influence <- influence.measures(amt_model5)
+cooks_d <- influence$infmat[, "cook.d"]
+print(claims_only[which.max(cooks_d), ])
+```
+
+Looking closer at point 2038 shows that the policy holder had unusually high payout amount of 107586. However, it is not possible to tell if this is due to a data entry error or is representative of a true payout amount for an accident with greater damage.
+
+
+
+#### MQ: Fit Linear Model
 
 ```{r}
 lm_model <- lm(
@@ -989,9 +1180,9 @@ summary(lm_model)
 
 ```
 
-### Assumption Testing – Linear
+##### Assumption Testing – Linear
 
-### Linearity & Residual Plots
+##### Linearity & Residual Plots
 
 Explanation: p \> 0.05 = residuals are normally distributed (good!)
 
@@ -1008,14 +1199,14 @@ Residuals vs. Fitted: should show no pattern (linearity)
 
 Q-Q Plot: points should fall along diagonal (normality)
 
-### Normality of Residuals
+##### Normality of Residuals
 
 ```{r}
 shapiro.test(residuals(lm_model))
 
 ```
 
-### Multicollinearity
+##### Multicollinearity
 
 ```{r}
 
@@ -1024,7 +1215,46 @@ vif(lm_model)
 ```
 
 
-## MODEL EVALUATION
+
+
+#### Payout Model comparison
+```{r full-model-lrstats}
+
+library(vcdExtra)
+library(pscl)
+
+stats <- LRstats(amt_model1, amt_model2, amt_model3, amt_model4, amt_model5, lm_model)
+
+stats$McFaddenR2 <- NA 
+stats$CV_est_predict_err <- NA 
+stats$CV_adj_est <- NA 
+
+enhanceEvaluationMetrics <- function(df, model_name) {
+  model <- get(model_name)
+  model_data <- claims_only
+  print(model_name)
+  head(model)
+  
+  df[model_name, "McFaddenR2"] <- pR2(model)["McFadden"]
+  # Cross-Validation using 10 folsds
+  cv_result <- boot::cv.glm(model_data, model, K= 10)
+  df[model_name, "CV_est_predict_err"] <- cv_result$delta[1]
+  df[model_name, "CV_adj_est"] <- cv_result$delta[2]
+  
+  return(df) 
+}
+
+
+# Loop through the list of models and update the dataframe for each
+for (model_name in rownames(stats)) {
+  
+  #stats <- enhanceEvaluationMetrics(stats, model_name)
+}
+
+stats 
+```
+
+## MODEL SELECTION
 
 
 ### Make Predictions on Evaluation Data
@@ -1065,25 +1295,24 @@ eval_flag_pred <- ifelse(eval_probs > 0.5, 1, 0)
 
 ### Predict Cost for Crashers Only
 
-```{r}
-eval_amt_pred <- rep(0, nrow(eval))
-eval_crash_idx <- which(eval_flag_pred == 1)
-eval_amt_pred[eval_crash_idx] <- predict(lm_model, newdata = insurance_evaluation_df[eval_crash_idx, ])
+```{
+#eval_amt_pred <- rep(0, nrow(eval))
+#eval_crash_idx <- which(eval_flag_pred == 1)
+#eval_amt_pred[eval_crash_idx] <- predict(lm_model, newdata = #insurance_evaluation_df[eval_crash_idx, ])
 
 ```
 
 ### Final Combined Output
 
 ```{r}
-final_predictions <- eval %>%
-  select(INDEX) %>%
-  mutate(
-    PRED_TARGET_FLAG = eval_flag_pred,
-    PRED_TARGET_AMT = eval_amt_pred
-  )
+#final_predictions <- eval %>%
+#  select(INDEX) %>%
+#  mutate(
+#    PRED_TARGET_FLAG = eval_flag_pred,
+#    PRED_TARGET_AMT = eval_amt_pred
+#  )
 
-head(final_predictions)
-write_csv(final_predictions, "insurance_predictions.csv")
+#head(final_predictions)
 
 ```
 
