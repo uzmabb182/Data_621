@@ -35,12 +35,11 @@ library(car)
 
 ```{r}
 
-wine_training_df <- read_csv(" ")
+wine_training_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment5/wine-training-data.csv")
 
-wine_evaluation_df <- read_csv(" ")
+wine_evaluation_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment5/wine-evaluation-data.csv")
 
 head(wine_training_df)
 #head(wine_evaluation_df)
-
 
 ```
