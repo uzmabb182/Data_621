@@ -1,6 +1,6 @@
 ---
 title: "Assignment4_Data621"
-author: "Puja Roy, Mubashira Qari, Marco Castro"
+author: "Puja Roy, Mubashira Qari, Marco Castro, Zach Rose"
 date: "2025-03-23"
 format: pdf
 ---
@@ -1293,6 +1293,90 @@ eval_flag_pred <- ifelse(eval_probs > 0.5, 1, 0)
 
 ```
 
+### Logistic Regression Model Comparison
+
+```{r}
+model_list <- list(
+  model1 = model1,
+  model2 = model2,
+  model3 = model3,
+  model4 = model4,
+  model5 = model5,
+  logit_model = logit_model
+)
+```
+
+```{r}
+logit_eval_df <- data.frame(
+  Model = character(),
+  AIC = numeric(),
+  McFaddenR2 = numeric(),
+  Accuracy = numeric(),
+  Precision = numeric(),
+  Recall = numeric(),
+  Specificity = numeric(),
+  F1 = numeric(),
+  AUC = numeric(),
+  stringsAsFactors = FALSE
+)
+
+for (model_name in names(model_list)) {
+  model <- model_list[[model_name]]
+  
+if (model_name == "logit_model") {
+  df <- insurance_training_clean
+} else if (model_name %in% c("model4", "model5")) {
+  df <- df_training_one_hot
+} else {
+  df <- training_df
+}
+  
+  probs <- predict(model, newdata = df, type = "response")
+  preds <- ifelse(probs > 0.5, 1, 0)
+  
+  cm <- confusionMatrix(as.factor(preds), as.factor(df$TARGET_FLAG))
+  
+  roc_obj <- roc(df$TARGET_FLAG, probs)
+  auc_val <- as.numeric(roc_obj$auc)
+  
+  logit_eval_df <- rbind(logit_eval_df, data.frame(
+    Model = model_name,
+    AIC = AIC(model),
+    McFaddenR2 = pR2(model)["McFadden"],
+    Accuracy = cm$overall["Accuracy"],
+    Precision = cm$byClass["Precision"],
+    Recall = cm$byClass["Sensitivity"],
+    Specificity = cm$byClass["Specificity"],
+    F1 = cm$byClass["F1"],
+    AUC = auc_val
+  ))
+}
+
+knitr::kable(logit_eval_df, caption = "Logistic Regression Model Comparison")
+```
+
+After evaluating six logistic regression models, we selected model3 as the best binary classification model for predicting TARGET_FLAG. This model achieved the highest AUC (0.816) and highest accuracy (79.3%), while also maintaining a strong balance between precision (0.818) and recall (0.925). It demonstrated the highest McFadden R² (0.2299) and the lowest AIC (7327.13) among all models evaluated. Although model4 had a slightly lower AIC, its predictive metrics were marginally weaker, so model3 was prioritized for its superior performance and interpretability. For predicting TARGET_AMT, we compared six regression models. These included both standard linear models and a gamma GLM. We found that amt_model3, which includes BLUEBOOK_LOG and MVR_PTS as predictors for a log-transformed payout amount (TARGET_AMT_LOG), was the strongest overall. It achieved an AIC of 5179.6, the lowest among all linear models, and showed improved explanatory power over simpler versions. Both predictors were statistically significant, and diagnostic plots indicated acceptable performance across key assumptions. While the gamma GLM (amt_model5) handled skewness well, it had a much higher AIC (41282), and thus was not chosen.
+
+Overall, model3 for classification and amt_model3 for payout prediction provide the most reliable, interpretable, and statistically sound results. These models are recommended for deployment, with model3 used to first classify crashers, and amt_model3 used to estimate payout amounts for those predicted to crash.
+
+
+
+#### ROC Curve Comparison
+
+```{r}
+# Compare ROC curves visually
+plot(roc(training_df$TARGET_FLAG, predict(model1, type="response")), col = "blue", main = "ROC Curves for Logistic Models")
+lines(roc(training_df$TARGET_FLAG, predict(model2, type="response")), col = "green")
+lines(roc(training_df$TARGET_FLAG, predict(model3, type="response")), col = "orange")
+lines(roc(df_training_one_hot$TARGET_FLAG, predict(model4, type="response")), col = "purple")
+lines(roc(training_df$TARGET_FLAG, predict(model5, type="response")), col = "red")
+lines(roc(insurance_training_clean$TARGET_FLAG, predict(logit_model, type="response")), col = "black")
+legend("bottomright", legend = c("model1", "model2", "model3", "model4", "model5", "logit_model"),
+       col = c("blue", "green", "orange", "purple", "red", "black"), lty = 1, cex = 0.8)
+
+```
+
+
 ### Predict Cost for Crashers Only
 
 ```{
@@ -1323,4 +1407,5 @@ Everyone gets a binary prediction (crash or not).
 Only predicted crashers get a dollar amount predicted.
 
 Others remain at zero.
+
 
