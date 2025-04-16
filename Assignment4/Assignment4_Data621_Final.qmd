@@ -1,6 +1,6 @@
 ---
 title: "Assignment4_Data621"
-author: "Puja Roy, Mubashira Qari, Marco Castro, Zach Rose"
+author: "Puja Roy, Mubashira Qari, Marco Castro, Zach Rose, Erick Hadi"
 date: "2025-03-23"
 format: pdf
 ---
@@ -1388,7 +1388,7 @@ legend("bottomright", legend = c("model1", "model2", "model3", "model4", "model5
 
 ### Final Combined Output
 
-```{r bin-age}
+```{r}
 # Transform data by putting it into buckets using case_when
 testing_df_clean <- testing_df %>%
   mutate(
@@ -1403,7 +1403,7 @@ testing_df_clean <- testing_df %>%
 
 ```
 
-```{r bin-income}
+```{r}
 # Fix Income Grouping - Ensure proper quantile calculation
 income_quantiles <- quantile(testing_df$INCOME, probs = seq(0, 1, 0.25), na.rm = TRUE)
 
