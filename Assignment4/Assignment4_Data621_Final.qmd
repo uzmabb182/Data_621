@@ -252,7 +252,7 @@ for (colname in names(training_df)[factor_cols]) {
 
   plot_data <- training_df %>%
     group_by(TARGET_FLAG, group_var = .data[[colname]]) %>%
-    summarise(count = n(), .groups = "drop") %>%
+    dplyr::summarise(count = n(), .groups = "drop") %>%
     group_by(group_var) %>%
     mutate(
       percent = 100 * count / sum(count),
@@ -462,7 +462,7 @@ en_plots1 <- ggplot(training_df, aes(x = AVG_CLAIM)) +
 
 plot_data <- training_df %>%
   group_by(TARGET_FLAG, group_var = .data[['HIGH_RISK_CAR']]) %>%
-  summarise(count = n(), .groups = "drop") %>%
+  dplyr::summarise(count = n(), .groups = "drop") %>%
   group_by(group_var) %>%
   mutate(
     percent = 100 * count / sum(count),
@@ -662,7 +662,7 @@ for (colname in new_factor_cols) {
 
   plot_data <- training_df %>%
     group_by(TARGET_FLAG, group_var = .data[[colname]]) %>%
-    summarise(count = n(), .groups = "drop") %>%
+    dplyr::summarise(count = n(), .groups = "drop") %>%
     group_by(group_var) %>%
     mutate(
       percent = 100 * count / sum(count),
@@ -1387,7 +1387,7 @@ legend("bottomright", legend = c("model1", "model2", "model3", "model4", "model5
 ```
 
 ### Final Combined Output
-AGE_GROUP + LOG_BLUEBOOK + CAR_AGE + CAR_TYPE + CAR_USE + CLM_FREQ + EDUCATION + HOMEKIDS + LOG_HOME_VAL + INCOME_GROUP + JOB + KIDSDRIV  + MSTATUS + MVR_PTS + LOG_OLDCLAIM + PARENT1  + RED_CAR + REVOKED + SEX + TIF + TRAVTIME + URBANICITY + YOJ
+
 ```{r bin-age}
 # Transform data by putting it into buckets using case_when
 testing_df_clean <- testing_df %>%
@@ -1420,6 +1420,22 @@ testing_df_clean <- testing_df_clean %>%
 ```
 
 ```{r}
+testing_df_clean <- testing_df_clean %>%
+  mutate(
+    BLUEBOOK = ifelse(is.na(BLUEBOOK), 0.01, BLUEBOOK),
+    OLDCLAIM = ifelse(is.na(OLDCLAIM), 0.01, OLDCLAIM),
+    INCOME = ifelse(is.na(INCOME), 0.01, INCOME),
+    HOME_VAL = ifelse(is.na(INCOME), 0.01, HOME_VAL),
+    LOG_BLUEBOOK = log1p(BLUEBOOK),
+    LOG_OLDCLAIM = log1p(OLDCLAIM),
+    LOG_INCOME = log1p(INCOME),
+    LOG_HOME_VAL = log1p(HOME_VAL)
+  )
+
+
+```
+
+```{r}
 #final_predictions <- eval %>%
 #  select(INDEX) %>%
 #  mutate(
@@ -1430,7 +1446,21 @@ testing_df_clean <- testing_df_clean %>%
 #head(final_predictions)
 
 prediction <- predict(model3, testing_df_clean)
+testing_df_clean$TARGET_FLAG <- prediction
 
+testing_df_clean <- testing_df_clean  %>%
+ rename(
+    INCOME_LOG = LOG_INCOME,
+    HOME_VAL_LOG = LOG_HOME_VAL,
+    OLDCLAIM_LOG = LOG_OLDCLAIM,
+    BLUEBOOK_LOG = LOG_BLUEBOOK
+  )
+
+predictions_amt <- predict(amt_model3, testing_df_clean)
+testing_df_clean$TARGET_AMT <- predictions_amt
+
+
+head(testing_df_clean)
 ```
 
 Explanation:
