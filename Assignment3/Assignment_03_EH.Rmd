@@ -150,7 +150,8 @@ evaluate_model <- function(model, dataset, target_col, model_name) {
     F1 = cm$byClass["F1"],
     Deviance = model$deviance,
     R2 = 1 - model$deviance / model$null.deviance,
-    AIC = model$aic
+    AIC = model$aic,
+    BIC = model$bic
   )
   
   return(list(cm = cm, metrics = metrics))
@@ -159,18 +160,57 @@ evaluate_model <- function(model, dataset, target_col, model_name) {
 ```
 
 ```{r}
-results <- evaluate_model(model_1, crimetesting, target_col = "target", model_name = "Model #1")
-cm_1 <- results$cm
+results_1 <- evaluate_model(model_1, crimetesting, target_col = "target", model_name = "Model #1")
+cm_1 <- results_1$cm
 
-results <- evaluate_model(model_stepAIC, crimetesting, target_col = "target", model_name = "Model #2")
-cm_2 <- results$cm
+results_2 <- evaluate_model(model_stepAIC, crimetesting, target_col = "target", model_name = "Model #2")
+cm_2 <- results_2$cm
+
 
 cm_1
+results_1
 cm_2
-
+results_2
 ```
 
+```{r}
+anova_model_1 <- anova(model_1, test = "Chisq")
+anova_model_stepAIC <- anova(model_stepAIC, test = "Chisq")
 
+mcfadden_r2_model_1 <- 1 - (model_1$deviance / model_1$null.deviance)
+mcfadden_r2_model_stepAIC <- 1 - (model_stepAIC$deviance / model_stepAIC$null.deviance)
+
+
+accuracy_1 <- cm_1$overall["Accuracy"]
+precision_1 <- cm_1$byClass["Precision"]
+recall_1 <- cm_1$byClass["Recall"]
+
+accuracy_2 <- cm_2$overall["Accuracy"]
+precision_2 <- cm_2$byClass["Precision"]
+recall_2 <- cm_2$byClass["Recall"]
+
+library(pROC)
+roc_1 <- roc(crimetesting$target, predict(model_1, crimetesting, type = "response"))
+auc_1 <- auc(roc_1)
+
+roc_2 <- roc(crimetesting$target, predict(model_stepAIC, crimetesting, type = "response"))
+auc_2 <- auc(roc_2)
+
+estimated_error_1 <- 1 - accuracy_1
+estimated_error_2 <- 1 - accuracy_2
+
+cv_error_1 <- mean((crimetesting$target - predict(model_1, crimetesting, type = "response"))^2)
+cv_error_2 <- mean((crimetesting$target - predict(model_stepAIC, crimetesting, type = "response"))^2)
+
+results <- tibble(
+  Metric = c("LR Chisq", "Df", "Pr(>Chisq)", "McFadden R²", "Accuracy", "Precision", "Recall", "AUC", "Estimated Pred. Error", "Adj. CV Error"),
+  Model_1 = c(anova_model_1[2, "Deviance"], anova_model_1[2, "Df"], anova_model_1[2, "Pr(>Chi)"], mcfadden_r2_model_1, accuracy_1, precision_1, recall_1, auc_1, estimated_error_1, cv_error_1),
+  Model_2 = c(anova_model_stepAIC[2, "Deviance"], anova_model_stepAIC[2, "Df"], anova_model_stepAIC[2, "Pr(>Chi)"], mcfadden_r2_model_stepAIC, accuracy_2, precision_2, recall_2, auc_2, estimated_error_2, cv_error_2)
+)
+
+results
+
+```
 
 
 

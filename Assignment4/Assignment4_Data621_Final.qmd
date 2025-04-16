@@ -1387,6 +1387,37 @@ legend("bottomright", legend = c("model1", "model2", "model3", "model4", "model5
 ```
 
 ### Final Combined Output
+AGE_GROUP + LOG_BLUEBOOK + CAR_AGE + CAR_TYPE + CAR_USE + CLM_FREQ + EDUCATION + HOMEKIDS + LOG_HOME_VAL + INCOME_GROUP + JOB + KIDSDRIV  + MSTATUS + MVR_PTS + LOG_OLDCLAIM + PARENT1  + RED_CAR + REVOKED + SEX + TIF + TRAVTIME + URBANICITY + YOJ
+```{r bin-age}
+# Transform data by putting it into buckets using case_when
+testing_df_clean <- testing_df %>%
+  mutate(
+    AGE_GROUP = case_when(
+      AGE <= 25 ~ "Young",
+      AGE > 25 & AGE <= 40 ~ "Adult",
+      AGE > 40 & AGE <= 60 ~ "Middle Aged",
+      AGE > 60 ~ "Senior",
+      TRUE ~ NA_character_  # Handle missing values
+    )
+  )
+
+```
+
+```{r bin-income}
+# Fix Income Grouping - Ensure proper quantile calculation
+income_quantiles <- quantile(testing_df$INCOME, probs = seq(0, 1, 0.25), na.rm = TRUE)
+
+testing_df_clean <- testing_df_clean %>%
+  mutate(
+    INCOME_GROUP = case_when(
+      INCOME <= income_quantiles[2] ~ "Low",
+      INCOME > income_quantiles[2] & INCOME <= income_quantiles[3] ~ "Medium",
+      INCOME > income_quantiles[3] & INCOME <= income_quantiles[4] ~ "High",
+      INCOME > income_quantiles[4] ~ "Very High",
+      TRUE ~ NA_character_
+    )
+  )
+```
 
 ```{r}
 #final_predictions <- eval %>%
@@ -1397,6 +1428,8 @@ legend("bottomright", legend = c("model1", "model2", "model3", "model4", "model5
 #  )
 
 #head(final_predictions)
+
+prediction <- predict(model3, testing_df_clean)
 
 ```
 
