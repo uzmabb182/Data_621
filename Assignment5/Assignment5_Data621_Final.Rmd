@@ -420,7 +420,7 @@ i <- 1
 
 for (colname in names(wine_training_imputed)[numeric_cols]) {
   
-   if (colname == "Ph" | colname == "Alcohol"  | colname == "Density" ) {
+   if (colname == "pH" | colname == "Alcohol"  | colname == "Density" ) {
      plots[[i]]  <- ggplot(wine_training_imputed, aes(x = .data[[colname]])) +
        geom_histogram(fill = "#bbbf00", bins = 40) 
      i <- i + 1
