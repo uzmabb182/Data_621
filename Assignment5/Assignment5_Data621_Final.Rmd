@@ -83,6 +83,7 @@ Additionally, eight parameters had missing values ranging from 395 missing value
 missing <- colSums(is.na(wine_training_df))
 
 missing[missing > 0]
+
 ```
 
 ### Examining Numerical Variables
@@ -116,7 +117,7 @@ wine_properties <- tibble::tibble(
     "VolatileAcidity",
     "pH"
   ),
-  NormalRange = c(
+  CommonRange = c(
     "0 or higher",
     "8% – 15% ABV",
     "0.01 – 0.10 g/L",
@@ -141,8 +142,26 @@ below_zero_counts <-  numeric_df %>%
   )
 
 
-below_zero_counts %>%
+summary_stats <- lapply(numeric_df, function(x) {
+  if (is.numeric(x)) {
+    list(
+      Q25 = round(quantile(x, 0.25, na.rm = TRUE), 3),
+      Median = round(median(x, na.rm = TRUE), 3),
+      Q75 = round(quantile(x, 0.75, na.rm = TRUE), 3)
+    )
+  } else {
+    list(Q25 = NA, Median = NA, Q75 = NA)
+  }
+})
+
+tibble(
+  Variable = names(numeric_df),
+  Q25 = sapply(summary_stats, function(x) x$Q25),
+  Median = sapply(summary_stats, function(x) x$Median),
+  Q75 = sapply(summary_stats, function(x) x$Q75)
+) %>%
   left_join(wine_properties, by = "Variable") %>%
+  left_join(below_zero_counts, by = "Variable") %>%
   kable(caption="Number of negative values") 
 
 ```
@@ -161,7 +180,7 @@ numeric_df %>%
 
 ### Examining Categorical Variables
 
-Visualizing the distributions of out categorical variables helps ensure variables are treated as discrete categories, not continuous numbers. Our AcidIndex variable shows that majority of values fall between 6 and 11 with 342 observations collectively making up the remaining values. We may want to bin values for this parameter. Label Appeal has a normal distribution ranging from -2 to 2 and centered around 0. The our Wine rative variable STARS has the most missing values (3359) of any variable; of missing value, 61% of rows had 0 cases purchased. As would be expected, the majority of observations have a low STARS value (1/2), while few observations have a perfect value of 4.
+Visualizing the distributions of out categorical variables helps ensure variables are treated as discrete categories, not continuous numbers. Our AcidIndex variable shows that majority of values fall between 6 and 11 with 342 observations collectively making up the remaining values. We may want to bin values for this parameter. Label Appeal has a normal distribution ranging from -2 to 2 and centered around 0. The  Wine rative variable STARS has the most missing values (3359) of any variable; of missing value, 61% of rows had 0 cases purchased. As would be expected, the majority of observations have a low STARS value (1/2), while few observations have a perfect value of 4.
 
 ```{r factor-charts, fig.width=7, fig.height=6, echo=FALSE}
 
@@ -256,7 +275,7 @@ wrap_plots(plots, ncol = 3, nrow = 4, guides = "collect")
 
 Our skewness test confirms that our numerical variables are nearly symmetrical or almost symmetrical.
 
-```{r skewness}
+```{r skewness, echo=FALSE}
 
 # Calculate skewness for each numeric variable (using original values)
 skew_vals <- sapply(numeric_df |> subset(select=-c(TARGET)), function(x) skewness(x, na.rm = TRUE, type = 3))
@@ -319,14 +338,27 @@ car::vif(full_lm_model)
 
 ### Handling Negative Values
 
-In the Data Exploration phase, we discovered that nine out of 11 numerical variables had negative values. While Poisson and Negative Binomial Regression will allow negative predictor values, we know that these values are impossible in the read world. Thus, ignoring these values could lead to biased coefficient estimates that could introduce highly misleading relationships in our models. We will assume that these erronous values may be the result of data entry or normalization errors and attempt to address them.
+In the Data Exploration phase, we discovered that nine out of 11 numerical variables had negative values. While Poisson and Negative Binomial Regression will allow negative predictor values, we know that these values are impossible in the read world. Ignoring these values could lead to biased coefficient estimates that could introduce highly misleading relationships in our models. We will assume that these erronous values may be the result of data entry or normalization errors and attempt to address them.
 
- As we do not know what transformations may have been applied if normalization occurred, we will need to address the negative values through another method. From our earlier observations, we noted that nearly all of the affected parameters had thousands of affected records, with Chlorides having the most affects rows (3197). This means that nearly 1/4 of our 12,795 may be affected one way or another and we would loose too much data if we were to drop the affected records. We will instead only drop the 118 records with for Alcohol Content as it is a low percentage of the dataset since some of these records may also have negative values; we will then set the remaining negative values to N/A, allowing the values to be imputed if desired. Imputing may introduce some bias into our results, but will retain much of our data. 
+ As we do not know what transformations may have been applied if normalization occurred, we will need to address the negative values through another method. From our earlier observations, we noted that nearly all of the affected parameters had thousands of affected records, with Chlorides having the most affects rows (3197). This means that nearly 1/4 of our 12,795 may be affected one way or another and we would loose too much data if we were to drop the affected records. We will instead only drop the 118 records with for Alcohol Content as it is a small fraction of the total rows in our  dataset. We will then set the remaining negative values to N/A, allowing the values to be imputed if desired. Imputing may introduce some bias into our results, but will retain much of our data; dropping these 118 rows may somewhat help reduce this bias. 
 
 ```{r handle-negative, echo=FALSE}
 
+wine_training_flagged <- wine_training_df |>
+  mutate(
+    across(all_of(names(wine_training_df)[numeric_cols]),
+      .fns = list(
+        flag_neg = ~ ifelse(. < 0, 1, 0)
+      ),
+      .names = "{.col}_{.fn}"
+    )
+  ) |>
+  mutate(
+    STARS_na = ifelse(is.na(STARS), 1, 0)
+  ) 
+
 wine_training_non_neg <- wine_training_df |>
-  filter(Alcohol > 0)
+  filter(Alcohol > 0 | is.na(Alcohol))
   
 for (colname in names(wine_training_non_neg)[numeric_cols]) {
   
@@ -343,15 +375,24 @@ for (colname in names(wine_training_non_neg)[numeric_cols]) {
 
 ### Handling Missing Values
 
+Given that we don't know if our data was previously transformed, we will apply median imputation to our variables with missing data. This method was preferred over multiple imputation or other techniques as it is easier to understand how we have altered the data and simpler to . Additionally, Multiple-imputation may magnify additional bias that may have been introduced if the data was previously transformed. We won't impute values for STARS since this appears to be an indication that a rating was not given to these observations. When exploring our data, we noticed that 61% of the wines without a STAR rating had zero (0) cases purchased. As such, a NA value may represent useful data for our model. We will convert this variable to -1 for interpretability by our model.
+
 ```{r impute-missing, echo=FALSE}
 
-wine_training_imputed <- wine_training_non_neg
+wine_training_imputed <- wine_training_non_neg |>
+  mutate(
+    STARS = as.factor(ifelse(is.na(as.numeric(STARS)), -1, as.numeric(STARS)))
+  )
+
+missing <- colSums(is.na(wine_training_imputed))
 
 # Impute missing values in those columns using median
 for (col in names(wine_training_imputed[missing > 0])) {
   median_val <- median(as.numeric(wine_training_imputed[[col]]), na.rm = TRUE)
   wine_training_imputed[[col]][is.na(wine_training_imputed[[col]])] <- median_val
 }
+
+
 
 kable(
   data.frame(
@@ -363,12 +404,73 @@ kable(
 
 ```
 
+### Transformations
+
+Dropping our negative values and imputing our missing values introduced skewness into most of the numerical variables. All variables but Alcohol, Density and pH have are right—skewed  --though the right tail for FixedAcidity and TotalSulfurDioxide are relatively moderal compared the heavy right tails of the other variables.
+
+
+```{r distributions2, fig.width=7, fig.height=5, echo=FALSE, message = FALSE, warning=FALSE}
+
+plots <- list()  
+i <- 1
+
+for (colname in names(wine_training_imputed)[numeric_cols]) {
+  
+  if (is.numeric(wine_training_imputed[[colname]]) && !is.na(colname) && colname != "TARGET") {
+     plots[[i]]  <- ggplot(wine_training_imputed, aes(x = .data[[colname]])) +
+       geom_histogram(fill = "#ffbf00", bins = 40) 
+     i <- i + 1
+  }
+}
+
+
+wrap_plots(plots, ncol = 3, nrow = 4, guides = "collect")
+```
+
+We can apply log transformation to these variables to help address skewness.
+
+```{r log-transformations, echo=FALSE}
+
+wine_training_clean <- wine_training_imputed |>
+  mutate(
+    Chlorides = log1p(Chlorides),
+    CitricAcid = log1p(CitricAcid),
+    FixedAcidity = log1p(FixedAcidity),
+    FreeSulfurDioxide = log1p(FreeSulfurDioxide),
+    ResidualSugar = log1p(ResidualSugar),
+    Sulphates = log1p(Sulphates),
+    TotalSulfurDioxide = log1p(TotalSulfurDioxide),
+    VolatileAcidity = log1p(VolatileAcidity)
+  )
+
+```
+
+
+```{r distributions3, fig.width=7, fig.height=5, echo=FALSE, message = FALSE, warning=FALSE}
+
+plots <- list()  
+i <- 1
+
+for (colname in names(wine_training_clean)[numeric_cols]) {
+  
+  if (is.numeric(wine_training_clean[[colname]]) && !is.na(colname) && colname != "TARGET") {
+     plots[[i]]  <- ggplot(wine_training_clean, aes(x = .data[[colname]])) +
+       geom_histogram(fill = "#ffbf00", bins = 40) 
+     i <- i + 1
+  }
+}
+
+wrap_plots(plots, ncol = 3, nrow = 4, guides = "collect")
+```
+
+
+
 ### Binned Transformation 
 
 To simplify the effects of AcidIndex, this variable was transformed into categorical bins. This can help reduce the influence of extreme values and better capture non-linear effects in logistic regression.
 
 
-```{r binning, echo=FALSE}
+```{r binning, fig.width=4, fig.height=3, echo=FALSE}
 # Create bins 
 
 wine_training_df$AcidIdx <- cut(as.numeric(wine_training_df$AcidIndex),
@@ -389,8 +491,13 @@ wine_training_imputed$AcidIdx <- cut(as.numeric(wine_training_imputed$AcidIndex)
                   include.lowest = TRUE, 
                   right = TRUE)
 
+wine_training_clean$AcidIdx <- cut(as.numeric(wine_training_clean$AcidIndex),
+                  breaks = c(1, 3, 4, 5, 6, Inf),  
+                  labels = c("1-6", "7","8","9", "10+"),
+                  include.lowest = TRUE, 
+                  right = TRUE)
 
-ggplot(wine_training_df, aes(x=AcidIdx, fill=factor(TARGET, levels = 8:0))) +
+ggplot(wine_training_clean, aes(x=AcidIdx, fill=factor(TARGET, levels = 8:0))) +
   geom_bar() +
    scale_fill_manual(values = factorColors) +
     theme_minimal() +
@@ -400,16 +507,18 @@ ggplot(wine_training_df, aes(x=AcidIdx, fill=factor(TARGET, levels = 8:0))) +
 ```
 
 
-### Transformations
+### Outliers
+
+Diagnostic plots show several points with relatively high Cook's distance values when compared to rest of our data. 
 
 ```{r base_model-diagnostic-plots, fig.width=6, fig.height=3, echo=FALSE}
-layout(matrix(1:2, nrow = 1, byrow = TRUE))
-plot(full_lm_model, which = c(4, 5), col=wine_training_df$TARGET,  id.n = 5)
+layout(matrix(1:2, ncol=2, nrow = 2, byrow = TRUE))
+full_lm_model <- lm(TARGET ~ ., data = wine_training_clean)
+plot(full_lm_model, which = c(4, 6),  id.n = 5)
 par(mfrow = c(1, 1))
 
+
 ```
-
-
 
 
 ## Model Building
