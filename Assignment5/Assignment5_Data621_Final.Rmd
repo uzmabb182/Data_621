@@ -182,11 +182,9 @@ numeric_df %>%
 
 Visualizing the distributions of out categorical variables helps ensure variables are treated as discrete categories, not continuous numbers. Our AcidIndex variable shows that majority of values fall between 6 and 11 with 342 observations collectively making up the remaining values. We may want to bin values for this parameter. Label Appeal has a normal distribution ranging from -2 to 2 and centered around 0. The  Wine rative variable STARS has the most missing values (3359) of any variable; of missing value, 61% of rows had 0 cases purchased. As would be expected, the majority of observations have a low STARS value (1/2), while few observations have a perfect value of 4.
 
-```{r factor-charts, fig.width=7, fig.height=6, echo=FALSE}
+```{r factor-charts, fig.width=7, fig.height=8, echo=FALSE}
 
 # Show bar charts for factors
-
-summary(wine_training_df[factor_cols])
 
 plots <- list()  
 i <- 1
@@ -220,7 +218,7 @@ factorColors <-  c(
   # Plot   
  plots[[i]]  <- ggplot(plot_data, aes(x = group_var, y = count, fill = TARGET, label = label)) +
     geom_col(position = "stack") +
-    geom_text(position = position_stack(0.5), size = 3) +
+    geom_text(position = position_stack(0.5), size = 2) +
     labs(
       title = paste("Distribution of", colname, "by TARGET"),
       x = colname,
@@ -231,7 +229,7 @@ factorColors <-  c(
     theme_minimal() +
     theme(
       plot.title = element_blank(),
-      axis.title.x = element_text(size = 6),
+      axis.title.x = element_text(size =5),
       axis.text.x = element_text(angle = 45, hjust = 1)
     )
     
@@ -245,15 +243,17 @@ wrap_plots(plots[2:3], ncol = 2, guides = "collect") ) & theme(legend.position =
 
 layout(1)
 par(mfrow = c(1, 1))
+
+
+summary(wine_training_df[factor_cols])
 ```
 
 
 
 
-\newpage
 ### Visualizing Distributions
 
-Next we will visualize the distributions for our numeric variables. Using the histograms, we can quickly spot skewness, check distribution and value ranges, and identify variables with spikes or unusual spread. The histograms show symmetric unimodal distributions strongly peaked with thin tails across our numeric variables. 
+Next we will visualize the distributions for our numeric variables. Using the histograms, we can quickly spot skewness, check distribution and value ranges, and identify variables with spikes or unusual spread. The histograms show symmetric unimodal distributions strongly peaked with thin tails across our numeric variables. However, as noted earlier, negative values for many of these parameters would be impossible.
 
 ```{r distributions1, fig.width=7, fig.height=7, echo=FALSE, message = FALSE, warning=FALSE}
 
@@ -273,6 +273,8 @@ for (colname in names(numeric_df)[numeric_cols]) {
 wrap_plots(plots, ncol = 3, nrow = 4, guides = "collect")
 ```
 
+\newpage
+
 Our skewness test confirms that our numerical variables are nearly symmetrical or almost symmetrical.
 
 ```{r skewness, echo=FALSE}
@@ -290,13 +292,13 @@ skew_df <- data.frame(
 skew_df <- skew_df[order(-abs(skew_df$Skewness)), ]
 
 # Show top 10 most skewed variables (untransformed)
-head(skew_df, 10)
+kable(skew_df, caption = "Skewness")
 
 ```
 
 ### Visualizing Relationships Among Variables
 
-Correlation plots help us understand variable relationships and potential multicollinearity. A correlation plot for all variables shows moderate correlation between our dependent variable TARGET and the variables STARS and LabelAppeal and weak correlation between TARGET and AcidIndex.
+Correlation plots help us understand variable relationships and potential multicollinearity. A correlation plot for all variables shows moderate correlation between our dependent variable TARGET and the variables STARS and LabelAppeal and weak correlation between TARGET and AcidIndex. STARS, LabelAppeal, and AcidIndex are also three parameters that we identified to be ordinal.
 
 
 ```{r corrplot1, echo=FALSE}
@@ -309,7 +311,8 @@ corrplot(cor_matrix, method = "color", tl.cex = 0.8)
 
 ```
 
-STARS, LabelAppeal, and AcidIndex are also three parameters that we identified to be ordinal. The following correlation plot shows the correlation between the remaining numerical parameters. This view also groups the parameters into four clusters that appear to have a relationship with each other. 
+\newpage
+The following correlation plot shows the correlation between only the numerical parameters. This view also groups the parameters into four clusters that appear to have a relationship with each other. 
 
 ```{r corrplot2, echo=FALSE }
 
@@ -404,9 +407,10 @@ kable(
 
 ```
 
+
 ### Transformations
 
-Dropping our negative values and imputing our missing values introduced skewness into most of the numerical variables. All variables but Alcohol, Density and pH have are right—skewed  --though the right tail for FixedAcidity and TotalSulfurDioxide are relatively moderal compared the heavy right tails of the other variables.
+Dropping our negative values and imputing our missing values introduced skewness into most of the numerical variables. All variables but Alcohol, Density and pH have are right—skewed  --though the right tail for FixedAcidity and TotalSulfurDioxide are relatively moderate compared the heavy right tails of the other variables. We can apply log transformation to these variables to help address skewness.
 
 
 ```{r distributions2, fig.width=7, fig.height=5, echo=FALSE, message = FALSE, warning=FALSE}
@@ -416,7 +420,16 @@ i <- 1
 
 for (colname in names(wine_training_imputed)[numeric_cols]) {
   
-  if (is.numeric(wine_training_imputed[[colname]]) && !is.na(colname) && colname != "TARGET") {
+   if (colname == "Ph" | colname == "Alcohol"  | colname == "Density" ) {
+     plots[[i]]  <- ggplot(wine_training_imputed, aes(x = .data[[colname]])) +
+       geom_histogram(fill = "#bbbf00", bins = 40) 
+     i <- i + 1
+  }
+}
+
+for (colname in names(wine_training_imputed)[numeric_cols]) {
+  
+   if (is.numeric(wine_training_imputed[[colname]]) && !is.na(colname) && colname != "TARGET" && colname != "Alcohol"  && colname != "Density"  && colname != "pH") {
      plots[[i]]  <- ggplot(wine_training_imputed, aes(x = .data[[colname]])) +
        geom_histogram(fill = "#ffbf00", bins = 40) 
      i <- i + 1
@@ -424,10 +437,15 @@ for (colname in names(wine_training_imputed)[numeric_cols]) {
 }
 
 
-wrap_plots(plots, ncol = 3, nrow = 4, guides = "collect")
+wrap_plots(plots, ncol = 3, nrow = 4, guides = "collect") +
+  plot_annotation(
+    title = "Numerical Variables - Before Transformation",
+    theme = theme(plot.title = element_text(size = 10, hjust = 0.5))
+  )
 ```
 
-We can apply log transformation to these variables to help address skewness.
+---
+
 
 ```{r log-transformations, echo=FALSE}
 
@@ -446,25 +464,29 @@ wine_training_clean <- wine_training_imputed |>
 ```
 
 
-```{r distributions3, fig.width=7, fig.height=5, echo=FALSE, message = FALSE, warning=FALSE}
+```{r distributions3, fig.width=7, fig.height=4, echo=FALSE, message = FALSE, warning=FALSE}
 
 plots <- list()  
 i <- 1
 
 for (colname in names(wine_training_clean)[numeric_cols]) {
   
-  if (is.numeric(wine_training_clean[[colname]]) && !is.na(colname) && colname != "TARGET") {
+  if (is.numeric(wine_training_clean[[colname]]) && !is.na(colname) && colname != "TARGET" && colname != "Alcohol"  && colname != "Density"  && colname != "pH") {
      plots[[i]]  <- ggplot(wine_training_clean, aes(x = .data[[colname]])) +
-       geom_histogram(fill = "#ffbf00", bins = 40) 
+       geom_histogram(fill = "#ffb999", bins = 40) 
      i <- i + 1
   }
 }
 
-wrap_plots(plots, ncol = 3, nrow = 4, guides = "collect")
+wrap_plots(plots, ncol = 3, nrow = 3, guides = "collect") +
+  plot_annotation(
+    title = "Numerical Variables - Post Transformation",
+    theme = theme(plot.title = element_text(size = 10, hjust = 0.5))
+  )
 ```
 
 
-
+\newpage 
 ### Binned Transformation 
 
 To simplify the effects of AcidIndex, this variable was transformed into categorical bins. This can help reduce the influence of extreme values and better capture non-linear effects in logistic regression.
