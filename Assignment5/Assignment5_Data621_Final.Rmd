@@ -88,7 +88,7 @@ missing[missing > 0]
 
 ### Examining Numerical Variables
 
-A review of the summary statistics reveals issues with our data. In particular, nine of the 11 numeric variables show minimum values below zero.  Table 1 shows number of missing values.
+A review of the summary statistics reveals issues with our data. In particular, nine of the 11 numeric variables show minimum values below zero.  Table 1 shows number of negative values.
 
 
 ```{r data-summaries, echo=FALSE}
