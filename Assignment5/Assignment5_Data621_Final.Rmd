@@ -1,533 +1,421 @@
 ---
-title: "Assignment5_Data621_MQ"
-author: "Mubashira Qari"
+title: "Assignment5_Data621"
+author: "Mubashira Qari, Marco Castro"
 date: "2025-04-13"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
 ---
 
-### Objective:
-
-The goal is to build a count regression model to predict the number of wine cases sold (TARGET), based on wine characteristics.
-
-### Load Libraries
-
-```{r, warning = FALSE, message = FALSE}
+```{r, warning = FALSE, message = FALSE, echo=FALSE, include=FALSE}
 # Load required packages
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
 library(htmltools)
+library(knitr)
+library(RColorBrewer)
+library(DataExplorer)
+#library(skimr)
+library(recipes)
+library(corrplot)
+library(MASS)
 library(caret)
 library(pROC)
-library(tidyverse)
-library(ggplot2)
-library(dplyr)
-library(corrplot)
-library(skimr)
-require(DataExplorer)
-require(miscTools)
-require(MASS)
-require(performance)
-require(lmtest)
-require(mice)
-require(glmnet)
-require(Metrics) 
-library(patchwork)  # for combining ggplots
+library(miscTools)
+library(performance)
+library(lmtest)
+library(mice)
+library(glmnet)
+library(Metrics) 
+library(patchwork)  
 library(e1071)
-library(car)
+#library(car)
+```
+
+## Data Exploration
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE, include=FALSE }
+
+# load the dataset and understand its structure
+
+training_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment5/wine-training-data.csv")
+
+evaluation_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment5/wine-evaluation-data.csv")
 
 ```
 
-###  load the dataset and understand its structure.
+The training dataset has 12,795 observations across 15 columns and an additional INDEX column. For the purposes of our analysis, we will drop the INDEX column. The parameters STARS, AcidIndex, LabelAppeal appear to be categorical, while the remaining 12 variables, including our TARGET variable, appear numerical. The number of cases purchased (TARGET) ranges from 0-8. Roughly 21.4% (2734) of our observations had a TARGET value of zero.
 
-```{r, warning = FALSE, message = FALSE}
-# echo=FALSE, include=FALSE
+```{r exploration, echo=FALSE}
 
-wine_training_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment5/wine-training-data.csv")
-
-wine_evaluation_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment5/wine-evaluation-data.csv")
-
-head(wine_training_df)
-#head(wine_evaluation_df)
-
-```
-```{r}
-# Count missing values
-any(is.na(wine_training_df))
-sum(is.na(wine_training_df))
-colSums(is.na(wine_training_df))
-```
+wine_training_df <- training_df %>%
+  subset(select =-c(INDEX)) %>%
+  dplyr::select(
+    all_of(c("TARGET")),
+    sort(setdiff(names(.), c("TARGET")))
+  ) %>%
+  mutate(
+    STARS = as.factor(STARS),
+    AcidIndex = as.factor(AcidIndex),
+    LabelAppeal = as.factor(LabelAppeal)
+  )
+ 
+glimpse(wine_training_df)
 
 
-```{r}
-
-colSums(is.na(wine_training_df))
-```
-### Identifying and Handling missing Values:
-
-```{r}
-# Identify numeric columns with missing values
-numeric_cols <- sapply(wine_training_df, is.numeric)
-cols_with_na <- colnames(wine_training_df)[numeric_cols & colSums(is.na(wine_training_df)) > 0]
-
-# Impute missing values in those columns using median
-for (col in cols_with_na) {
-  median_val <- median(wine_training_df[[col]], na.rm = TRUE)
-  wine_training_df[[col]][is.na(wine_training_df[[col]])] <- median_val
-}
-colSums(is.na(wine_training_df))
-
-```
-### Visualizing Relationships among Variables:
-
-Correlation plots help us understand variable relationships and potential multicollinearity.
-
-
-```{r}
-# Correlation matrix (exclude non-numeric or identifier variables)
-cor_matrix <- cor(wine_training_df %>% select_if(is.numeric), use = "complete.obs")
-corrplot(cor_matrix, method = "color", tl.cex = 0.8)
-
-
-```
-```{r}
-# Load necessary libraries
-library(corrplot)
-library(dplyr)
-
-# 1. Select only numeric columns
 numeric_df <- wine_training_df %>%
-  dplyr::select(where(is.numeric))
+  dplyr::select(where(is.numeric))  
 
-# 2. Remove columns with all NA or constant values (optional but recommended)
-numeric_df <- numeric_df[, sapply(numeric_df, function(x) length(unique(x[!is.na(x)])) > 1)]
+numeric_cols <- sapply(wine_training_df, is.numeric)
+factor_cols <- sapply(wine_training_df, is.factor)
 
-# 3. Compute correlation matrix
-cor_matrix <- cor(numeric_df, use = "pairwise.complete.obs", method = "pearson")
+table(wine_training_df$TARGET)
+```
 
-# 4. Visualize the correlation matrix
-corrplot(cor_matrix,
-         method = "color",           # Use colored squares
-         type = "upper",             # Show only upper triangle
-         tl.cex = 0.8,               # Text label size
-         addCoef.col = "black",      # Show correlation values
-         number.cex = 0.7,           # Size of the coefficients
-         tl.col = "black",           # Text label color
-         diag = FALSE)               # Hide diagonal
+### Missing Values
+
+Additionally, eight parameters had missing values ranging from 395 missing values (pH) to 3359 missing values (STARS). Below is the full list of variables with missing values:
+
+```{r missing-values, echo=FALSE}
+# Count missing values
+missing <- colSums(is.na(wine_training_df))
+
+missing[missing > 0]
+```
+
+### Examining Numerical Variables
+
+A review of the summary statistics reveals issues with our data. In particular, nine of the 11 numeric variables show minimum values below zero.  Table 1 shows number of missing values.
+
+
+```{r data-summaries, echo=FALSE}
+
+summary(wine_training_df[numeric_cols])
 
 ```
-```{r}
 
-library(dplyr)
 
-wine_features <- dplyr::select(wine_training_df, -INDEX)
-#wine_features
-# Load required package
-library(car)
+When put in the context of our specific properties of wine they represent, these negative values appear to be erroneous. For example, we expected `Alcohol Content` to have a minimum value of zero instead of a negative value. The same can be said of the other parameters with negative values (Chlorides, Citric Acid, Fixed Acidity, Free Sulfur Dioxide, Residual Sugar, Sulphates, Total Sulfur Dioxie, and Volatile Acidity). This suggests possible data entry errors or normalization that shifted our actual values to the left. 
 
-# Fit linear model using all remaining features to predict TARGET
-vif_model <- lm(TARGET ~ ., data = wine_features)
+```{r negative-values, echo=FALSE}
 
-# Compute VIF values
-vif_values <- vif(vif_model)
+wine_properties <- tibble::tibble(
+  Variable = c(
+    "TARGET",
+    "Alcohol",
+    "Chlorides",
+    "CitricAcid",
+    "Density",
+    "FixedAcidity",
+    "FreeSulfurDioxide",
+    "ResidualSugar",
+    "Sulphates",
+    "TotalSulfurDioxide",
+    "VolatileAcidity",
+    "pH"
+  ),
+  NormalRange = c(
+    "0 or higher",
+    "8% – 15% ABV",
+    "0.01 – 0.10 g/L",
+    "0 – 1.0 g/L",
+    "0.990 – 1.005 g/cm³",
+    "4 – 9 g/L",
+    "10 – 70 mg/L",
+    "0 – 45 g/L",
+    "0.3 – 1.0 g/L",
+    "30 – 150 mg/L",
+    "0.2 – 0.8 g/L",
+    "2.9 – 4.0"
+  )
+)
 
-# View all VIF values
-print(vif_values)
+below_zero_counts <-  numeric_df %>%
+  summarise(across(everything(), ~ sum(. < 0, na.rm = TRUE)))  %>%
+  pivot_longer(
+    cols = everything(),      
+    names_to = "Variable",    
+    values_to = "Rows Below Zero"       
+  )
 
-# Optional: Filter features with VIF > 5 (multicollinearity concern)
-high_vif <- vif_values[vif_values > 5]
-print(high_vif)
 
-# Column positions of high VIF variables in wine_features
-which(names(vif_values) %in% names(high_vif))
+below_zero_counts %>%
+  left_join(wine_properties, by = "Variable") %>%
+  kable(caption="Number of negative values") 
 
 ```
-All very close to 1, ranging from ~1.00 to ~1.10
 
-No variable has a VIF > 5
+A look at our boxplots shows the IQR's for each parameter are centered around a similar x-axis for each of our case counts. The boxplots confirm the presence of  extreme values at lower as well as on the upper ranges.  It should be noted the IQRs for the affected variables are in line with their corresponding typical ranges according to [VineEnology.com](https://www.vinoenology.com/wine-composition/) as shown in Table 1. 
 
-Final filtered output named numeric(0) and integer(0) means:
+```{r explore-boxplot-p2, fig.width=7, fig.height=9, echo=FALSE, message = FALSE, warning=FALSE}
 
-No variables exceeded the multicollinearity threshold you set (probably VIF > 5)
+numeric_df %>% 
+  mutate(TARGET = as.factor(TARGET)) %>% 
+  drop_na() %>%
+  plot_boxplot(by = "TARGET", title="Boxplots of Target vs Param", ncol = 2)
 
-### Detect Skewed Variables
+```
 
-```{r}
-# Load e1071 for skewness
-library(e1071)
 
-# 1. Keep only numeric columns
-numeric_df <- wine_training_df[sapply(wine_training_df, is.numeric)]
+### Examining Categorical Variables
 
-# 2. Remove identifier and target columns if present
-numeric_df <- numeric_df[ , !(names(numeric_df) %in% c("INDEX", "TARGET"))]
+Visualizing the distributions of out categorical variables helps ensure variables are treated as discrete categories, not continuous numbers. Our AcidIndex variable shows that majority of values fall between 6 and 11 with 342 observations collectively making up the remaining values. We may want to bin values for this parameter. Label Appeal has a normal distribution ranging from -2 to 2 and centered around 0. The our Wine rative variable STARS has the most missing values (3359) of any variable; of missing value, 61% of rows had 0 cases purchased. As would be expected, the majority of observations have a low STARS value (1/2), while few observations have a perfect value of 4.
 
-# 3. Calculate skewness for each numeric variable (using original values)
-skew_vals <- sapply(numeric_df, function(x) skewness(x, na.rm = TRUE))
+```{r factor-charts, fig.width=7, fig.height=6, echo=FALSE}
 
-# 4. Create a dataframe with skewness
+# Show bar charts for factors
+
+summary(wine_training_df[factor_cols])
+
+plots <- list()  
+i <- 1
+
+for (colname in names(wine_training_df)[factor_cols]) {
+  
+  if (colname != 'TARGET') {
+  
+  plot_data <- wine_training_df %>%
+    group_by(TARGET, group_var = .data[[colname]]) %>%
+    dplyr::summarise(count = n(), .groups = "drop") %>%
+    group_by(group_var) %>%
+    mutate(
+      percent = 100 * count / sum(count),
+      label = paste0(round(percent), "%")
+    ) %>%
+    mutate(TARGET = factor(TARGET, levels = 8:0)) 
+
+factorColors <-  c(
+    "0" = "gray",
+    "1" = "pink",
+    "2" = "cyan",
+    "3" = "yellow",
+    "4" = "orange",
+    "5" = "purple",
+    "6" = "green",
+    "7" = "blue",
+    "8" = "red"
+    )
+
+  # Plot   
+ plots[[i]]  <- ggplot(plot_data, aes(x = group_var, y = count, fill = TARGET, label = label)) +
+    geom_col(position = "stack") +
+    geom_text(position = position_stack(0.5), size = 3) +
+    labs(
+      title = paste("Distribution of", colname, "by TARGET"),
+      x = colname,
+      y = "Count",
+      fill = "# Cases" 
+    ) +
+   scale_fill_manual(values = factorColors) +
+    theme_minimal() +
+    theme(
+      plot.title = element_blank(),
+      axis.title.x = element_text(size = 6),
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+    
+    i <- i + 1
+  }
+}
+
+( wrap_plots(plots[1], ncol = 1, guides = "collect") /
+wrap_plots(plots[2:3], ncol = 2, guides = "collect") ) & theme(legend.position = "bottom")
+
+
+layout(1)
+par(mfrow = c(1, 1))
+```
+
+
+
+
+\newpage
+### Visualizing Distributions
+
+Next we will visualize the distributions for our numeric variables. Using the histograms, we can quickly spot skewness, check distribution and value ranges, and identify variables with spikes or unusual spread. The histograms show symmetric unimodal distributions strongly peaked with thin tails across our numeric variables. 
+
+```{r distributions1, fig.width=7, fig.height=7, echo=FALSE, message = FALSE, warning=FALSE}
+
+plots <- list()  
+i <- 1
+
+for (colname in names(numeric_df)[numeric_cols]) {
+  
+  if (!is.na(colname) && colname != "TARGET") {
+     plots[[i]]  <- ggplot(numeric_df, aes(x = .data[[colname]])) +
+       geom_histogram(fill = "#ffbf00", bins = 40) 
+     i <- i + 1
+  }
+}
+
+
+wrap_plots(plots, ncol = 3, nrow = 4, guides = "collect")
+```
+
+Our skewness test confirms that our numerical variables are nearly symmetrical or almost symmetrical.
+
+```{r skewness}
+
+# Calculate skewness for each numeric variable (using original values)
+skew_vals <- sapply(numeric_df |> subset(select=-c(TARGET)), function(x) skewness(x, na.rm = TRUE, type = 3))
+
+# Create a dataframe with skewness
 skew_df <- data.frame(
   Variable = names(skew_vals),
   Skewness = skew_vals
 )
 
-# 5. Sort by highest absolute skewness
+# Sort by highest absolute skewness
 skew_df <- skew_df[order(-abs(skew_df$Skewness)), ]
 
-# 6. Show top 10 most skewed variables (untransformed)
+# Show top 10 most skewed variables (untransformed)
 head(skew_df, 10)
 
 ```
 
-AcidIndex	1.65	Highly right-skewed	- consider log() or sqrt()
-STARS	0.56	Moderately right-skewed	- Possibly bin or treat as ordinal/factor
+### Visualizing Relationships Among Variables
+
+Correlation plots help us understand variable relationships and potential multicollinearity. A correlation plot for all variables shows moderate correlation between our dependent variable TARGET and the variables STARS and LabelAppeal and weak correlation between TARGET and AcidIndex.
 
 
-```{r}
-# Load libraries
-library(ggplot2)
-library(patchwork)
-
-# Example: If your top skewed vars aren't defined, use dummy fallback
-# Replace with actual top skewed variables as needed
-top_skewed_vars <- c("ResidualSugar", "TotalSulfurDioxide", "Chlorides")
-
-# Create 3 ggplot histograms
-p1 <- ggplot(wine_training_df, aes_string(x = top_skewed_vars[1])) +
-  geom_histogram(bins = 30, fill = "#2c7fb8", color = "white") +
-  labs(title = paste("Histogram of", top_skewed_vars[1])) +
-  theme_minimal()
-
-p2 <- ggplot(wine_training_df, aes_string(x = top_skewed_vars[2])) +
-  geom_histogram(bins = 30, fill = "#4daf4a", color = "white") +
-  labs(title = paste("Histogram of", top_skewed_vars[2])) +
-  theme_minimal()
-
-p3 <- ggplot(wine_training_df, aes_string(x = top_skewed_vars[3])) +
-  geom_histogram(bins = 30, fill = "#984ea3", color = "white") +
-  labs(title = paste("Histogram of", top_skewed_vars[3])) +
-  theme_minimal()
-
-# Display all three plots in one view
-(p1 / p2 / p3)  # stacked vertically
-# Or side-by-side with: (p1 | p2 | p3)
-
-
-
-
-```
-### Feature Engineering:
-
-Some features may benefit from transformation (e.g., reducing skew with log1p), or discretization (e.g., bucketing pH). These transformations help linear models fit better.
-
-### Log Transform on AcidIndex
-
-log1p(x) is equivalent to log(x + 1) and works better with small or zero values.
-
-This helps reduce right skew and stabilize the variance of AcidIndex.
-
-### To visualize the improvement:
-
-```{r}
-library(e1071)
-
-# Original skewness
-skewness(wine_training_df$AcidIndex, na.rm = TRUE)
-
-# After log
-wine_training_df$log_AcidIndex <- log1p(wine_training_df$AcidIndex)
-skewness(wine_training_df$log_AcidIndex, na.rm = TRUE)
-
-```
-The log transformation working reducing skewness from 1.65 → 0.88 means the distribution became more symmetric and closer to normal, which is ideal for many models (like linear regression, Poisson, etc.).
-
-### Convert STARS to a Factor
-
-```{r}
-wine_training_df$STARS_factor <- as.factor(wine_training_df$STARS)
-
-wine_training_df$STARS_ord <- factor(wine_training_df$STARS,
-                                      levels = c(1, 2, 3, 4),
-                                      ordered = TRUE)
-head(wine_training_df)
+```{r corrplot1, echo=FALSE}
+layout(1)
+par(mfrow = c(1, 1))
+# Correlation matrix (exclude non-numeric or identifier variables)
+cor_matrix <- cor( training_df %>%
+  subset(select =-c(INDEX))  %>% select_if(is.numeric), use = "complete.obs")
+corrplot(cor_matrix, method = "color", tl.cex = 0.8)
 
 ```
 
-All three display the same numbers, but only STARS_factor and STARS_ord tell R to treat them as categories, not numbers.
+STARS, LabelAppeal, and AcidIndex are also three parameters that we identified to be ordinal. The following correlation plot shows the correlation between the remaining numerical parameters. This view also groups the parameters into four clusters that appear to have a relationship with each other. 
 
+```{r corrplot2, echo=FALSE }
 
-### Build Multiple Models
+par(mfrow = c(1, 1))
+cor_matrix <- cor(numeric_df |> subset(select=-c(TARGET)), use = "pairwise.complete.obs", method = "pearson")
 
-### Poisson Regression – Basic
-
-log_AcidIndex	- Reduced skew, transformed acidity
-Alcohol	- Typically positively correlated with wine quality/sales
-Density	- Impacts texture; important physical feature
-LabelAppeal	- Reflects marketing impact
-STARS_factor - Captures perceived expert quality (categorical)
-
-```{r}
-# Fit Poisson regression model
-poisson_model <- glm(
-  TARGET ~ log_AcidIndex + Alcohol + Density + LabelAppeal + STARS_factor,
-  family = poisson(link = "log"),
-  data = wine_training_df
-)
-
-# Show model summary
-summary(poisson_model)
-
+corrplot(cor_matrix, method="shade", order="hclust", addrect=4)
 
 ```
 
-### Poisson Regression – With interaction
+A Variance Inflation Factor (VIF) test confirms that no major multicollinearity present in between our variables.
 
-```{r}
-# Poisson model with interaction between LabelAppeal and STARS
-poisson_model_interact <- glm(
-  TARGET ~ log_AcidIndex + Alcohol + Density + LabelAppeal * STARS_factor,
-  family = poisson(link = "log"),
-  data = wine_training_df
-)
 
-# Model summary
-summary(poisson_model_interact)
+```{r vif-scores, echo=FALSE}
+
+# Fit linear model using all remaining features to predict TARGET
+full_lm_model <- lm(TARGET ~ ., data = wine_training_df)
+
+car::vif(full_lm_model)
 
 ```
 
-### Negative Binomial Regression
 
-Why Apply Negative Binomial Regression?
-Poisson Assumes:
-The mean = variance of the response (TARGET).
+\newpage
+## Data Preparation
 
-That is, the number of wine cases sold has a similar average and variability.
+### Handling Negative Values
 
-But in reality:
-Count data often shows overdispersion — where the variance > mean.
+In the Data Exploration phase, we discovered that nine out of 11 numerical variables had negative values. While Poisson and Negative Binomial Regression will allow negative predictor values, we know that these values are impossible in the read world. Thus, ignoring these values could lead to biased coefficient estimates that could introduce highly misleading relationships in our models. We will assume that these erronous values may be the result of data entry or normalization errors and attempt to address them.
 
-If we use Poisson under overdispersion:
+ As we do not know what transformations may have been applied if normalization occurred, we will need to address the negative values through another method. From our earlier observations, we noted that nearly all of the affected parameters had thousands of affected records, with Chlorides having the most affects rows (3197). This means that nearly 1/4 of our 12,795 may be affected one way or another and we would loose too much data if we were to drop the affected records. We will instead only drop the 118 records with for Alcohol Content as it is a low percentage of the dataset since some of these records may also have negative values; we will then set the remaining negative values to N/A, allowing the values to be imputed if desired. Imputing may introduce some bias into our results, but will retain much of our data. 
 
-We get underestimated standard errors
+```{r handle-negative, echo=FALSE}
 
-This leads to inflated significance and unreliable inferences
-
-```{r}
-# Fit NB model with interaction
-nb_model <- glm.nb(
-  TARGET ~ log_AcidIndex + Alcohol + Density + LabelAppeal * STARS_factor,
-  data = wine_training_df
-)
-
-# View summary
-summary(nb_model)
-
-```
-
-### Negative Binomial – With interactions
-
-wine sample cases sold (TARGET), which is count data:
-
-Overdispersion (variance > mean) — so Negative Binomial is more appropriate than Poisson.
-
-Some variables (like LabelAppeal) likely behave differently at different star ratings (STARS).
-
-So combining these two ideas:
-
- We use Negative Binomial + interaction terms to handle both:
-
-The overdispersion in count data
-
-The conditional effect (e.g., the impact of LabelAppeal might depend on STARS)
-
-
-
-```{r}
-
-nb_interact_model <- glm.nb(
-  TARGET ~ log_AcidIndex + Alcohol + Density + LabelAppeal * STARS_factor,
-  data = wine_training_df
-)
-
-# View summary
-summary(nb_interact_model)
-
-
-```
-
-### Multiple Linear Regression
-
-Even though TARGET is count-based, linear regression can still be a useful benchmark to compare against Poisson and Negative Binomial models. 
-It’s often easier to interpret, and can perform decently if the residuals are not heavily skewed.
-
-```{r}
-# Fit Multiple Linear Regression
-mlr_model <- lm(
-  TARGET ~ log_AcidIndex + Alcohol + Density + LabelAppeal + STARS_factor,
-  data = wine_training_df
-)
-
-# View summary
-summary(mlr_model)
-
-```
-
-### MLR – All variables
-
-Multiple Linear Regression (MLR) model using all available predictors from your wine_training_df. 
-This includes all numeric features, and categorical variables like STARS should be properly encoded (as a factor).
-
-```{r}
-# Ensure STARS is a factor
-wine_training_df$STARS_factor <- as.factor(wine_training_df$STARS)
-
-# Drop unnecessary columns
-vars_to_exclude <- c("INDEX", "TARGET", "STARS", "STARS_ord")  # if exists
-all_vars <- setdiff(names(wine_training_df), vars_to_exclude)
-
-# Formula for linear regression
-mlr_formula <- as.formula(
-  paste("TARGET ~", paste(all_vars, collapse = " + "))
-)
-
-# Fit the full model
-mlr_full_model <- lm(mlr_formula, data = wine_training_df)
-
-# Model summary
-summary(mlr_full_model)
-
-```
-
-### Evaluate Models: Compare AIC (for Poisson/NB only)
-
-Poisson, Poisson with interaction, Negative Binomial, Negative Binomial with interaction, and Multiple Linear Regression (MLR with selected and all variables).
-Lower AIC = better model among count models.
-
-```{r}
-
-AIC(poisson_model, poisson_model_interact, nb_model, nb_interact_model)
-
-
-```
-
-### Compare RMSE and MAE (all models)
-
-```{r}
-# Calculate RMSE and MAE
-rmse_df <- data.frame(
-  Model = c("Poisson", "Poisson + Interact", "NB", "NB + Interact", "MLR", "MLR (All Vars)"),
-  RMSE = c(
-    rmse(wine_training_df$TARGET, predict(poisson_model, type = "response")),
-    rmse(wine_training_df$TARGET, predict(poisson_model_interact, type = "response")),
-    rmse(wine_training_df$TARGET, predict(nb_model, type = "response")),
-    rmse(wine_training_df$TARGET, predict(nb_interact_model, type = "response")),
-    rmse(wine_training_df$TARGET, predict(mlr_model)),
-    rmse(wine_training_df$TARGET, predict(mlr_full_model))
-  ),
-  MAE = c(
-    mae(wine_training_df$TARGET, predict(poisson_model, type = "response")),
-    mae(wine_training_df$TARGET, predict(poisson_model_interact, type = "response")),
-    mae(wine_training_df$TARGET, predict(nb_model, type = "response")),
-    mae(wine_training_df$TARGET, predict(nb_interact_model, type = "response")),
-    mae(wine_training_df$TARGET, predict(mlr_model)),
-    mae(wine_training_df$TARGET, predict(mlr_full_model))
-  )
-)
-
-# View comparison
-print(rmse_df)
-```
-
-### Interpretation:
-
-AIC (Akaike Information Criterion) balances model fit and complexity — lower AIC is better.
-
-The Poisson model with interaction has the lowest AIC → suggesting best balance between complexity and goodness of fit.
-
-Interestingly, Negative Binomial (NB) models do not significantly outperform Poisson here, suggesting low overdispersion in data.
-
-### Visualization – RMSE and MAE
-
-```{r}
-library(tidyr)
-library(ggplot2)
-
-# Convert for plotting
-rmse_long <- pivot_longer(rmse_df, cols = c("RMSE", "MAE"), names_to = "Metric", values_to = "Value")
-
-# Plot
-ggplot(rmse_long, aes(x = reorder(Model, Value), y = Value, fill = Metric)) +
-  geom_col(position = "dodge") +
-  coord_flip() +
-  labs(
-    title = "Model Comparison: RMSE & MAE",
-    x = "Model", y = "Error Value",
-    fill = "Metric"
-  ) +
-  theme_minimal(base_size = 13)
-
-```
-### Interpretation:
-
-MLR with All Variables has the lowest RMSE and MAE — indicating best predictive accuracy on the training data.
-
-However, MLR assumes normally distributed residuals, which may not be appropriate for count target variable (TARGET).
-
-MLR models also may overfit or underestimate variance for low-count observations.
-
-### Preprocess wine_evaluation_df the same way
-
-```{r}
-### Step 1: Preprocess Evaluation Data the Same Way
-
-# Impute missing values using training medians
-for (col in names(wine_evaluation_df)) {
-  if (is.numeric(wine_evaluation_df[[col]])) {
-    missing <- is.na(wine_evaluation_df[[col]])
-    if (any(missing)) {
-      # Use training median
-      train_median <- median(wine_training_df[[col]], na.rm = TRUE)
-      wine_evaluation_df[[col]][missing] <- train_median
-    }
+wine_training_non_neg <- wine_training_df |>
+  filter(Alcohol > 0)
+  
+for (colname in names(wine_training_non_neg)[numeric_cols]) {
+  
+  if (!is.na(colname) && colname != "TARGET") {
+    wine_training_non_neg[[colname]] <- ifelse(wine_training_non_neg[[colname]] < 0, NA, wine_training_non_neg[[colname]])
   }
 }
 
-# Step 2: Apply same transformations
-wine_evaluation_df$log_AcidIndex <- log1p(wine_evaluation_df$AcidIndex)
-wine_evaluation_df$STARS_factor <- as.factor(wine_evaluation_df$STARS)
 
-# Confirm everything matches structure of training data
-str(wine_evaluation_df[, c("log_AcidIndex", "Alcohol", "Density", "LabelAppeal", "STARS_factor")])
+
 
 ```
 
-### Apply Model to Evaluation Set
 
-```{r}
-# Predict using the best count model — Poisson with interaction
-wine_evaluation_df$Predicted_TARGET <- predict(poisson_model_interact,
-                                                newdata = wine_evaluation_df,
-                                                type = "response")
+### Handling Missing Values
 
-# Round to whole numbers (optional)
-wine_evaluation_df$Predicted_TARGET <- round(wine_evaluation_df$Predicted_TARGET)
+```{r impute-missing, echo=FALSE}
+
+wine_training_imputed <- wine_training_non_neg
+
+# Impute missing values in those columns using median
+for (col in names(wine_training_imputed[missing > 0])) {
+  median_val <- median(as.numeric(wine_training_imputed[[col]]), na.rm = TRUE)
+  wine_training_imputed[[col]][is.na(wine_training_imputed[[col]])] <- median_val
+}
+
+kable(
+  data.frame(
+    'Original Missing Count' = colSums(is.na(wine_training_df)),
+    'New Missing Count' = colSums(is.na(wine_training_non_neg)),
+    'After Imputation' = colSums(is.na(wine_training_imputed))
+  ), caption="Number of missing values"
+)
+
+```
+
+### Binned Transformation 
+
+To simplify the effects of AcidIndex, this variable was transformed into categorical bins. This can help reduce the influence of extreme values and better capture non-linear effects in logistic regression.
+
+
+```{r binning, echo=FALSE}
+# Create bins 
+
+wine_training_df$AcidIdx <- cut(as.numeric(wine_training_df$AcidIndex),
+                  breaks = c(1, 3, 4, 5, 6, Inf),  
+                  labels = c("1-6", "7","8","9", "10+"),
+                  include.lowest = TRUE, 
+                  right = TRUE)
+
+wine_training_non_neg$AcidIdx <- cut(as.numeric(wine_training_non_neg$AcidIndex),
+                  breaks = c(1, 3, 4, 5, 6, Inf),  
+                  labels = c("1-6", "7","8","9", "10+"),
+                  include.lowest = TRUE, 
+                  right = TRUE)
+
+wine_training_imputed$AcidIdx <- cut(as.numeric(wine_training_imputed$AcidIndex),
+                  breaks = c(1, 3, 4, 5, 6, Inf),  
+                  labels = c("1-6", "7","8","9", "10+"),
+                  include.lowest = TRUE, 
+                  right = TRUE)
+
+
+ggplot(wine_training_df, aes(x=AcidIdx, fill=factor(TARGET, levels = 8:0))) +
+  geom_bar() +
+   scale_fill_manual(values = factorColors) +
+    theme_minimal() +
+    labs(
+      fill = "# Cases" 
+    )
+```
+
+
+### Transformations
+
+```{r base_model-diagnostic-plots, fig.width=6, fig.height=3, echo=FALSE}
+layout(matrix(1:2, nrow = 1, byrow = TRUE))
+plot(full_lm_model, which = c(4, 5), col=wine_training_df$TARGET,  id.n = 5)
+par(mfrow = c(1, 1))
 
 ```
 
-Distribution of predicted sample case orders (your TARGET variable) for the evaluation dataset, based on your Poisson Regression model with interaction.
 
-```{r}
-ggplot(wine_evaluation_df, aes(x = Predicted_TARGET)) +
-  geom_histogram(bins = 30, fill = "#2c7fb8", color = "white") +
-  labs(
-    title = "Distribution of Predicted TARGET for Evaluation Set",
-    x = "Predicted Number of Sample Cases",
-    y = "Frequency"
-  ) +
-  theme_minimal(base_size = 13)
 
-```
-Interpretation Summary:
 
-Insight	Explanation:
-Most wines receive 2–4 predicted cases	These are likely average wines with decent characteristics.
-Some wines go above 5–7 predicted cases	Likely top-tier wines (high appeal and expert scores).
-Very few wines are predicted < 1 case	Indicates limited perceived demand — maybe weaker features.
+## Model Building
+
+
+
+
+## Model Selection
 
