@@ -30,6 +30,7 @@ library(mice)
 library(glmnet)
 library(Metrics) 
 library(patchwork)  
+library(gridExtra)
 library(e1071)
 #library(car)
 ```
@@ -180,7 +181,7 @@ numeric_df %>%
 
 ### Examining Categorical Variables
 
-Visualizing the distributions of out categorical variables helps ensure variables are treated as discrete categories, not continuous numbers. Our AcidIndex variable shows that majority of values fall between 6 and 11 with 342 observations collectively making up the remaining values. We may want to bin values for this parameter. Label Appeal has a normal distribution ranging from -2 to 2 and centered around 0. The  Wine rative variable STARS has the most missing values (3359) of any variable; of missing value, 61% of rows had 0 cases purchased. As would be expected, the majority of observations have a low STARS value (1/2), while few observations have a perfect value of 4.
+Visualizing the distributions of out categorical variables helps ensure variables are treated as discrete categories, not continuous numbers. Our AcidIndex variable shows that majority of values fall between 6 and 11 with 342 observations collectively making up the remaining values. We may want to bin values for this parameter. LabelAppeal has a normal distribution ranging from -2 to 2 and centered around 0 suggesting no major e. The STARS rating variable has the most missing values (3359) of any variable; 61% of rows without a STAR rating had zero cases purchased. About half of the total observations have a low STARS value (1/2), while few observations have a perfect value of 4.
 
 ```{r factor-charts, fig.width=7, fig.height=8, echo=FALSE}
 
@@ -241,21 +242,69 @@ factorColors <-  c(
 wrap_plots(plots[2:3], ncol = 2, guides = "collect") ) & theme(legend.position = "bottom")
 
 
+
 layout(1)
 par(mfrow = c(1, 1))
 
-
 summary(wine_training_df[factor_cols])
+
 ```
 
+A closer look at LabelAppeal shows relatively few observations had the highest values (-2 or 2). For observations where zero cases were bought (TARGET = 0), label appeal seemed to have very little impact, as there nearly equal number of positive and negative label appeal ratings within their respective categories. However, lower case purchases (1-3) had more lower rankings counts than higher rankings, while higher case purchases (4+) had higher label appeal ratings.
+
+```{r label-appeals-chart, fig.width=7, fig.height=4, echo=FALSE}
+
+plot_data <- wine_training_df  |>
+  group_by(LabelAppeal, TARGET = TARGET)  |>
+  summarise(count = n(), .groups = "drop") 
 
 
+ plot_data %>%
+  filter(LabelAppeal != 0) %>%
+  mutate(
+    LabelAppeal = factor(LabelAppeal, levels = c(-2, -1, 1, 2)), 
+    count_signed = ifelse(LabelAppeal == -2 | LabelAppeal == -1, -count, count)  
+  ) %>%
+  ggplot(aes(x = count_signed, y = factor(TARGET), fill = LabelAppeal)) +
+    geom_col(width = 0.7) +
+    scale_fill_manual(values = c("#D73027", "#FC8D59", "#91BFDB", "#4575B4")) +  
+    labs(
+      title = "Label Appeal # Cases Purched",
+      x = "Counts",
+      y = "# Cases Purched",
+      fill = "Label Appeal"
+    ) +
+    theme_minimal() +
+    geom_vline(xintercept = 0, color = "black", linetype = "dashed") +
+    theme(legend.position = "bottom") + 
+   coord_flip()
+```
 
+--- 
+ 
+```{r label-appeals-table, echo=FALSE} 
+plot_data |>
+  pivot_wider(
+    names_from = LabelAppeal,
+    values_from = count
+  ) |>
+  mutate(
+    `-2` = ifelse(is.na(`-2`), 0, `-2`),
+    `-1` = ifelse(is.na(`-1`), 0, `-1`),
+    `0` = ifelse(is.na(`0`), 0, `0`),
+    `1` = ifelse(is.na(`1`), 0, `1`),
+    `2` = ifelse(is.na(`2`), 0, `2`)
+  ) |>
+  kable()
+
+```
+
+\newpage
 ### Visualizing Distributions
 
 Next we will visualize the distributions for our numeric variables. Using the histograms, we can quickly spot skewness, check distribution and value ranges, and identify variables with spikes or unusual spread. The histograms show symmetric unimodal distributions strongly peaked with thin tails across our numeric variables. However, as noted earlier, negative values for many of these parameters would be impossible.
 
-```{r distributions1, fig.width=7, fig.height=7, echo=FALSE, message = FALSE, warning=FALSE}
+```{r distributions1, fig.width=7, fig.height=6, echo=FALSE, message = FALSE, warning=FALSE}
 
 plots <- list()  
 i <- 1
@@ -489,8 +538,7 @@ wrap_plots(plots, ncol = 3, nrow = 3, guides = "collect") +
 \newpage 
 ### Binned Transformation 
 
-To simplify the effects of AcidIndex, this variable was transformed into categorical bins. This can help reduce the influence of extreme values and better capture non-linear effects in logistic regression.
-
+To simplify the effects of AcidIndex, this variable was transformed into categorical bins. This can help reduce the influence of extreme values and better capture non-linear effects in logistic regression. It will also help free up degrees of freedom in our models.
 
 ```{r binning, fig.width=4, fig.height=3, echo=FALSE}
 # Create bins 
