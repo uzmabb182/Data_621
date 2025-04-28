@@ -529,9 +529,9 @@ ggplot(wine_training_clean, aes(x=AcidIdx, fill=factor(TARGET, levels = 8:0))) +
 ```
 
 
-### Outliers
+### Possible Outliers
 
-Diagnostic plots show several points with relatively high Cook's distance values when compared to rest of our data. 
+Diagnostic plots show several points with relatively high Cook's Distance values when compared to rest of our data, but Cook's Distance values are fairly low overall and these points may not affect our models much. Prior to transformation, we saw two points with perfect leverage that we flagged for possible removal, but none of the points seem to have strong leverage or influence after transformation. 
 
 ```{r base_model-diagnostic-plots, fig.width=6, fig.height=3, echo=FALSE}
 layout(matrix(1:2, ncol=2, nrow = 2, byrow = TRUE))
@@ -542,7 +542,7 @@ par(mfrow = c(1, 1))
 
 ```
 
-
+\newpage 
 ## Model Building
 
 
