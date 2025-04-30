@@ -135,7 +135,7 @@ wine_properties <- tibble::tibble(
 )
 
 below_zero_counts <-  numeric_df %>%
-  summarise(across(everything(), ~ sum(. < 0, na.rm = TRUE)))  %>%
+  dplyr::summarise(across(everything(), ~ sum(. < 0, na.rm = TRUE)))  %>%
   pivot_longer(
     cols = everything(),      
     names_to = "Variable",    
@@ -256,7 +256,7 @@ A closer look at LabelAppeal shows relatively few observations had the highest v
 
 plot_data <- wine_training_df  |>
   group_by(LabelAppeal, TARGET = TARGET)  |>
-  summarise(count = n(), .groups = "drop") 
+  dplyr::summarise(count = n(), .groups = "drop") 
 
 
  plot_data %>%
@@ -592,9 +592,99 @@ par(mfrow = c(1, 1))
 
 \newpage 
 ## Model Building
+```{r}
+n <- nrow(wine_training_clean)
+split_index <- sample(seq_len(n), size = 0.8 * n)
+train_data <- wine_training_clean[split_index, ]
+test_data  <- wine_training_clean[-split_index, ]
 
+```
 
+### Poisson Regression Models
 
+In the first model we included all of the variables.
+
+```{r}
+poisson_model1 <- glm(TARGET ~ FixedAcidity + VolatileAcidity + CitricAcid + ResidualSugar + 
+                Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + Density +
+                pH + Sulphates + Alcohol + 
+                as.factor(LabelAppeal) +
+                as.factor(AcidIndex) +
+                as.factor(STARS),
+              data=train_data, 
+              family=poisson)
+
+summary(poisson_model1)
+```
+```{r}
+library(vip)
+vip(poisson_model1, num_features = length(coef(poisson_model1)), 
+    main = "Poisson Model 1 Variable Importance")
+
+```
+
+Poisson using the most predictive variables
+
+```{r}
+poisson_model2 <- glm(TARGET ~ VolatileAcidity + TotalSulfurDioxide + 
+                as.factor(LabelAppeal) + 
+                as.factor(AcidIndex) + 
+                as.factor(STARS),
+              data=train_data, 
+              family=poisson)
+
+summary(poisson_model2)
+```
+
+### Negative Binomial Regression Models
+
+Negative Binomial Regression with all variables
+
+```{r}
+nb_model1 <- glm.nb(TARGET ~ FixedAcidity + VolatileAcidity + CitricAcid + ResidualSugar + 
+                Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + Density +
+                pH + Sulphates + Alcohol + 
+                as.factor(LabelAppeal) +
+                as.factor(AcidIndex) +
+                as.factor(STARS),
+              data=train_data)
+summary(nb_model1)
+```
+
+Negative Binomial Regression using most predictive variables
+
+```{r}
+nb_model2 <- glm.nb(TARGET~ VolatileAcidity + FreeSulfurDioxide + TotalSulfurDioxide +
+                as.factor(LabelAppeal) +
+                as.factor(AcidIndex) + 
+                as.factor(STARS),
+              data=train_data)
+summary(nb_model2)
+```
+
+### Multiple Linear Regression Models
+
+Multiple Linear Regression using all variables
+
+```{r}
+lm_model1 <- lm(TARGET ~ FixedAcidity + VolatileAcidity + CitricAcid + ResidualSugar + 
+                Chlorides + FreeSulfurDioxide + TotalSulfurDioxide + Density +
+                pH + Sulphates + Alcohol + 
+                as.factor(LabelAppeal) +
+                as.factor(AcidIndex) +
+                as.factor(STARS),
+              data=train_data)
+summary(lm_model1)
+```
+
+Using stepAIC to choose the most predictive features
+
+```{r}
+lm_model2 <- stepAIC(lm_model1, direction = "both",
+               scope = list(upper = lm_model1, lower = ~ 1),
+               scale = 0, trace = FALSE)
+summary(lm_model2)
+```
 
 ## Model Selection
 
