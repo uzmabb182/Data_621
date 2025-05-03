@@ -1,0 +1,48 @@
+---
+title: "Data621_Final_Project"
+author: "Mubashira Qari"
+date: "2025-04-26"
+output: html_document
+---
+### Objective:
+
+The goal is to build a count regression model to predict the number of wine cases sold (TARGET), based on wine characteristics.
+
+### Load Libraries
+
+```{r, warning = FALSE, message = FALSE}
+# Load required packages
+library(htmltools)
+library(caret)
+library(pROC)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(skimr)
+require(DataExplorer)
+require(miscTools)
+require(MASS)
+require(performance)
+require(lmtest)
+require(mice)
+require(glmnet)
+require(Metrics) 
+library(patchwork)  # for combining ggplots
+library(e1071)
+library(car)
+
+```
+
+###  load the dataset and understand its structure.
+
+```{r, warning = FALSE, message = FALSE}
+# echo=FALSE, include=FALSE
+
+remote_work_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Final_Project/Impact_of_Remote_Work_on_Mental_Health.csv")
+
+
+head(remote_work_df)
+
+
+```
