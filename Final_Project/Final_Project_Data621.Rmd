@@ -31,6 +31,7 @@ require(Metrics)
 library(patchwork)  # for combining ggplots
 library(e1071)
 library(car)
+library(forcats)      # For better factor handling
 
 ```
 
@@ -44,5 +45,203 @@ remote_work_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621
 
 head(remote_work_df)
 
+```
+
+### Checking & Cleaning Data
+
+```{r}
+glimpse(remote_work_df)
+summary(remote_work_df)
+skim(remote_work_df)
+```
+
+### Checking for missing values
+
+```{r}
+
+colSums(is.na(remote_work_df))
 
 ```
+### Convert categorical variables to factors
+
+```{r}
+
+remote_work_df <- remote_work_df %>%
+  mutate(across(where(is.character), as.factor))
+
+```
+
+### Checking Datatypes
+
+```{r}
+str(remote_work_df)
+```
+### Descriptive Statistics for Numeric Columns Summary
+
+```{r}
+remote_work_df %>%
+  dplyr::select(where(is.numeric)) %>%
+  summary()
+```
+### Descriptive Statistics for Categorical Columns Frequency
+
+```{r}
+
+remote_work_df %>%
+  dplyr::select(where(is.factor)) %>%
+  map(table)
+
+```
+
+### Distribution Plots for Age column
+
+```{r}
+ggplot(remote_work_df, aes(x = Age)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
+  theme_minimal() +
+  labs(title = "Age Distribution", x = "Age", y = "Count")
+
+```
+### Distribution Plots for Work Location vs Stress Level
+
+```{r}
+ggplot(remote_work_df, aes(x = Work_Location, fill = Stress_Level)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Stress Level by Work Location", x = "Work Location", y = "Count") +
+  theme_minimal()
+
+```
+### Distribution Plots for Mental Health Condition by Gender
+
+```{r}
+ggplot(remote_work_df, aes(x = Gender, fill = Mental_Health_Condition)) +
+  geom_bar(position = "fill") +
+  labs(title = "Mental Health Condition Distribution by Gender", y = "Proportion") +
+  theme_minimal() +
+  coord_flip()
+
+```
+### Correlation (Numeric Features)
+
+```{r}
+# Correlation matrix
+numeric_data <- remote_work_df %>%
+  dplyr::select(where(is.numeric))
+
+cor_matrix <- cor(numeric_data, use = "complete.obs")
+round(cor_matrix, 2)
+
+# Optional: Use corrplot for better visuals
+library(corrplot)
+corrplot(cor_matrix, method = "color", tl.cex = 0.8)
+
+```
+### Relationships Exploration for Productivity Change vs Mental Health
+
+```{r}
+ggplot(remote_work_df, aes(x = Mental_Health_Condition, fill = Productivity_Change)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Productivity Change by Mental Health Condition") +
+  theme_minimal()
+
+```
+###  Relationships Exploration for Sleep Quality by Region
+
+```{r}
+ggplot(remote_work_df, aes(x = Region, fill = Sleep_Quality)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Sleep Quality Across Regions") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+### Automated Exploratory Report 
+
+```{r}
+# Generate an HTML report
+create_report(remote_work_df, output_file = "eda_remote_work_report.html")
+
+```
+### Check for outliers or inconsistent entries
+
+
+```{r}
+# identify typos or categories like "Prefer not to say" that may need special handling
+boxplot(remote_work_df$Hours_Worked_Per_Week, main = "Boxplot of Weekly Hours Worked")
+
+# Check unique values in categorical columns
+sapply(remote_work_df %>% dplyr::select(where(is.factor)), levels)
+
+```
+Possible Data Preparation Steps Outline (Post-Exploration)
+1. Handle Missing Values
+Check for NA values in both categorical and numerical columns.
+
+Impute or drop:
+
+For numerical features: use median or mean imputation.
+
+For categorical features: use mode or a new category like "Unknown".
+
+2. Encode Categorical Variables
+Convert categorical features for ML models:
+
+One-hot encoding: for unordered categories (e.g., Job_Role, Industry, Region).
+
+Ordinal encoding: for ordered factors (e.g., Stress_Level, Satisfaction_with_Remote_Work).
+
+3. Feature Engineering
+Create new features if beneficial:
+
+Binary flags (e.g., Has_Mental_Health_Issue = if Mental_Health_Condition ≠ "None")
+
+Group rare categories (e.g., combine job roles or industries with low frequency)
+
+Bucket Age or Years_of_Experience into groups if needed
+
+4. Scale / Normalize Numeric Features
+Normalize features like:
+
+Hours_Worked_Per_Week
+
+Social_Isolation_Rating
+
+Work_Life_Balance_Rating
+
+Use standardization (z-score) or min-max scaling depending on model choice
+
+5. Balance the Dataset (if needed)
+If target variable (e.g., Mental_Health_Condition or Productivity_Change) is imbalanced:
+
+Consider SMOTE, undersampling, or class weighting for classification models
+
+6. Remove Redundant Features
+Drop non-informative or leakage-prone features:
+
+Employee_ID (irrelevant for modeling)
+
+Possibly Region or Work_Location if highly correlated with other variables
+
+7. Outlier Detection
+Use boxplots or z-scores to detect outliers in:
+
+Hours_Worked_Per_Week, Social_Isolation_Rating, etc.
+
+Decide whether to cap, transform, or remove
+
+8. Ensure Consistent Factor Levels
+Standardize labels for categorical values (e.g., "Prefer not to say" may need special handling)
+
+Collapse categories for sparsity or interpretability
+
+9. Create Target Variable (if modeling)
+Define the dependent variable:
+
+Classification: Mental_Health_Condition, Productivity_Change
+
+Regression: could be derived scores (e.g., scale of mental health burden)
+
+10. Train-Test Split (if modeling)
+Split dataset (e.g., 70% training, 30% testing) using caret or rsample
+
+
