@@ -4,9 +4,7 @@ author: "Mubashira Qari"
 date: "2025-04-26"
 output: html_document
 ---
-### Objective:
 
-The goal is to build a count regression model to predict the number of wine cases sold (TARGET), based on wine characteristics.
 
 ### Load Libraries
 
