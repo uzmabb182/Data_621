@@ -74,6 +74,18 @@ remote_work_df <- remote_work_df %>%
 ```{r}
 str(remote_work_df)
 ```
+###  Dropping Employee_ID Column and Update df
+
+```{r}
+# Drop the Employee_ID column
+remote_work_df <- remote_work_df %>% dplyr::select(-Employee_ID)
+
+# Verify that the column is removed
+glimpse(remote_work_df)
+
+
+```
+
 ### Descriptive Statistics for Numeric Columns Summary
 
 ```{r}
@@ -171,7 +183,108 @@ boxplot(remote_work_df$Hours_Worked_Per_Week, main = "Boxplot of Weekly Hours Wo
 sapply(remote_work_df %>% dplyr::select(where(is.factor)), levels)
 
 ```
-Possible Data Preparation Steps Outline (Post-Exploration)
+### Summary of Insights from Data Exploration
+
+### Dataset Structure and Quality
+
+The dataset includes a diverse set of variables like below: 
+
+demographic (age, gender, region)
+work-related (job role industry, work location) 
+mental health (stress level mental health condition, access to resources)
+and lifestyle factors (sleep quality, physical activity)
+
+No missing values were reported — indicating a complete dataset suitable for direct analysis.
+
+All categorical columns were successfully converted to factors, and numeric variables are in usable form.
+
+Employee_ID was removed correctly, avoiding unnecessary noise.
+
+### Interpretation of Charts:
+
+### Age Distribution Chart
+
+25–30, 40–50, and 50–55 age bins have the highest frequencies.
+
+Each of these bins has 650–700 employees, indicating a strong middle-aged workforce presence.
+
+The 18–22 group has the lowest count (under 150).
+
+The 60+ group also has fewer participants (around 400), possibly due to retirements or reduced digital/remote work participation.
+
+This is not a normal (bell-shaped) distribution. Instead, it’s closer to a uniform or flat distribution from ages 25 to 55.
+
+The slight dip at the edges (youngest and oldest) is typical in workplace data where fewer very young or senior employees are present.
+
+### Stress Level by Work Location Chart
+
+Remote workers report the highest number of high stress levels, noticeably more than hybrid or onsite workers.
+
+Onsite workers have the most balanced distribution, with slightly more reporting low stress than high.
+
+Hybrid workers show a fairly even spread across all stress levels, suggesting a moderate stress profile.
+
+### Mental Health Condition Distribution by Gender Chart
+
+Anxiety is the most common condition across all genders, especially among males and females.
+
+Non-binary and “Prefer not to say” groups have higher proportions of depression and burnout compared to the binary genders.
+
+The "None" category (no mental health condition) is least prevalent in the non-binary and "Prefer not to say" groups.
+
+Males have the highest proportion of "None" (no mental health condition).
+
+### Correlation Matrix of Numeric Variables Chart
+
+Strongest Positive Correlation:
+
+Age and Years_of_Experience show a strong positive correlation (~0.9+), which is expected—older individuals typically have more work experience.
+
+Moderate Positive Relationships:
+
+Hours_Worked_Per_Week has a moderate positive correlation with Number_of_Virtual_Meetings, suggesting those who attend more meetings tend to work more hours.
+
+Weak or No Correlations:
+
+Most other relationships (e.g., Company_Support_for_Remote_Work, Work_Life_Balance_Rating, Social_Isolation_Rating) show low or negligible correlations, indicating they may vary independently.
+
+No Evidence of Multicollinearity:
+
+No pairs of variables (besides age/experience) show very high correlation (>0.85), so there's low risk of multicollinearity in predictive modeling.
+
+### Productivity Change by Mental Health Condition Chart
+
+Decrease in Productivity is most prominent among individuals with:
+
+Depression (highest drop)
+
+Burnout and Anxiety (also show high counts of decreased productivity)
+
+Individuals with no mental health condition still report productivity decreases, but less frequently compared to those with depression.
+
+Increase in productivity (green bars) is lowest among those with depression, suggesting a clear negative impact of depression on work output.
+
+### Sleep Quality Across Regions Charts
+
+Africa and Oceania have the highest counts of "Good" sleep quality, suggesting relatively better rest patterns among employees in those regions.
+
+Asia and North America show a slightly higher proportion of "Poor" sleep quality, which may indicate higher stress, longer work hours, or less work-life balance.
+
+Europe and South America present a balanced distribution, with no extreme dominance of any sleep quality level.
+
+### Boxplot of Weekly Hours Worked Chart
+
+Median (black line) is around 40 hours/week, which aligns with a standard full-time workload.
+
+The interquartile range (IQR) spans approximately 30 to 50 hours, showing where most employees fall.
+
+The minimum is around 20 hours, and the maximum is close to 60 hours.
+
+There are no extreme outliers shown, but a few employees are working near the upper threshold, which may indicate potential overwork or burnout risk.
+
+
+### Possible Data Preparation Steps Outline (Post-Exploration)
+
 1. Handle Missing Values
 Check for NA values in both categorical and numerical columns.
 
