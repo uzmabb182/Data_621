@@ -1,0 +1,360 @@
+---
+title: "Data621_Final_Project"
+author: "Mubashira Qari"
+date: "2025-04-26"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+### Load Libraries
+
+```{r, warning = FALSE, message = FALSE}
+# Load required packages
+library(htmltools)
+library(caret)
+library(pROC)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(skimr)
+require(DataExplorer)
+require(miscTools)
+require(MASS)
+require(performance)
+require(lmtest)
+require(mice)
+require(glmnet)
+require(Metrics) 
+library(patchwork)  # for combining ggplots
+library(e1071)
+library(car)
+library(forcats)      # For better factor handling
+
+```
+
+###  load the dataset and understand its structure.
+
+```{r, warning = FALSE, message = FALSE}
+# echo=FALSE, include=FALSE
+
+remote_work_df <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Final_Project/Impact_of_Remote_Work_on_Mental_Health.csv")
+
+
+head(remote_work_df)
+
+```
+
+### Checking & Cleaning Data
+
+```{r}
+glimpse(remote_work_df)
+summary(remote_work_df)
+skim(remote_work_df)
+```
+
+### Checking for missing values
+
+```{r}
+
+colSums(is.na(remote_work_df))
+
+```
+### Convert categorical variables to factors
+
+```{r}
+
+remote_work_df <- remote_work_df %>%
+  mutate(across(where(is.character), as.factor))
+
+```
+
+### Checking Datatypes
+
+```{r}
+str(remote_work_df)
+```
+###  Dropping Employee_ID Column and Update df
+
+```{r}
+# Drop the Employee_ID column
+remote_work_df <- remote_work_df %>% dplyr::select(-Employee_ID)
+
+# Verify that the column is removed
+glimpse(remote_work_df)
+
+
+```
+
+### Descriptive Statistics for Numeric Columns Summary
+
+```{r}
+remote_work_df %>%
+  dplyr::select(where(is.numeric)) %>%
+  summary()
+```
+### Descriptive Statistics for Categorical Columns Frequency
+
+```{r}
+
+remote_work_df %>%
+  dplyr::select(where(is.factor)) %>%
+  map(table)
+
+```
+
+### Distribution Plots for Age column
+
+```{r}
+ggplot(remote_work_df, aes(x = Age)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
+  theme_minimal() +
+  labs(title = "Age Distribution", x = "Age", y = "Count")
+
+```
+### Distribution Plots for Work Location vs Stress Level
+
+```{r}
+ggplot(remote_work_df, aes(x = Work_Location, fill = Stress_Level)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Stress Level by Work Location", x = "Work Location", y = "Count") +
+  theme_minimal()
+
+```
+### Distribution Plots for Mental Health Condition by Gender
+
+```{r}
+ggplot(remote_work_df, aes(x = Gender, fill = Mental_Health_Condition)) +
+  geom_bar(position = "fill") +
+  labs(title = "Mental Health Condition Distribution by Gender", y = "Proportion") +
+  theme_minimal() +
+  coord_flip()
+
+```
+### Correlation (Numeric Features)
+
+```{r}
+# Correlation matrix
+numeric_data <- remote_work_df %>%
+  dplyr::select(where(is.numeric))
+
+cor_matrix <- cor(numeric_data, use = "complete.obs")
+round(cor_matrix, 2)
+
+# Optional: Use corrplot for better visuals
+library(corrplot)
+corrplot(cor_matrix, method = "color", tl.cex = 0.8)
+
+```
+### Relationships Exploration for Productivity Change vs Mental Health
+
+```{r}
+ggplot(remote_work_df, aes(x = Mental_Health_Condition, fill = Productivity_Change)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Productivity Change by Mental Health Condition") +
+  theme_minimal()
+
+```
+###  Relationships Exploration for Sleep Quality by Region
+
+```{r}
+ggplot(remote_work_df, aes(x = Region, fill = Sleep_Quality)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Sleep Quality Across Regions") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+### Automated Exploratory Report 
+
+```{r}
+# Generate an HTML report
+create_report(remote_work_df, output_file = "eda_remote_work_report.html")
+
+```
+### Check for outliers or inconsistent entries
+
+
+```{r}
+# identify typos or categories like "Prefer not to say" that may need special handling
+boxplot(remote_work_df$Hours_Worked_Per_Week, main = "Boxplot of Weekly Hours Worked")
+
+# Check unique values in categorical columns
+sapply(remote_work_df %>% dplyr::select(where(is.factor)), levels)
+
+```
+### Summary of Insights from Data Exploration
+
+### Dataset Structure and Quality
+
+The dataset includes a diverse set of variables like below: 
+
+demographic (age, gender, region)
+work-related (job role industry, work location) 
+mental health (stress level mental health condition, access to resources)
+and lifestyle factors (sleep quality, physical activity)
+
+No missing values were reported — indicating a complete dataset suitable for direct analysis.
+
+All categorical columns were successfully converted to factors, and numeric variables are in usable form.
+
+Employee_ID was removed correctly, avoiding unnecessary noise.
+
+### Interpretation of Charts:
+
+### Age Distribution Chart
+
+25–30, 40–50, and 50–55 age bins have the highest frequencies.
+
+Each of these bins has 650–700 employees, indicating a strong middle-aged workforce presence.
+
+The 18–22 group has the lowest count (under 150).
+
+The 60+ group also has fewer participants (around 400), possibly due to retirements or reduced digital/remote work participation.
+
+This is not a normal (bell-shaped) distribution. Instead, it’s closer to a uniform or flat distribution from ages 25 to 55.
+
+The slight dip at the edges (youngest and oldest) is typical in workplace data where fewer very young or senior employees are present.
+
+### Stress Level by Work Location Chart
+
+Remote workers report the highest number of high stress levels, noticeably more than hybrid or onsite workers.
+
+Onsite workers have the most balanced distribution, with slightly more reporting low stress than high.
+
+Hybrid workers show a fairly even spread across all stress levels, suggesting a moderate stress profile.
+
+### Mental Health Condition Distribution by Gender Chart
+
+Anxiety is the most common condition across all genders, especially among males and females.
+
+Non-binary and “Prefer not to say” groups have higher proportions of depression and burnout compared to the binary genders.
+
+The "None" category (no mental health condition) is least prevalent in the non-binary and "Prefer not to say" groups.
+
+Males have the highest proportion of "None" (no mental health condition).
+
+### Correlation Matrix of Numeric Variables Chart
+
+Strongest Positive Correlation:
+
+Age and Years_of_Experience show a strong positive correlation (~0.9+), which is expected—older individuals typically have more work experience.
+
+Moderate Positive Relationships:
+
+Hours_Worked_Per_Week has a moderate positive correlation with Number_of_Virtual_Meetings, suggesting those who attend more meetings tend to work more hours.
+
+Weak or No Correlations:
+
+Most other relationships (e.g., Company_Support_for_Remote_Work, Work_Life_Balance_Rating, Social_Isolation_Rating) show low or negligible correlations, indicating they may vary independently.
+
+No Evidence of Multicollinearity:
+
+No pairs of variables (besides age/experience) show very high correlation (>0.85), so there's low risk of multicollinearity in predictive modeling.
+
+### Productivity Change by Mental Health Condition Chart
+
+Decrease in Productivity is most prominent among individuals with:
+
+Depression (highest drop)
+
+Burnout and Anxiety (also show high counts of decreased productivity)
+
+Individuals with no mental health condition still report productivity decreases, but less frequently compared to those with depression.
+
+Increase in productivity (green bars) is lowest among those with depression, suggesting a clear negative impact of depression on work output.
+
+### Sleep Quality Across Regions Charts
+
+Africa and Oceania have the highest counts of "Good" sleep quality, suggesting relatively better rest patterns among employees in those regions.
+
+Asia and North America show a slightly higher proportion of "Poor" sleep quality, which may indicate higher stress, longer work hours, or less work-life balance.
+
+Europe and South America present a balanced distribution, with no extreme dominance of any sleep quality level.
+
+### Boxplot of Weekly Hours Worked Chart
+
+Median (black line) is around 40 hours/week, which aligns with a standard full-time workload.
+
+The interquartile range (IQR) spans approximately 30 to 50 hours, showing where most employees fall.
+
+The minimum is around 20 hours, and the maximum is close to 60 hours.
+
+There are no extreme outliers shown, but a few employees are working near the upper threshold, which may indicate potential overwork or burnout risk.
+
+
+### Possible Data Preparation Steps Outline (Post-Exploration)
+
+1. Handle Missing Values
+Check for NA values in both categorical and numerical columns.
+
+Impute or drop:
+
+For numerical features: use median or mean imputation.
+
+For categorical features: use mode or a new category like "Unknown".
+
+2. Encode Categorical Variables
+Convert categorical features for ML models:
+
+One-hot encoding: for unordered categories (e.g., Job_Role, Industry, Region).
+
+Ordinal encoding: for ordered factors (e.g., Stress_Level, Satisfaction_with_Remote_Work).
+
+3. Feature Engineering
+Create new features if beneficial:
+
+Binary flags (e.g., Has_Mental_Health_Issue = if Mental_Health_Condition ≠ "None")
+
+Group rare categories (e.g., combine job roles or industries with low frequency)
+
+Bucket Age or Years_of_Experience into groups if needed
+
+4. Scale / Normalize Numeric Features
+Normalize features like:
+
+Hours_Worked_Per_Week
+
+Social_Isolation_Rating
+
+Work_Life_Balance_Rating
+
+Use standardization (z-score) or min-max scaling depending on model choice
+
+5. Balance the Dataset (if needed)
+If target variable (e.g., Mental_Health_Condition or Productivity_Change) is imbalanced:
+
+Consider SMOTE, undersampling, or class weighting for classification models
+
+6. Remove Redundant Features
+Drop non-informative or leakage-prone features:
+
+Employee_ID (irrelevant for modeling)
+
+Possibly Region or Work_Location if highly correlated with other variables
+
+7. Outlier Detection
+Use boxplots or z-scores to detect outliers in:
+
+Hours_Worked_Per_Week, Social_Isolation_Rating, etc.
+
+Decide whether to cap, transform, or remove
+
+8. Ensure Consistent Factor Levels
+Standardize labels for categorical values (e.g., "Prefer not to say" may need special handling)
+
+Collapse categories for sparsity or interpretability
+
+9. Create Target Variable (if modeling)
+Define the dependent variable:
+
+Classification: Mental_Health_Condition, Productivity_Change
+
+Regression: could be derived scores (e.g., scale of mental health burden)
+
+10. Train-Test Split (if modeling)
+Split dataset (e.g., 70% training, 30% testing) using caret or rsample
+
+
