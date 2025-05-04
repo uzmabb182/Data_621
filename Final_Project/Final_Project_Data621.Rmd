@@ -1,4 +1,11 @@
 ---
+title: "Untitled"
+author: "Mubashira Qari"
+date: "2025-05-04"
+output: html_document
+---
+
+---
 title: "Data621_Final_Project"
 author: "Mubashira Qari"
 date: "2025-04-26"
@@ -171,7 +178,7 @@ ggplot(remote_work_df, aes(x = Region, fill = Sleep_Quality)) +
 
 ```{r}
 # Generate an HTML report
-create_report(remote_work_df, output_file = "eda_remote_work_report.html")
+#create_report(remote_work_df, output_file = "eda_remote_work_report.html")
 
 ```
 ### Check for outliers or inconsistent entries
