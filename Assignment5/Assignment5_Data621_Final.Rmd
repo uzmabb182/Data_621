@@ -1,6 +1,6 @@
 ---
 title: "Assignment5_Data621"
-author: "Mubashira Qari, Marco Castro"
+author: "Mubashira Qari, Marco Castro, Zach Rose"
 date: "2025-04-13"
 output:
   pdf_document: default
@@ -33,6 +33,8 @@ library(patchwork)
 library(gridExtra)
 library(e1071)
 #library(car)
+library(pscl)
+library(randomForest)
 ```
 
 ## Data Exploration
@@ -686,5 +688,97 @@ lm_model2 <- stepAIC(lm_model1, direction = "both",
 summary(lm_model2)
 ```
 
+```{r}
+zinb_model <- zeroinfl(
+  TARGET ~ VolatileAcidity + TotalSulfurDioxide + as.factor(LabelAppeal) + 
+    as.factor(AcidIndex) + as.factor(STARS) | 1,
+  data = train_data,
+  dist = "negbin"
+)
+summary(zinb_model)
+AIC(zinb_model)
+```
+
+```{r}
+zip_model <- zeroinfl(
+  TARGET ~ VolatileAcidity + TotalSulfurDioxide + as.factor(LabelAppeal) + 
+    as.factor(AcidIndex) + as.factor(STARS) | 1,
+  data = train_data,
+  dist = "poisson"
+)
+summary(zip_model)
+AIC(zip_model)
+```
+
+
+```{r}
+set.seed(000)
+
+rf_model <- randomForest(
+  TARGET ~ ., 
+  data = train_data, 
+  ntree = 500,
+  mtry = floor(sqrt(ncol(train_data) - 1)),
+  importance = TRUE
+)
+
+print(rf_model)
+importance(rf_model)
+```
+LabelAppeal and STARS had strong positive effects across all models. Wines with more appealing labels or higher star ratings were consistently associated with higher purchase counts. STARS ratings that were missing were coded as -1 and often aligned with low case purchases, suggesting unrated wines were less appealing. VolatileAcidity and TotalSulfurDioxide were also important predictors, especially in the Poisson and Negative Binomial models. The Poisson and Negative Binomial models produced similar results, which suggests limited overdispersion. In contrast, the multiple linear regression models showed some coefficients with different directions, like pH, which may reflect that the assumptions of linear regression are less suited for count data. The ZIP and ZINB models accounted for the high number of zero case purchases and provided additional flexibility.
+
+
 ## Model Selection
 
+```{r}
+model_comparison <- data.frame(
+  Model = c(
+    "Poisson Model 1",
+    "Poisson Model 2",
+    "NB Model 1",
+    "NB Model 2",
+    "ZINB Model",
+    "ZIP Model",
+    "Linear Model (Full)",
+    "Linear Model (Step)",
+    "Random Forest"
+  ),
+  AIC = c(
+    36079,
+    36102,
+    36082,
+    36088,
+    35830,
+    35828,
+    NA,
+    NA,
+    NA
+  ),
+  Residual_Deviance = c(
+    10704,
+    10744,
+    10703,
+    10725,
+    NA,
+    NA,
+    NA,
+    NA,
+    NA
+  ),
+  R2 = c(
+    NA,
+    NA,
+    NA,
+    NA,
+    NA,
+    NA,
+    0.547,
+    0.547,
+    0.582
+  )
+)
+
+kable(model_comparison, caption = "Model Comparison Summary")
+```
+
+Model selection was based on a combination of fit, parsimony, and interpretability. Although the multiple linear regression and random forest models explained a slightly higher proportion of variance, count regression models were prioritized to meet project requirements for deployment. Among these, the Zero-Inflated Poisson model performed best based on AIC, achieving the lowest value across all models tested. AIC was used as the primary comparison metric, as it accounts for both model accuracy and complexity. The ZIP model demonstrated strong statistical performance and offered stable, interpretable coefficient estimates. Key predictors such as LabelAppeal, STARS, and VolatileAcidity were consistently significant across all count models, and their affects aligned with expectations. The ZIP model also addressed the excess zeros in the dataset effectively, without overfitting.
