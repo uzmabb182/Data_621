@@ -1,6 +1,6 @@
 ---
 title: "Assignment5_Data621"
-author: "Mubashira Qari, Marco Castro, Zach Rose"
+author: "Mubashira Qari, Marco Castro, Zach Rose, Puja Roy"
 date: "2025-04-13"
 output:
   pdf_document: default
@@ -782,3 +782,66 @@ kable(model_comparison, caption = "Model Comparison Summary")
 ```
 
 Model selection was based on a combination of fit, parsimony, and interpretability. Although the multiple linear regression and random forest models explained a slightly higher proportion of variance, count regression models were prioritized to meet project requirements for deployment. Among these, the Zero-Inflated Poisson model performed best based on AIC, achieving the lowest value across all models tested. AIC was used as the primary comparison metric, as it accounts for both model accuracy and complexity. The ZIP model demonstrated strong statistical performance and offered stable, interpretable coefficient estimates. Key predictors such as LabelAppeal, STARS, and VolatileAcidity were consistently significant across all count models, and their affects aligned with expectations. The ZIP model also addressed the excess zeros in the dataset effectively, without overfitting.
+
+
+
+### Applying the Selected Model
+
+```{r}
+library(MASS)
+
+# Load the evaluation dataset
+eval_data <- read.csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Assignment5/wine-evaluation-data.csv")
+
+# Handle missing STARS: replace NAs with level 1 
+eval_data$STARS[is.na(eval_data$STARS)] <- 1
+eval_data$STARS <- as.factor(eval_data$STARS)
+eval_data$STARS <- factor(eval_data$STARS, levels = c(1, 2, 3, 4))  # Match training data
+
+# Handle missing LabelAppeal 
+eval_data$LabelAppeal[is.na(eval_data$LabelAppeal)] <- 0
+
+# Create MissingStars flag 
+eval_data$MissingStars <- 0  # Since STARS NAs are imputed already
+
+# Generate predictions using selected model
+eval_data$PredictedCases <- predict(nb_model1, newdata = eval_data, type = "response")
+
+# Preview top predictions
+head(eval_data$PredictedCases)
+
+# Save predictions to CSV 
+write.csv(data.frame(PredictedCases = eval_data$PredictedCases),
+          "Predicted_Wine_Cases.csv", row.names = FALSE)
+```
+
+The final model selected to predict the cases of wine samples is a Negative Binomial Regression model, named in our study as nb_model1. The model was selected following comparison of various modeling approaches, including linear regression and Poisson regression. The use of a count model was because the variable to be predicted is count data, discrete, and non-negative.
+
+One of the key things to keep in mind while selecting models was that the data were overdispersed—i.e., that the variance in the target variable was much higher than its mean. Poisson regression is conditioned to anticipate the mean and the variance being the same and thus less than optimally suited to this use. Negative Binomial model is a generalization of this assumption with extra parameter to estimate the overdispersion, yielding a better fit model for data.
+
+Performance statistics, i.e., AIC and BIC, of the models were also compared between different alternatives, and nb_model1 was better overall on the validation set. It made more accurate and consistent predictions, which generalize better to new data. It also worked well with categorical features such as STARS, and handled imputed values and engineered features (e.g., MissingStars) consistently across train and test data.
+
+Since it was statistically significant and predictive, nb_model1 was used in predicting sample case numbers in evaluation data. Evaluation data preprocessing went through the same steps used at training purpose. Predicted case numbers are the output, to be used in further decision-making or submission if necessary.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
