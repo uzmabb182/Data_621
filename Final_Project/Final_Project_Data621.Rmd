@@ -370,6 +370,10 @@ Split dataset (e.g., 70% training, 30% testing) using caret or rsample
 data <- remote_work_df
 ```
 
+```{r}
+# Keep only rows where (Age - Years_of_Experience) is at least 22.
+data <- data %>% filter((Age - Years_of_Experience) >= 22)
+```
 
 ```{r}
 data <- data %>% 
