@@ -1,6 +1,6 @@
 ---
 title: "Untitled"
-author: "Mubashira Qari"
+author: "Mubashira Qari, Erick Hadi, Puja Roy, Marco Castro, Zach Rose"
 date: "2025-05-04"
 output: html_document
 ---
