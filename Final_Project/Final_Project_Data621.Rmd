@@ -294,7 +294,7 @@ There are no extreme outliers shown, but a few employees are working near the up
 
 ### Possible Data Preparation Steps Outline (Post-Exploration)
 
-1. Handle Missing Values
+#### 1. Handle Missing Values
 Check for NA values in both categorical and numerical columns.
 
 Impute or drop:
@@ -302,6 +302,8 @@ Impute or drop:
 For numerical features: use median or mean imputation.
 
 For categorical features: use mode or a new category like "Unknown".
+
+There is no NA values in both  categorical and numerical columns.
 
 2. Encode Categorical Variables
 Convert categorical features for ML models:
@@ -364,4 +366,77 @@ Regression: could be derived scores (e.g., scale of mental health burden)
 10. Train-Test Split (if modeling)
 Split dataset (e.g., 70% training, 30% testing) using caret or rsample
 
+```{r}
+data <- remote_work_df
+```
+
+
+```{r}
+data <- data %>% 
+  filter(Satisfaction_with_Remote_Work %in% c("Satisfied", "Unsatisfied"))
+
+data$Gender    <- factor(data$Gender)
+data$Job_Role  <- factor(data$Job_Role)
+data$Industry  <- factor(data$Industry)
+data$Work_Location <- factor(data$Work_Location)
+data$Region    <- factor(data$Region)
+
+data$Stress_Level <- factor(data$Stress_Level, levels = c("Low", "Medium", "High"), ordered = TRUE)
+data$Productivity_Change <- factor(data$Productivity_Change, 
+                                   levels = c("Decrease", "No Change", "Increase"), ordered = TRUE)
+
+data$Mental_Health_Condition <- factor(data$Mental_Health_Condition)
+data$Access_to_Mental_Health_Resources <- factor(data$Access_to_Mental_Health_Resources, 
+                                                 levels = c("No", "Yes"))
+data$Satisfaction_with_Remote_Work <- factor(data$Satisfaction_with_Remote_Work, 
+                                              levels = c("Unsatisfied", "Satisfied"))
+
+```
+
+```{r}
+data$Has_Mental_Health_Issue <- ifelse(data$Mental_Health_Condition != "None", 1, 0)
+data$Has_Mental_Health_Issue <- factor(data$Has_Mental_Health_Issue, 
+                                       levels = c(0,1), labels = c("No", "Yes"))
+
+```
+
+```{r}
+dummy_vars <- dummyVars(Satisfaction_with_Remote_Work ~ ., data = data)
+data_dummies <- data.frame(predict(dummy_vars, newdata = data))
+
+data_dummies$Satisfaction_with_Remote_Work <- data$Satisfaction_with_Remote_Work
+
+predictor_names <- setdiff(names(data_dummies), "Satisfaction_with_Remote_Work")
+num_cols <- sapply(data_dummies[, predictor_names], is.numeric)
+
+preProcValues <- preProcess(data_dummies[, predictor_names][, num_cols], method = c("center", "scale"))
+data_dummies[, predictor_names][, num_cols] <- predict(preProcValues, data_dummies[, predictor_names][, num_cols])
+
+data_processed <- data_dummies
+
+glimpse(data_processed)
+```
+
+```{r}
+set.seed(621)  
+trainIndex <- createDataPartition(data_processed$Satisfaction_with_Remote_Work, 
+                                  p = 0.7,  
+                                  list = FALSE)
+
+train_data <- data_processed[trainIndex, ]
+test_data  <- data_processed[-trainIndex, ]
+```
+
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+```{r}
+
+```
 
