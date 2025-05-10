@@ -39,7 +39,7 @@ library(patchwork)  # for combining ggplots
 library(e1071)
 library(car)
 library(forcats)      # For better factor handling
-
+library(car)
 ```
 
 ###  load the dataset and understand its structure.
@@ -370,15 +370,22 @@ Split dataset (e.g., 70% training, 30% testing) using caret or rsample
 data <- remote_work_df
 ```
 
+Since this data is simulated there is a lot of data that doesn't make sense. For example, in one of the rows the Age = 27 and Years_of_Experience = 20. This means that this person has been working since age 7, which is unrealistic. So we filtered the data so that Age - Years_of_Experience >= 22.
+Keep only rows where (Age - Years_of_Experience) is at least 22.
+
 ```{r}
-# Keep only rows where (Age - Years_of_Experience) is at least 22.
 data <- data %>% filter((Age - Years_of_Experience) >= 22)
 ```
 
+
+Since, we will be predicting whether people are satisfied with remote work We removed people who voted neutral for Satisfaction_with_Remote_Work
 ```{r}
 data <- data %>% 
   filter(Satisfaction_with_Remote_Work %in% c("Satisfied", "Unsatisfied"))
+```
 
+There a handful of categorical variables that need to be converted into factors.
+```{r}
 data$Gender    <- factor(data$Gender)
 data$Job_Role  <- factor(data$Job_Role)
 data$Industry  <- factor(data$Industry)
@@ -386,8 +393,8 @@ data$Work_Location <- factor(data$Work_Location)
 data$Region    <- factor(data$Region)
 
 data$Stress_Level <- factor(data$Stress_Level, levels = c("Low", "Medium", "High"), ordered = TRUE)
-data$Productivity_Change <- factor(data$Productivity_Change, 
-                                   levels = c("Decrease", "No Change", "Increase"), ordered = TRUE)
+data$Work_Life_Balance_Rating <- factor(data$Work_Life_Balance_Rating, ordered = TRUE)
+data$Company_Support_for_Remote_Work <- factor(data$Company_Support_for_Remote_Work, ordered = TRUE)
 
 data$Mental_Health_Condition <- factor(data$Mental_Health_Condition)
 data$Access_to_Mental_Health_Resources <- factor(data$Access_to_Mental_Health_Resources, 
@@ -397,38 +404,53 @@ data$Satisfaction_with_Remote_Work <- factor(data$Satisfaction_with_Remote_Work,
 
 ```
 
+
+
+Creating a binary flag on whether a person has any type of mental health regardless of type. This is to make our data more simple. 
 ```{r}
 data$Has_Mental_Health_Issue <- ifelse(data$Mental_Health_Condition != "None", 1, 0)
 data$Has_Mental_Health_Issue <- factor(data$Has_Mental_Health_Issue, 
                                        levels = c(0,1), labels = c("No", "Yes"))
+data <- data %>% dplyr::select(-Mental_Health_Condition) 
+```
 
+Since we aren't looking into Productivity Change in our research we will drop this column
+```{r}
+data <- data %>% dplyr::select(-Productivity_Change) 
 ```
 
 ```{r}
-dummy_vars <- dummyVars(Satisfaction_with_Remote_Work ~ ., data = data)
-data_dummies <- data.frame(predict(dummy_vars, newdata = data))
-
-data_dummies$Satisfaction_with_Remote_Work <- data$Satisfaction_with_Remote_Work
-
-predictor_names <- setdiff(names(data_dummies), "Satisfaction_with_Remote_Work")
-num_cols <- sapply(data_dummies[, predictor_names], is.numeric)
-
-preProcValues <- preProcess(data_dummies[, predictor_names][, num_cols], method = c("center", "scale"))
-data_dummies[, predictor_names][, num_cols] <- predict(preProcValues, data_dummies[, predictor_names][, num_cols])
-
-data_processed <- data_dummies
-
-glimpse(data_processed)
+glimpse(data)
 ```
+```{r}
+model <- glm(Satisfaction_with_Remote_Work ~ Age + Gender + Job_Role + Industry +
+             Years_of_Experience + Work_Location + Hours_Worked_Per_Week +
+             Number_of_Virtual_Meetings + Work_Life_Balance_Rating +
+             Stress_Level + Access_to_Mental_Health_Resources +
+             Social_Isolation_Rating + Company_Support_for_Remote_Work +
+             Physical_Activity + Sleep_Quality + Region + Has_Mental_Health_Issue,
+             data = data, family = binomial)
 
+summary(model)
+```
+Testing for Multicollinearity 
+```{r}
+vif_values <- vif(model)
+print(vif_values)
+```
+There seems to be no multicollinearity, which indicates that there is no inter correlations among predictors that are inflating the variances of our parameter estimates
+
+
+
+After preparing the data, we split the dataset into an 80/20 split
 ```{r}
 set.seed(621)  
-trainIndex <- createDataPartition(data_processed$Satisfaction_with_Remote_Work, 
-                                  p = 0.7,  
+trainIndex <- createDataPartition(data$Satisfaction_with_Remote_Work, 
+                                  p = 0.8,  
                                   list = FALSE)
 
-train_data <- data_processed[trainIndex, ]
-test_data  <- data_processed[-trainIndex, ]
+train_data <- data[trainIndex, ]
+test_data  <- data[-trainIndex, ]
 ```
 
 
