@@ -1,0 +1,116 @@
+---
+title: "Remote Work, Mental Health and Work Satisfaction"
+output: html_document
+date: "2025-05-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Abstract
+
+#### Introduction
+
+#### Methods
+
+#### Results
+
+#### Conclusion
+
+##### Keywords
+
+### 1. Introduction
+
+#### 1.1 Overview
+
+Remote work, often referred to as Work From Home (WFH), is a term used to define employee labor performed in non-traditional spaces, such as an employee's home, a coffee shop, or a public space, that are outside of employer's workplace (i.e. office or job-site) (cite). Since the early 2000's, technological innovations and the widespread adoption of high-speed internet have facilitated the growth of remote worker, particular in sectors like technology, marketing, etc (cite). This trend saw rapid adoption in 2020 due to stay-at-home mandates introduced in response to the COVID-19 pandemic. In the United States, for example, the percentage of remote workers grew from 5.7% (9 million) in 2019 to 17.9% in 2019 (BLS, 2024). 
+
+As the covid mortality rates dropped and government mandates were lifted, many employers implemented "return to office" policies that made some or in-person work mandatory (Shimura et al. 2021). These policies were often reflective of negative views on remote work citing poor worker productivity and a belife that workers may be skirting their responsibilities (cite). In other cases, workers themselves preferred the office environment and voluntarily returned to onsite work. Estimates from the latest publicly available American Community Survey at writing showed that 13.8% (22 million) of U.S. workers usually worked from home (ACS, 2023), though the number is likely to continue to drop given the current political sentiment.
+
+At the heart of the debate around the effectiveness -- or lack thereof -- of remote work are the long-term outcomes on the mental health of workers. Prior studies have found both positive and negative outcomes that depend on a multitude of factors, including an individual's home life, health, work style, and access to support systems to name a few, suggesting the nuanced nature of remote work and its outcomes (cite). 
+
+Researchers have identified several positive outcomes associated with remote work for employees. These include increased flexibility and autonomy, higher morale and job satisfaction (Tavares, 2017; Shimura et al., 2021). Some remote workers also  experienced enhanced productivity, possibly due to a reduction in meetings and other work-related interruptions that eased time pressures through freeing up time for task completion (Smit et al., 2017). Notably, remote work satisfaction appeared to be higher among employees who reported greater perceived productivity (Toscano, 2020).
+
+On a personal level, remote work may facilitate better sharing family responsibilities, as employees save time on commuting, freeing up time to devote to other family obligations such as picking up children from school, household chores, and meal preparation (Darouei & Pluut, 2017). The increased flexiblity can lead to an improved work-life balance (Hill et al., 2003; Como, 2021). Further,  Shimura et al. (2021) found that remote work significantly decreases psychological and physical stress responses when accounting for confounding factors such as job stressors and sleep quality. Their study found that job stressors, poor sleep, and lack of support systems pose greater risks to productivity than remote work itself.
+
+Job role and industry also seems to play a role in the success of remote work. In 2024, the US Bureau of Labor Statistics found that of the top 10 industries experiencing the highest growth in remote work from 2019–22, 7 had increased output and labor inputs. Outputs far outpaced inputs for the industry sectors of computer systems design and related services; publishing industries, except internet [includes software]; and data processing, internet publishing, and other information services (BLS, 2024). Beyond increased output, companies saw other gains found in cost savings from lower employee turnover and decreased office space needs (Bloom et al., 2015; BLS 2024). In their observational experiment of teleworkers in China, Bloom et al. (2015) found that attrition fell by about 50% resulting in lower operating costs from not having to train new employees. 
+
+Despite these benefits of remote work, other studies have presented conflicting perspectives. Some researchers argue that there is no clear evidence that remote work enhances productivity (Bailey & Kurland, 2002). Family/life interferences,  such as interruptions in childcare, can replace workplace interferences (Grant et al., 2019). In some cases, working from home has been associated with heightened family tensions, particularly in households where both partners work remotely (Douglas et al., 2020). Como et al. found that some workers "may have trouble setting boundaries and making time for what is important" which may lead to overworking that may result in worker burnout. These work-family conflicts and work-life inbalances can negatively affect employee well-being and mental health through increased stress levels (Darouei & Pluut, 2017; Como et al. 2021).
+
+Remote work can also lead to increased social isolation (Douglas et al., 2020; Shimura et al., 2021; Di Martino & Wirth, 1990). Psychological impacts of self-isolation have also been observed, with evidence pointing to increased depression and decreased quality of life (Phadnis et al., 2021). In a study focused on the COVID-19 pandemic, Pieh et al. (2020) found that self-isolation significantly contributed to poorer mental health outcomes, especially among women, young adults, and individuals with lower income. This finding was corroborated by Toscano (2020).  
+
+The evidence on productivity remains mixed, with some studies indicating no clear improvement (Bailey & Kurland, 2002). Other studies found that remote work lead to less team collaboration (Siquiera & Medeiros, 2019; Como, 2021). Even in cases of documented economic benefits and higher output from remote work, gains do not appear to be trickling down into employee incomes (BLS, 2024). Bloom et al. (2015) also found that career prospects appear to limited among remote workers. Stagnant wages and few opportunities for promotions could contribute to work dissatisfaction among remote workers.
+
+Evidence on worker outcomes further emphasizes the importance of individual differences and organizational context in shaping remote work experiences. In their study, Gorshkova and Lebedeva (2023) found that mental well-being improved by an average of 0.01 units for each additional year of the employees age suggesting that work experience and maturity may contribute to better outcomes for remote workers. Individuals with prior experience working remotely reported better mental health than those for whom remote work was a new experience. Research work conducted during COVID-19 pandemic offered another insight: the importance of personal choice in whether to work remotely or return to the office. Bloom (2015) noted that flexibility and autonomy were critical to satisfaction and effectiveness; alternatives such as hybrid work models could be preferbel as they offer a balance between work-life needs and opportunities for team collaboration. Further, Como et al. (2021) and Shimura et al. (2021) suggested that the well-being of remote workers could be improved through greater organizational support, suggesting that structural and managerial factors remain central to successful implementation. 
+
+
+### 1.3. Hypothesis
+
+_Hypothesis 1: Remote workers were more likely to experience dissatisfaction than onsite workers_
+
+_Hypothesis 2: Workers who had a higher perception of worker isolation were more likely to also experience a Mental health condition_
+
+_Hypothesis 3: Female workers experience greater stress levels than men._
+ 
+
+### 2. Methodology
+
+#### 2.1. Data source
+
+This analysis uses a synthetic dataset downloaded from Kaggle (_Remote Work & Mental Health_)
+
+
+#### 2.2. Measures 
+**Employee_ID** – The unique identifier for each synthetic employee.
+**Age** – Modeled age of the employee
+**Gender** – Simulated gender representation
+**Job_Role** – Assigned job role
+**Industry** – Simulated industry category
+**Work_Location** – Work setting: Remote, Hybrid, or Onsite
+**Stress_Level** – Modeled self-reported stress level (Low, Medium, High)
+**Mental_Health_Condition** – Synthetic responses for mental health conditions (e.g., Anxiety, Depression)
+**Social_Isolation_Rating** – Simulated rating (1-5) on workplace isolation perception
+**Satisfaction_with_Remote_Work** – Modeled employee satisfaction with remote work (Satisfied, Neutral, Unsatisfied)
+
+
+#### 2.3. Statistical Analysis
+### Experimentation 
+
+### 3. Results
+
+### 4. Discussion 
+
+### 5. Conclusion
+
+
+#### Limitations
+ - Synthetic data - little metadata for parameters, context for data gathering, or m
+ - limited work since COVID. COVID may have skewed data or sentiments
+ - confounding varaibles that are missing from dataset
+
+### References
+
+Ali, W. (2024, September 22). Remote Work & Mental Health 🌍🧠. Kaggle. https://www.kaggle.com/datasets/waqi786/remote-work-and-mental-health Dataset
+
+Bertoni, M., Cavapozzi, D., Pasini, G., & Pavese, C. (n.d.). Remote working and mental health during the first wave of the COVID-19 pandemic. SSRN. https://doi.org/10.2139/ssrn.4111999
+
+Bloom, N., Liang J., Roberts J., & Ying, Z.J. (2015). Does working from home work? evidence from a Chinese experiment. _The Quarterly Journal of Economics_, 130(1), 165-218.
+
+Como, R. ., Hambley, L. ., & Domene, J. (2021). An Exploration of Work-Life Wellness and Remote Work During and Beyond COVID-19. _Canadian Journal of Career Development_, 20(1), 46–56. Retrieved from https://cjcd-rcdc.ceric.ca/index.php/cjcd/article/view/92
+
+Darouei, M., & Pluut, H. (2021). Work from home today for a better tomorrow! how working from home influences work‐family conflict and employees’ start of the next workday. _Stress and Health_, 37(5), 986–999. https://doi.org/10.1002/smi.3053 
+
+Douglas, M., Katikireddi, M, Taulbut, M., McKee, M., & McCartney G. (2020). Mitigating the wider health effects of COVID-19 panademic response. _BMJ_, 369.  https://doi.org/10.1136/bmj.m1557 
+
+Gorshkova, M.O., & Lebedeva, P.S. (2023). The impact of transition to a remote work format on the mental health of employees. _Population and Economics_, 7(1), 54-76. https://doi.org/10.3897/popecon.7.e90505
+
+Pieh C., Budimir S., Probst, T. (2020). The effect of age, gender, income, work, and physical activity on mental health during coronavirus disease (COVID-19) lockdown in Austria. _Journal of Psychosomatic Research_, 136, 100-186. https://doi.org/10.1016/j.psychores.2020.110186 
+
+Shimura, A., Yokoi, K., Ishibashi, Y., Akatsuka, Y., & Inoue, T. (2021). Remote work decreases psychological and physical stress responses, but full-remote work increases presenteeism. _Frontiers in Psychology_, 12, 730969. https://doi.org/10.3389/fpsyg.2021.730969
+
+Smit, B.W., Maloney, P.W., Maertz, C.P. Jr, & Montag-Smit, T. (2016). Out of sight, out of mind? How and when congnitive role transition episodes influence employee performance. _Human Relations_, 69, 2141-2168. https://doi.org/10.1177/0018726716636204
+
+Toscano, F & Zappala, S. (2020). Social isolation and stress as predictors of productivity perception and remote work satisfaction during the COVID-19 pandemic: The role of concern about the virus in a moderated double mediation. Sustainability, 12(23), 9804. https://doi.org/10.3390/su12239804
+
+U.S. Bureau of Labor Statistics. (2024). The rise in remote work across industries during the pandemic. U.S. Bureau of Labor Statistics. https://www.bls.gov/opub/btn/volume-13/remote-work-productivity.htm 
