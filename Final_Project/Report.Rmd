@@ -26,7 +26,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #### 1.1 Overview
 
-Remote work, often referred to as Work From Home (WFH), is a term used to define employee labor performed in non-traditional spaces, such as an employee's home, a coffee shop, or a public space, that are outside of employer's workplace (i.e. office or job-site) (cite). Since the early 2000's, technological innovations and the widespread adoption of high-speed internet have facilitated the growth of remote worker, particular in sectors like technology, marketing, etc (cite). This trend saw rapid adoption in 2020 due to stay-at-home mandates introduced in response to the COVID-19 pandemic. In the United States, for example, the percentage of remote workers grew from 5.7% (9 million) in 2019 to 17.9% in 2019 (BLS, 2024). 
+Remote work, often referred to as Work From Home (WFH), is a term used to define employee labor performed in non-traditional spaces, such as an employee's home, a coffee shop, or a public space, that are outside of employer's workplace (i.e. office or job-site) (cite). Since the early 2000's, technological innovations and the widespread adoption of high-speed internet have facilitated the growth of remote worker, particular in sectors like technology, marketing, etc (cite). This trend saw rapid adoption in 2020 due to stay-at-home mandates introduced in response to the COVID-19 pandemic. In the United States, for example, the percentage of remote workers grew from 5.7% (9 million) in 2019 to 17.9% in 2019 (BLS, 2024a). 
 
 As the covid mortality rates dropped and government mandates were lifted, many employers implemented "return to office" policies that made some or in-person work mandatory (Shimura et al. 2021). These policies were often reflective of negative views on remote work citing poor worker productivity and a belife that workers may be skirting their responsibilities (cite). In other cases, workers themselves preferred the office environment and voluntarily returned to onsite work. Estimates from the latest publicly available American Community Survey at writing showed that 13.8% (22 million) of U.S. workers usually worked from home (ACS, 2023), though the number is likely to continue to drop given the current political sentiment.
 
@@ -36,13 +36,13 @@ Researchers have identified several positive outcomes associated with remote wor
 
 On a personal level, remote work may facilitate better sharing family responsibilities, as employees save time on commuting, freeing up time to devote to other family obligations such as picking up children from school, household chores, and meal preparation (Darouei & Pluut, 2017). The increased flexiblity can lead to an improved work-life balance (Hill et al., 2003; Como, 2021). Further,  Shimura et al. (2021) found that remote work significantly decreases psychological and physical stress responses when accounting for confounding factors such as job stressors and sleep quality. Their study found that job stressors, poor sleep, and lack of support systems pose greater risks to productivity than remote work itself.
 
-Job role and industry also seems to play a role in the success of remote work. In 2024, the US Bureau of Labor Statistics found that of the top 10 industries experiencing the highest growth in remote work from 2019–22, 7 had increased output and labor inputs. Outputs far outpaced inputs for the industry sectors of computer systems design and related services; publishing industries, except internet [includes software]; and data processing, internet publishing, and other information services (BLS, 2024). Beyond increased output, companies saw other gains found in cost savings from lower employee turnover and decreased office space needs (Bloom et al., 2015; BLS 2024). In their observational experiment of teleworkers in China, Bloom et al. (2015) found that attrition fell by about 50% resulting in lower operating costs from not having to train new employees. 
+Job role and industry also seems to play a role in the success of remote work. In 2024, the US Bureau of Labor Statistics found that of the top 10 industries experiencing the highest growth in remote work from 2019–22, 7 had increased output and labor inputs. Outputs far outpaced inputs for the industry sectors of computer systems design and related services; publishing industries, except internet [includes software]; and data processing, internet publishing, and other information services. Beyond increased output, companies saw other gains found in cost savings from lower employee turnover and decreased office space needs (Bloom et al., 2015; BLS 2024a). In their observational experiment of teleworkers in China, Bloom et al. (2015) found that attrition fell by about 50% resulting in lower operating costs from not having to train new employees. 
 
 Despite these benefits of remote work, other studies have presented conflicting perspectives. Some researchers argue that there is no clear evidence that remote work enhances productivity (Bailey & Kurland, 2002). Family/life interferences,  such as interruptions in childcare, can replace workplace interferences (Grant et al., 2019). In some cases, working from home has been associated with heightened family tensions, particularly in households where both partners work remotely (Douglas et al., 2020). Como et al. found that some workers "may have trouble setting boundaries and making time for what is important" which may lead to overworking that may result in worker burnout. These work-family conflicts and work-life inbalances can negatively affect employee well-being and mental health through increased stress levels (Darouei & Pluut, 2017; Como et al. 2021).
 
 Remote work can also lead to increased social isolation (Douglas et al., 2020; Shimura et al., 2021; Di Martino & Wirth, 1990). Psychological impacts of self-isolation have also been observed, with evidence pointing to increased depression and decreased quality of life (Phadnis et al., 2021). In a study focused on the COVID-19 pandemic, Pieh et al. (2020) found that self-isolation significantly contributed to poorer mental health outcomes, especially among women, young adults, and individuals with lower income. This finding was corroborated by Toscano (2020).  
 
-The evidence on productivity remains mixed, with some studies indicating no clear improvement (Bailey & Kurland, 2002). Other studies found that remote work lead to less team collaboration (Siquiera & Medeiros, 2019; Como, 2021). Even in cases of documented economic benefits and higher output from remote work, gains do not appear to be trickling down into employee incomes (BLS, 2024). Bloom et al. (2015) also found that career prospects appear to limited among remote workers. Stagnant wages and few opportunities for promotions could contribute to work dissatisfaction among remote workers.
+The evidence on productivity remains mixed, with some studies indicating no clear improvement (Bailey & Kurland, 2002). Other studies found that remote work lead to less team collaboration (Siquiera & Medeiros, 2019; Como, 2021). Even in cases of documented economic benefits and higher output from remote work, gains do not appear to be trickling down into employee incomes (BLS, 2024a). Bloom et al. (2015) also found that career prospects appear to limited among remote workers. Stagnant wages and few opportunities for promotions could contribute to work dissatisfaction among remote workers.
 
 Evidence on worker outcomes further emphasizes the importance of individual differences and organizational context in shaping remote work experiences. In their study, Gorshkova and Lebedeva (2023) found that mental well-being improved by an average of 0.01 units for each additional year of the employees age suggesting that work experience and maturity may contribute to better outcomes for remote workers. Individuals with prior experience working remotely reported better mental health than those for whom remote work was a new experience. Research work conducted during COVID-19 pandemic offered another insight: the importance of personal choice in whether to work remotely or return to the office. Bloom (2015) noted that flexibility and autonomy were critical to satisfaction and effectiveness; alternatives such as hybrid work models could be preferable as they offer a balance between work-life needs and opportunities for team collaboration. Further, Como et al. (2021) and Shimura et al. (2021) suggested that the well-being of remote workers could be improved through greater organizational support, suggesting that structural and managerial factors remain central to successful implementation. 
 
@@ -79,19 +79,14 @@ _Hypothesis 3: Female workers experience greater stress levels than male workers
 
 #### 2.1. Data source
 
-This analysis uses a synthetic dataset downloaded from Kaggle (_Remote Work & Mental Health_). 
+This analysis uses a synthetic dataset downloaded from Kaggle (_Remote Work & Mental Health_). The original dataset is comprised on observations form 5,000 unique employees comprised of employee reported survey data such as level of work satisfaction, work-life balance, and stressors along with their basic employee profile (gender, age, years of experience, and job role) and company assessments (changes in productivity). A full list of the variables is included in Appendix A.
 
-#### 2.2. Measures 
-**Employee_ID** – The unique identifier for each synthetic employee.
-**Age** – Modeled age of the employee
-**Gender** – Simulated gender representation
-**Job_Role** – Assigned job role
-**Industry** – Simulated industry category
-**Work_Location** – Work setting: Remote, Hybrid, or Onsite
-**Stress_Level** – Modeled self-reported stress level (Low, Medium, High)
-**Mental_Health_Condition** – Synthetic responses for mental health conditions (e.g., Anxiety, Depression)
-**Social_Isolation_Rating** – Simulated rating (1-5) on workplace isolation perception
-**Satisfaction_with_Remote_Work** – Modeled employee satisfaction with remote work (Satisfied, Neutral, Unsatisfied)
+During the data exploration phase of the project, we discovered instances where years of experience was close to employee's age. We therefore filtered out any observations where the difference between the employee's age and their work experience was less than 22 years, as 22 is the minimum age of employees in the dataset. In the U.S., the share of 20-24 year-olds in the labor force was 71.3% in 2023 (BLS, 2024b). Our final analysis therefore consists of the remaining 2,711 observations.
+
+
+#### 2.2. Measures
+
+Our dataset consisted of the following measures:
 
 
 #### 2.3. Statistical Analysis
@@ -133,4 +128,35 @@ Smit, B.W., Maloney, P.W., Maertz, C.P. Jr, & Montag-Smit, T. (2016). Out of sig
 
 Toscano, F & Zappala, S. (2020). Social isolation and stress as predictors of productivity perception and remote work satisfaction during the COVID-19 pandemic: The role of concern about the virus in a moderated double mediation. Sustainability, 12(23), 9804. https://doi.org/10.3390/su12239804
 
-U.S. Bureau of Labor Statistics. (2024). The rise in remote work across industries during the pandemic. U.S. Bureau of Labor Statistics. https://www.bls.gov/opub/btn/volume-13/remote-work-productivity.htm 
+U.S. Bureau of Labor Statistics (BLS). (2024a). The rise in remote work across industries during the pandemic. U.S. Bureau of Labor Statistics. https://www.bls.gov/opub/btn/volume-13/remote-work-productivity.htm 
+
+U.S. Bureau of Labor Statistics (BLS). (2024b, August 29). Civilian labor force participation rate by age, sex, race, and ethnicity. https://www.bls.gov/emp/tables/civilian-labor-force-participation-rate.htm
+
+\newpage
+
+\begin{center}
+Appendix A: Full List of Measures in Dataset
+\end{center}
+
+\small
+| Variable                                       | Description                                    | Values                          |
+|------------------------------------------------|------------------------------------------------|-------------------------------------------|
+| Employee_ID                              | Unique ID for each synthetic employee          | Numeric ID                                                 |
+| Age                                           | Age of the employee                            | 22–60                                                      |
+| Gender                                        | Gender representation                          | Female, Male, Non-binary, Prefer not to say                |
+| Job_Role                                      | Assigned job role                              | Data Scientist, Designer, HR, Marketing, Project Manager, Sales, Software Engineer |
+| Industry                                      | Industry sector or category                    | Consulting, Education, Finance, Healthcare, IT, Manufacturing, Retail |
+| Work_Location                                 | Work setting                                   | Remote, Hybrid, Onsite                                     |
+| Hours_Worked_Per_Week                         | Average weekly hours worked                    | Numeric value                                              |
+| Number_of_Virtual_Meetings                    | Number of virtual meetings per week            | 0–15                                                       |
+| Work_Life_Balance_Rating            | Self-rated work-life balance                   | 1–5                                                        |
+| Stress_Level                                 | Self-reported stress level                     | Low, Medium, High                                          |
+| Mental_Health_Condition                      | Self-reported mental health status             | Anxiety, Burnout, Depression, None                         |
+| Access_to_Mental_Health_Resources | Access to mental health resources            | Yes / No                                                   |
+| Productivity_Change                          | Change in productivity                         | Increase, No Change, Decrease                              |
+| Social_Isolation_Rating                       | Perceived social isolation                     | 1–5                                                        |
+| Satisfaction_with_Remote_Work  | Satisfaction with remote work                  | Satisfied, Neutral, Unsatisfied                            |
+| Company_Support_for_Remote_Work| Company’s support for remote work              | 1–5                                                        |
+| Physical_Activity                            | Frequency of exercise                          | Daily, Weekly, None                                        |
+| Sleep_Quality                                | Self-assessed sleep quality                    | Good, Average, Poor                                        |
+| Region                                       | Region of employment                           | Africa, Asia, Europe, North America, Oceania, South America|
