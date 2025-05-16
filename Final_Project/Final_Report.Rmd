@@ -1,14 +1,75 @@
 ---
 title: "Remote Work, Mental Health and Work Satisfaction"
+author: "Mubashira Qari, Erick Hadi, Marco Castro, Zach Rose, Puja Roy"
 output:
   pdf_document: default
   html_document: default
-date: "2025-05-09"
+date: "2025-05-19"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+
+```{r load-data, warning = FALSE, message = FALSE, echo=FALSE, include=FALSE }
+# Load required packages
+library(htmltools)
+library(caret)
+library(pROC)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(skimr)
+require(DataExplorer)
+require(miscTools)
+require(MASS)
+require(performance)
+require(lmtest)
+require(mice)
+require(glmnet)
+require(Metrics) 
+library(patchwork)  # for combining ggplots
+library(e1071)
+library(car)
+library(forcats)      # For better factor handling
+library(car)
+
+remote_work_raw <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Final_Project/Impact_of_Remote_Work_on_Mental_Health.csv")
+
+remote_work_df <- remote_work_raw %>% 
+  filter((Age - Years_of_Experience) >= 22) %>% 
+  dplyr::select(-Employee_ID) %>%
+  mutate(across(where(is.character), as.factor))
+
+data <- remote_work_df  %>% 
+  filter(Satisfaction_with_Remote_Work %in% c("Satisfied", "Unsatisfied"))
+data$Stress_Level <- factor(data$Stress_Level, levels = c("Low", "Medium", "High"), ordered = TRUE)
+data$Work_Life_Balance_Rating <- factor(data$Work_Life_Balance_Rating, ordered = TRUE)
+data$Company_Support_for_Remote_Work <- factor(data$Company_Support_for_Remote_Work, ordered = TRUE)
+
+data$Access_to_Mental_Health_Resources <- factor(data$Access_to_Mental_Health_Resources, levels = c("No", "Yes"))
+data$Satisfaction_with_Remote_Work <- factor(data$Satisfaction_with_Remote_Work, 
+                                              levels = c("Unsatisfied", "Satisfied"))
+
+data$Has_Mental_Health_Issue <- ifelse(data$Mental_Health_Condition != "None", 1, 0)
+data$Has_Mental_Health_Issue <- factor(data$Has_Mental_Health_Issue, 
+                                       levels = c(0,1), labels = c("No", "Yes"))
+
+data <- data %>% dplyr::select(-Mental_Health_Condition) 
+data <- data %>% dplyr::select(-Productivity_Change) 
+
+set.seed(621)  
+trainIndex <- createDataPartition(data$Satisfaction_with_Remote_Work, 
+                                  p = 0.8,  
+                                  list = FALSE)
+
+train_data <- data[trainIndex, ]
+test_data  <- data[-trainIndex, ]
+```
+
+
 
 ### Abstract
 
@@ -26,9 +87,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #### 1.1 Overview
 
-Remote work, often referred to as Work From Home (WFH), is a term used to define employee labor performed in non-traditional spaces, such as an employee's home, a coffee shop, or a public space, that are outside of employer's workplace (i.e. office or job-site) (cite). Since the early 2000's, technological innovations and the widespread adoption of high-speed internet have facilitated the growth of remote worker, particular in sectors like technology, marketing, etc (cite). This trend saw rapid adoption in 2020 due to stay-at-home mandates introduced in response to the COVID-19 pandemic. In the United States, for example, the percentage of remote workers grew from 5.7% (9 million) in 2019 to 17.9% in 2019 (BLS, 2024a). 
+Remote work, often referred to as telework, work for pay at home or  ork From Home (WFH), is a term used to define an arrangement in which employee labor is performed in non-traditional spaces, such as an employee's home or another public/private space, that are outside of employer's worksite (i.e. office or job-site) (OPM). Since the early 2000's, technological innovations and the widespread adoption of high-speed internet have facilitated the growth of remote worker, particular in sectors like technology, marketing, etc (cite). This trend saw rapid adoption in 2020 due to stay-at-home mandates introduced in response to the COVID-19 pandemic. In the United States, for example, the percentage of remote workers grew from 5.7% (9 million) in 2019 to 17.9% in 2019 (BLS, 2024a). 
 
-As the covid mortality rates dropped and government mandates were lifted, many employers implemented "return to office" policies that made some or in-person work mandatory (Shimura et al. 2021). These policies were often reflective of negative views on remote work citing poor worker productivity and a belife that workers may be skirting their responsibilities (cite). In other cases, workers themselves preferred the office environment and voluntarily returned to onsite work. Estimates from the latest publicly available American Community Survey at writing showed that 13.8% (22 million) of U.S. workers usually worked from home (ACS, 2023), though the number is likely to continue to drop given the current political sentiment.
+As the covid mortality rates dropped and government mandates were lifted, many employers implemented "return to office" policies that made some or in-person work mandatory (Shimura et al. 2021). These policies were often reflective of negative views on remote work citing poor worker productivity and a belief that workers may be skirting their responsibilities (cite). In other cases, workers themselves preferred the office environment and voluntarily returned to onsite work. Estimates from the latest publicly available American Community Survey at writing showed that 13.8% (22 million) of U.S. workers usually worked from home (ACS, 2023), though the number is likely to continue to drop given the current political sentiment.
 
 At the heart of the debate around the effectiveness -- or lack thereof -- of remote work are the long-term outcomes on the mental health of workers. Prior studies have found both positive and negative outcomes that depend on a multitude of factors, including an individual's home life, health, work style, and access to support systems to name a few, suggesting the nuanced nature of remote work and its outcomes (cite). 
 
@@ -86,15 +147,60 @@ During the data exploration phase of the project, we discovered instances where 
 
 #### 2.2. Measures
 
-Our dataset consisted of the following measures:
-
+[Placeholder for variables used in our analysis and some basic stts. Maybe we dont need this.?]
+Our analysis consisted of the following measures:
 
 #### 2.3. Statistical Analysis
+
+For this study, we were interested to understand how remote work affects employee job satisfaction for remote work based on a simulated dataset. Our focus was Satisfaction_with_Remote_Work, and it had two classes: Satisfied and Unsatisfied. Since this is a binary classification problem, our first modeling attempt was logistic regression because it is simple to interpret and can handle binary responses.
+
+Data preparation was conducted before modeling. We removed neutral responders on satisfaction (for a clean contrast between satisfied and dissatisfied groups). Categorical variables were factorized, and a new binary variable Has_Mental_Health_Issue was created from the original Mental_Health_Condition. We also removed non-relevant columns like Productivity_Change and Employee_ID. It was subsequently divided into training and test sets in the ratio of 80/20 to enable proper testing.
+
+To be able to verify stability of our logistic regression model, we checked for multicollinearity using VIF (Variance Inflation Factor), and this confirmed all predictors were not engaged in suspect intercorrelations. We attempted a LASSO-penalized logistic regression attempting variable selection but observed no coefficients were selected — showing absence of strong predictors and suggesting weak signal strength in features.
+
 ### Experimentation 
 
-### 3. Results
+#### 3. Results
+
+Logistic model output indicated that all but one of the predictor variables were not significant. Some were weakly or marginally significant at 0.10 or 0.05. The following was seen:
+Healthcare respondents were significantly more likely to dislike telework (p = 0.039).
+
+Remote workers had moderately increased odds of dissatisfaction compared to onsite workers (p = 0.052), weakly supported Hypothesis 1.
+
+Oceania workers were only sweeter, but the impact was statistically significant (p = 0.0539) only.
+
+Physical activity last week was on the verge of significance (p = 0.07) and indicates that active players would be sweeter, but that needs to be explored.
+
+Model performing measures were low:
+
+* Accuracy: 50.7%
+* Sensitivity ( Identified Unsatisfied): 55.5%
+* Specificity ( Identified Satisfied): 45.9%
+* AUC Score: ~0.51 (random-like)
+
+This means that the model can't differentiate between the satisfied and dissatisfied respondents. Poor performance prediction is reflected by the confusion matrix using almost balanced but poor performance — it shows that the data are clean but of poor predictive powers for this specific result.
+
+According to the hypotheses:
+
+Hypothesis 1 is weakly supported: Remote workers were somewhat dissatisfied, although the result is weakly significant.
+
+Hypothesis 2 was not testable since a binary mental health variable had been constructed and the original variable was not present in the model.
+
+Hypothesis 3 was false since Gender did not have a statistically significant effect on stress level or job satisfaction in our logistic model.
+
 
 ### 4. Discussion 
+
+Though logistic regression indicated what variables might be driving remote work satisfaction, predictive strength was weak, and all but a few variables contributed minimally. The model is suggesting industry-wide dissatisfaction but particularly in health care and less latent regional and behavior-based variations (i.e., exercise, where one works). Overall, thus, the judgment is that remote working job satisfaction is a product of highly interactive, multivariate factors which cannot be fully encompassed within the described characteristics.
+
+Subsequent models might then be supplemented with higher-importance data such as open-ended free text responses, personality traits, work environment control, or organizational support systems in addition to the rating scale.
+
+The research did try to predict employee telecommuting job satisfaction with the use of logistic regression application. Despite having clean, well-formatted data, the model was not discriminative and was about 51% accurate and AUC value was at the near chance level. The predictor variables were extremely poor on statistical significance.
+
+There was no evidence to support the existence of the fact that telecommuters were less satisfied (contrary to Hypothesis 1), or working professionals in the health sector were less satisfied. There was little evidence for either Hypothesis 2 (psychological isolation and mental well-being) or Hypothesis 3 (gender difference of the stress level).
+
+Overall, results suggest that job satisfaction among telecommuters is a multifaceted and intricate phenomenon that cannot be accounted for by underlying conditions of work and demographic variables. Future research must take into account the role played by yet more advanced psychological, social, and organizational variables in efforts to maximize predictive validity as well as understanding.
+
 
 ### 5. Conclusion
 
@@ -132,6 +238,8 @@ U.S. Bureau of Labor Statistics (BLS). (2024a). The rise in remote work across i
 
 U.S. Bureau of Labor Statistics (BLS). (2024b, August 29). Civilian labor force participation rate by age, sex, race, and ethnicity. https://www.bls.gov/emp/tables/civilian-labor-force-participation-rate.htm
 
+U.S. Office of Personnel Management (OPM). (n.d.). What is the definition of remote work? https://www.opm.gov/frequently-asked-questions/telework-faq/employee/what-is-the-definition-of-remote-work/
+
 \newpage
 
 \begin{center}
@@ -160,3 +268,149 @@ Appendix A: Full List of Measures in Dataset
 | Physical_Activity                            | Frequency of exercise                          | Daily, Weekly, None                                        |
 | Sleep_Quality                                | Self-assessed sleep quality                    | Good, Average, Poor                                        |
 | Region                                       | Region of employment                           | Africa, Asia, Europe, North America, Oceania, South America|
+
+\newpage
+
+
+\begin{center}
+Appendix B: Exploratory Charts
+\end{center}
+
+```{r, fig.height=4, echo=FALSE, include=TRUE}
+
+### Distribution Plots for Work Location vs Stress Level
+p1 <- ggplot(data, aes(x = Work_Location, fill = Stress_Level)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Stress Level by Work Location", x = "Work Location", y = "Count") +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  ) 
+
+
+### Relationships Exploration for Productivity Change vs Mental Health
+p2 <- ggplot(remote_work_df, aes(x = Mental_Health_Condition, fill = Productivity_Change)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Productivity Change by Mental Health Condition") +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  ) 
+
+(p1 | p2)
+
+numeric_data <- data %>%
+  dplyr::select(where(is.numeric))
+
+cor_matrix <- cor(numeric_data, use = "complete.obs")
+
+# Optional: Use corrplot for better visuals
+library(corrplot)
+corrplot(cor_matrix, method = "color", tl.cex = 0.8)
+
+```
+
+\newpage
+
+\begin{center}
+Appendix C: Summary Output of Logistic Regression Model
+\end{center}
+
+```{r, echo=FALSE, include=TRUE}
+# Fit logistic regression model
+model <- glm(Satisfaction_with_Remote_Work ~ Age + Gender + Job_Role + Industry +
+               Years_of_Experience + Work_Location + Hours_Worked_Per_Week +
+               Number_of_Virtual_Meetings + Work_Life_Balance_Rating +
+               Stress_Level + Access_to_Mental_Health_Resources +
+               Social_Isolation_Rating + Company_Support_for_Remote_Work +
+               Physical_Activity + Sleep_Quality + Region + Has_Mental_Health_Issue,
+             data = train_data, family = binomial)
+
+summary(model)
+```
+
+\newpage
+
+\begin{center}
+Appendix C: Plot of LASSO Cross-validation Curve
+\end{center}
+
+```{r, echo=FALSE, include=TRUE}
+### LASSO Logistic Regression
+# Prepare data matrices
+x <- model.matrix(Satisfaction_with_Remote_Work ~ . -1, data = train_data)
+y <- train_data$Satisfaction_with_Remote_Work
+
+# Encode response as binary for glmnet
+y_bin <- ifelse(y == "Satisfied", 1, 0)
+
+# Fit LASSO logistic regression
+set.seed(621)
+cv.lasso <- cv.glmnet(x, y_bin, alpha = 1, family = "binomial")
+
+# Best lambda
+best_lambda <- cv.lasso$lambda.min
+best_lambda
+
+# Plot cross-validation curve
+plot(cv.lasso)
+
+
+```
+
+\newpage
+```{r, echo=FALSE, include=FALSE}
+# Fit model with best lambda
+lasso_model <- glmnet(x, y_bin, alpha = 1, family = "binomial", lambda = best_lambda)
+
+# Coefficients
+coef(lasso_model)
+
+```
+
+
+\newpage 
+
+\begin{center}
+Appendix: Confusion Matrix of Logistic Regression Model
+\end{center}
+
+```{r, echo=FALSE}
+# Predict probabilities on the test set
+test_probs <- predict(model, newdata = test_data, type = "response")
+
+# Convert probabilities to predicted classes
+test_preds <- ifelse(test_probs > 0.5, "Satisfied", "Unsatisfied")
+test_preds <- factor(test_preds, levels = levels(test_data$Satisfaction_with_Remote_Work))
+
+# Confusion Matrix
+conf_matrix <- confusionMatrix(test_preds, test_data$Satisfaction_with_Remote_Work)
+ print(conf_matrix)
+
+# Load required library
+library(pROC)
+
+# Convert true labels to numeric: 0 = Unsatisfied, 1 = Satisfied
+y_true <- ifelse(test_data$Satisfaction_with_Remote_Work == "Satisfied", 1, 0)
+
+# Compute ROC and AUC
+roc_obj <- roc(response = y_true, predictor = test_probs)
+```
+
+\newpage
+
+\begin{center}
+Appendix E: ROC Curve
+\end{center}
+
+```{r, echo=FALSE}
+# Plot ROC curve
+plot(roc_obj, col = "blue", main = "ROC Curve for Logistic Regression")
+abline(a = 0, b = 1, lty = 2, col = "gray")
+
+# Print AUC
+#auc_value <- auc(roc_obj)
+#cat("AUC:", auc_value, "\n")
+
+
+```

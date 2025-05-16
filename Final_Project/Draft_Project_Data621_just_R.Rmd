@@ -1,0 +1,221 @@
+---
+title: "Untitled"
+author: "Mubashira Qari, Erick Hadi, Puja Roy, Marco Castro, Zach Rose"
+date: "2025-05-04"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+---
+title: "Data621_Final_Project"
+author: "Mubashira Qari"
+date: "2025-04-26"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE, include=FALSE }
+# Load required packages
+library(htmltools)
+library(caret)
+library(pROC)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(skimr)
+require(DataExplorer)
+require(miscTools)
+require(MASS)
+require(performance)
+require(lmtest)
+require(mice)
+require(glmnet)
+require(Metrics) 
+library(patchwork)  # for combining ggplots
+library(e1071)
+library(car)
+library(forcats)      # For better factor handling
+library(car)
+
+remote_work_raw <- read_csv("https://raw.githubusercontent.com/uzmabb182/Data_621/refs/heads/main/Final_Project/Impact_of_Remote_Work_on_Mental_Health.csv")
+
+remote_work_df <- remote_work_raw %>% 
+  filter((Age - Years_of_Experience) >= 22) %>% 
+  dplyr::select(-Employee_ID) %>%
+  mutate(across(where(is.character), as.factor))
+
+data <- remote_work_df  %>% 
+  filter(Satisfaction_with_Remote_Work %in% c("Satisfied", "Unsatisfied"))
+data$Stress_Level <- factor(data$Stress_Level, levels = c("Low", "Medium", "High"), ordered = TRUE)
+data$Work_Life_Balance_Rating <- factor(data$Work_Life_Balance_Rating, ordered = TRUE)
+data$Company_Support_for_Remote_Work <- factor(data$Company_Support_for_Remote_Work, ordered = TRUE)
+
+data$Access_to_Mental_Health_Resources <- factor(data$Access_to_Mental_Health_Resources, levels = c("No", "Yes"))
+data$Satisfaction_with_Remote_Work <- factor(data$Satisfaction_with_Remote_Work, 
+                                              levels = c("Unsatisfied", "Satisfied"))
+
+data$Has_Mental_Health_Issue <- ifelse(data$Mental_Health_Condition != "None", 1, 0)
+data$Has_Mental_Health_Issue <- factor(data$Has_Mental_Health_Issue, 
+                                       levels = c(0,1), labels = c("No", "Yes"))
+
+data <- data %>% dplyr::select(-Mental_Health_Condition) 
+data <- data %>% dplyr::select(-Productivity_Change) 
+
+set.seed(621)  
+trainIndex <- createDataPartition(data$Satisfaction_with_Remote_Work, 
+                                  p = 0.8,  
+                                  list = FALSE)
+
+train_data <- data[trainIndex, ]
+test_data  <- data[-trainIndex, ]
+```
+
+
+
+```{r, echo=FALSE}
+### Distribution Plots for Age column
+ggplot(data, aes(x = Age)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
+  theme_minimal() +
+  labs(title = "Age Distribution", x = "Age", y = "Count")
+
+```
+
+```{r, echo=FALSE, include=TRUE}
+
+### Distribution Plots for Work Location vs Stress Level
+p1 <- ggplot(data, aes(x = Work_Location, fill = Stress_Level)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Stress Level by Work Location", x = "Work Location", y = "Count") +
+  theme_minimal()
+
+
+
+### Relationships Exploration for Productivity Change vs Mental Health
+p2 <- ggplot(remote_work_df, aes(x = Mental_Health_Condition, fill = Productivity_Change)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Productivity Change by Mental Health Condition") +
+  theme_minimal()
+
+(p1 | p2)
+```
+
+
+
+
+```{r, echo=FALSE}
+
+### Distribution Plots for Mental Health Condition by Gender
+ggplot(remote_work_df, aes(x = Gender, fill = Mental_Health_Condition)) +
+  geom_bar(position = "fill") +
+  labs(title = "Mental Health Condition Distribution by Gender", y = "Proportion") +
+  theme_minimal() +
+  coord_flip()
+
+```
+
+
+```{r, echo=FALSE, include=FALSE}
+
+### Correlation (Numeric Features)
+# Correlation matrix
+numeric_data <- data %>%
+  dplyr::select(where(is.numeric))
+
+cor_matrix <- cor(numeric_data, use = "complete.obs")
+round(cor_matrix, 2)
+
+# Optional: Use corrplot for better visuals
+library(corrplot)
+corrplot(cor_matrix, method = "color", tl.cex = 0.8)
+
+```
+
+
+
+
+
+
+### Modeling & Results
+
+Logistic Regression
+```{r, echo=FALSE, include=FALSE}
+# Fit logistic regression model
+model <- glm(Satisfaction_with_Remote_Work ~ Age + Gender + Job_Role + Industry +
+               Years_of_Experience + Work_Location + Hours_Worked_Per_Week +
+               Number_of_Virtual_Meetings + Work_Life_Balance_Rating +
+               Stress_Level + Access_to_Mental_Health_Resources +
+               Social_Isolation_Rating + Company_Support_for_Remote_Work +
+               Physical_Activity + Sleep_Quality + Region + Has_Mental_Health_Issue,
+             data = train_data, family = binomial)
+
+
+### LASSO Logistic Regression
+# Prepare data matrices
+x <- model.matrix(Satisfaction_with_Remote_Work ~ . -1, data = train_data)
+y <- train_data$Satisfaction_with_Remote_Work
+
+# Encode response as binary for glmnet
+y_bin <- ifelse(y == "Satisfied", 1, 0)
+
+# Fit LASSO logistic regression
+set.seed(621)
+cv.lasso <- cv.glmnet(x, y_bin, alpha = 1, family = "binomial")
+
+# Best lambda
+best_lambda <- cv.lasso$lambda.min
+best_lambda
+
+# Plot cross-validation curve
+plot(cv.lasso)
+
+
+```
+
+```{r, echo=FALSE, include=FALSE}
+# Fit model with best lambda
+lasso_model <- glmnet(x, y_bin, alpha = 1, family = "binomial", lambda = best_lambda)
+
+# Coefficients
+coef(lasso_model)
+
+```
+
+
+```{r, echo=FALSE}
+# Predict probabilities on the test set
+test_probs <- predict(model, newdata = test_data, type = "response")
+
+# Convert probabilities to predicted classes
+test_preds <- ifelse(test_probs > 0.5, "Satisfied", "Unsatisfied")
+test_preds <- factor(test_preds, levels = levels(test_data$Satisfaction_with_Remote_Work))
+
+# Confusion Matrix
+conf_matrix <- confusionMatrix(test_preds, test_data$Satisfaction_with_Remote_Work)
+print(conf_matrix)
+
+# Load required library
+library(pROC)
+
+# Convert true labels to numeric: 0 = Unsatisfied, 1 = Satisfied
+y_true <- ifelse(test_data$Satisfaction_with_Remote_Work == "Satisfied", 1, 0)
+
+# Compute ROC and AUC
+roc_obj <- roc(response = y_true, predictor = test_probs)
+
+# Plot ROC curve
+plot(roc_obj, col = "blue", main = "ROC Curve for Logistic Regression")
+abline(a = 0, b = 1, lty = 2, col = "gray")
+
+# Print AUC
+#auc_value <- auc(roc_obj)
+#cat("AUC:", auc_value, "\n")
+
+
+```
+
+
