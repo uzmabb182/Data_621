@@ -604,15 +604,134 @@ test_data  <- data[-trainIndex, ]
 ```
 
 
+### Modeling & Results
 
+Logistic Regression
 ```{r}
+# Fit logistic regression model
+model <- glm(Satisfaction_with_Remote_Work ~ Age + Gender + Job_Role + Industry +
+               Years_of_Experience + Work_Location + Hours_Worked_Per_Week +
+               Number_of_Virtual_Meetings + Work_Life_Balance_Rating +
+               Stress_Level + Access_to_Mental_Health_Resources +
+               Social_Isolation_Rating + Company_Support_for_Remote_Work +
+               Physical_Activity + Sleep_Quality + Region + Has_Mental_Health_Issue,
+             data = train_data, family = binomial)
+
+summary(model)
 
 ```
 
+For the assignment, we were interested to understand how remote work affects employee job satisfaction for remote work based on a simulated dataset. Our focus was Satisfaction_with_Remote_Work, and it had two classes: Satisfied and Unsatisfied. Since this is a binary classification problem, our first modeling attempt was logistic regression because it is simple to interpret and can handle binary responses.
+
+Data preparation was conducted before modeling. We removed unrealistic rows where Age - Years_of_Experience < 22, and neutral responders on satisfaction (for a clean contrast between satisfied and dissatisfied groups). Categorical variables were factorized, and a new binary variable Has_Mental_Health_Issue was created from the original Mental_Health_Condition. We also removed non-relevant columns like Productivity_Change and Employee_ID. It was subsequently divided into training and test sets in the ratio of 80/20 to enable proper testing.
+
+To be able to verify stability of our logistic regression model, we checked for multicollinearity using VIF (Variance Inflation Factor), and this confirmed all predictors were not engaged in suspect intercorrelations. We attempted a LASSO-penalized logistic regression attempting variable selection but observed no coefficients were selected — showing absence of strong predictors and suggesting weak signal strength in features.
+
+
+### LASSO Logistic Regression
+
 ```{r}
+# Prepare data matrices
+x <- model.matrix(Satisfaction_with_Remote_Work ~ . -1, data = train_data)
+y <- train_data$Satisfaction_with_Remote_Work
+
+# Encode response as binary for glmnet
+y_bin <- ifelse(y == "Satisfied", 1, 0)
+
+# Fit LASSO logistic regression
+set.seed(621)
+cv.lasso <- cv.glmnet(x, y_bin, alpha = 1, family = "binomial")
+
+# Best lambda
+best_lambda <- cv.lasso$lambda.min
+best_lambda
+
+# Plot cross-validation curve
+plot(cv.lasso)
+
+# Fit model with best lambda
+lasso_model <- glmnet(x, y_bin, alpha = 1, family = "binomial", lambda = best_lambda)
+
+# Coefficients
+coef(lasso_model)
 
 ```
+
+Logistic model output indicated that all but one of the predictor variables were not significant. Some were weakly or marginally significant at 0.10 or 0.05. The following was seen:
+Healthcare respondents were significantly more likely to dislike telework (p = 0.039).
+
+Remote workers had moderately increased odds of dissatisfaction compared to onsite workers (p = 0.052), weakly supported Hypothesis 1.
+
+Oceania workers were only sweeter, but the impact was statistically significant (p = 0.0539) only.
+
+Physical activity last week was on the verge of significance (p = 0.07) and indicates that active players would be sweeter, but that needs to be explored.
+
+Model performing measures were low:
+
+Accuracy: 50.7%
+
+Sensitivity ( Identified Unsatisfied): 55.5%
+
+Specificity ( Identified Satisfied): 45.9%
+
+AUC Score: ~0.51 (random-like)
+
+This means that the model can't differentiate between the satisfied and dissatisfied respondents. Poor performance prediction is reflected by the confusion matrix using almost balanced but poor performance — it shows that the data are clean but of poor predictive powers for this specific result.
+
+According to the hypotheses:
+
+Hypothesis 1 is weakly supported: Remote workers were somewhat dissatisfied, although the result is weakly significant.
+
+Hypothesis 2 was not testable since a binary mental health variable had been constructed and the original variable was not present in the model.
+
+Hypothesis 3 was false since Gender did not have a statistically significant effect on stress level or job satisfaction in our logistic model.
+
+
+### Model Evaluation on Test Set
+
 ```{r}
+# Predict probabilities on the test set
+test_probs <- predict(model, newdata = test_data, type = "response")
+
+# Convert probabilities to predicted classes
+test_preds <- ifelse(test_probs > 0.5, "Satisfied", "Unsatisfied")
+test_preds <- factor(test_preds, levels = levels(test_data$Satisfaction_with_Remote_Work))
+
+# Confusion Matrix
+conf_matrix <- confusionMatrix(test_preds, test_data$Satisfaction_with_Remote_Work)
+print(conf_matrix)
+
+# Load required library
+library(pROC)
+
+# Convert true labels to numeric: 0 = Unsatisfied, 1 = Satisfied
+y_true <- ifelse(test_data$Satisfaction_with_Remote_Work == "Satisfied", 1, 0)
+
+# Compute ROC and AUC
+roc_obj <- roc(response = y_true, predictor = test_probs)
+
+# Plot ROC curve
+plot(roc_obj, col = "blue", main = "ROC Curve for Logistic Regression")
+abline(a = 0, b = 1, lty = 2, col = "gray")
+
+# Print AUC
+auc_value <- auc(roc_obj)
+cat("AUC:", auc_value, "\n")
+
 
 ```
+
+Summary & Conclusion:
+
+
+Though logistic regression indicated what variables might be driving remote work satisfaction, predictive strength was weak, and all but a few variables contributed minimally. The model is suggesting industry-wide dissatisfaction but particularly in health care and less latent regional and behavior-based variations (i.e., exercise, where one works). Overall, thus, the judgment is that remote working job satisfaction is a product of highly interactive, multivariate factors which cannot be fully encompassed within the described characteristics.
+
+Subsequent models might then be supplemented with higher-importance data such as open-ended free text responses, personality traits, work environment control, or organizational support systems in addition to the rating scale.
+
+The research did try to predict employee telecommuting job satisfaction with the use of logistic regression application. Despite having clean, well-formatted data, the model was not discriminative and was about 51% accurate and AUC value was at the near chance level. The predictor variables were extremely poor on statistical significance.
+
+There was no evidence to support the existence of the fact that telecommuters were less satisfied (contrary to Hypothesis 1), or working professionals in the health sector were less satisfied. There was little evidence for either Hypothesis 2 (psychological isolation and mental well-being) or Hypothesis 3 (gender difference of the stress level).
+
+Overall, results suggest that job satisfaction among telecommuters is a multifaceted and intricate phenomenon that cannot be accounted for by underlying conditions of work and demographic variables. Future research must take into account the role played by yet more advanced psychological, social, and organizational variables in efforts to maximize predictive validity as well as understanding.
+
 
