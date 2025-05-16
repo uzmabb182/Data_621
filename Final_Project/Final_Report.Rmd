@@ -87,11 +87,11 @@ test_data  <- data[-trainIndex, ]
 
 #### 1.1 Overview
 
-Remote work, often referred to as telework, work for pay at home or  ork From Home (WFH), is a term used to define an arrangement in which employee labor is performed in non-traditional spaces, such as an employee's home or another public/private space, that are outside of employer's worksite (i.e. office or job-site) (OPM). Since the early 2000's, technological innovations and the widespread adoption of high-speed internet have facilitated the growth of remote worker, particular in sectors like technology, marketing, etc (cite). This trend saw rapid adoption in 2020 due to stay-at-home mandates introduced in response to the COVID-19 pandemic. In the United States, for example, the percentage of remote workers grew from 5.7% (9 million) in 2019 to 17.9% in 2019 (BLS, 2024a). 
+Remote work, often referred to as telework, work for pay at home or  ork From Home (WFH), is a term used to define an arrangement in which employee labor is performed in non-traditional spaces, such as an employee's home or another public/private space, that are outside of employer's worksite (i.e. office or job-site) (OPM). Since the early 2000's, technological innovations and the widespread adoption of high-speed internet have facilitated the growth of remote worker, particular in sectors like technology, marketing, etc. This trend saw rapid adoption in 2020 due to stay-at-home mandates introduced in response to the COVID-19 pandemic. In the United States, for example, the percentage of remote workers grew from 5.7% (9 million) in 2019 to 17.9% in 2019 (BLS, 2024a). 
 
-As the covid mortality rates dropped and government mandates were lifted, many employers implemented "return to office" policies that made some or in-person work mandatory (Shimura et al. 2021). These policies were often reflective of negative views on remote work citing poor worker productivity and a belief that workers may be skirting their responsibilities (cite). In other cases, workers themselves preferred the office environment and voluntarily returned to onsite work. Estimates from the latest publicly available American Community Survey at writing showed that 13.8% (22 million) of U.S. workers usually worked from home (ACS, 2023), though the number is likely to continue to drop given the current political sentiment.
+As the covid mortality rates dropped and government mandates were lifted, many employers implemented "return to office" policies that made some or in-person work mandatory (Shimura et al. 2021). These policies were often reflective of negative views on remote work citing poor worker productivity and a belief that workers may be skirting their responsibilities (Toscano et al., 2020). In other cases, workers themselves preferred the office environment and voluntarily returned to onsite work. Estimates from the latest publicly available American Community Survey at writing showed that 13.8% (22 million) of U.S. workers usually worked from home (ACS, 2023), though the number is likely to continue to drop given the current political sentiment.
 
-At the heart of the debate around the effectiveness -- or lack thereof -- of remote work are the long-term outcomes on the mental health of workers. Prior studies have found both positive and negative outcomes that depend on a multitude of factors, including an individual's home life, health, work style, and access to support systems to name a few, suggesting the nuanced nature of remote work and its outcomes (cite). 
+At the heart of the debate around the effectiveness -- or lack thereof -- of remote work are the long-term outcomes on the mental health of workers. Prior studies have found both positive and negative outcomes that depend on a multitude of factors, including an individual's home life, health, work style, and access to support systems to name a few, suggesting the nuanced nature of remote work and its outcomes (Bloom et al., 2015). 
 
 Researchers have identified several positive outcomes associated with remote work for employees. These include increased flexibility and autonomy, higher morale and job satisfaction (Tavares, 2017; Shimura et al., 2021). Some remote workers also  experienced enhanced productivity, possibly due to a reduction in meetings and other work-related interruptions that eased time pressures through freeing up time for task completion (Smit et al., 2017). Notably, remote work satisfaction appeared to be higher among employees who reported greater perceived productivity (Toscano, 2020).
 
@@ -189,7 +189,7 @@ Hypothesis 2 was not testable since a binary mental health variable had been con
 Hypothesis 3 was false since Gender did not have a statistically significant effect on stress level or job satisfaction in our logistic model.
 
 
-### 4. Discussion 
+### 4. Discussion and Limitations
 
 Though logistic regression indicated what variables might be driving remote work satisfaction, predictive strength was weak, and all but a few variables contributed minimally. The model is suggesting industry-wide dissatisfaction but particularly in health care and less latent regional and behavior-based variations (i.e., exercise, where one works). Overall, thus, the judgment is that remote working job satisfaction is a product of highly interactive, multivariate factors which cannot be fully encompassed within the described characteristics.
 
@@ -199,16 +199,13 @@ The research did try to predict employee telecommuting job satisfaction with the
 
 There was no evidence to support the existence of the fact that telecommuters were less satisfied (contrary to Hypothesis 1), or working professionals in the health sector were less satisfied. There was little evidence for either Hypothesis 2 (psychological isolation and mental well-being) or Hypothesis 3 (gender difference of the stress level).
 
-Overall, results suggest that job satisfaction among telecommuters is a multifaceted and intricate phenomenon that cannot be accounted for by underlying conditions of work and demographic variables. Future research must take into account the role played by yet more advanced psychological, social, and organizational variables in efforts to maximize predictive validity as well as understanding.
+Overall, results suggest that job satisfaction among telecommuters is a multifaceted and intricate phenomenon that cannot be accounted for by underlying conditions of work and demographic variables. Future research must take into account the role played by yet more advanced psychological, social, and organizational variables in efforts to maximize predictive validity as well as understanding. Our dataset also posed a challenge, as no metadata was available was available for many of the parameters in the set. Similarly, we were unable to determine the data collection mechanism and, more importantly, the workers had worked remotely for a similar amount of time. Future work may also benefit from taking a longetudinal approach, whereby workers are ask to self-report at regular intervals after begninning to work remotely to capture possible changes in satisfaction levels.
 
 
 ### 5. Conclusion
 
 
-#### Limitations
- - Synthetic data - little metadata for parameters, context for data gathering, or m
- - limited work since COVID. COVID may have skewed data or sentiments
- - confounding varaibles that are missing from dataset
+
 
 ### References
 
