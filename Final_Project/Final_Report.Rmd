@@ -1,10 +1,13 @@
+
+
 ---
 title: "Remote Work, Mental Health and Work Satisfaction"
 author: "Mubashira Qari, Erick Hadi, Marco Castro, Zach Rose, Puja Roy"
-output:
-  pdf_document: default
-  html_document: default
 date: "2025-05-19"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -71,7 +74,7 @@ test_data  <- data[-trainIndex, ]
 
 
 
-### Abstract
+**Abstract:** This project explores the impact of remote work on employee satisfaction, mental health, and perceived stress levels. Using a simulated dataset of 5,000 employees across multiple industries and job roles, exploratory data analysis was conducted and then a binary logistic regression model was built to evaluate which workplace, demographic, and psychological factors predict satisfaction with remote work. After filtering implausible entries and removing neutral satisfaction responses, the final dataset included 2,711 individuals. We assessed correlations, handled categorical encoding, and created new binary features such as presence of mental health conditions. Initial insights suggested higher stress levels among remote workers and greater productivity decline among those reporting depression or burnout. However, our logistic regression model yielded weak predictive performance (AUC ≈ 0.51), with most features showing no statistically significant relationship with satisfaction outcomes. The only marginally significant finding was that employees in the healthcare industry were more likely to report dissatisfaction when placed in telework. Despite testing LASSO regularization and checking for multicollinearity, no improvements were observed. These results suggest that satisfaction with remote work may be shaped by complex or unmeasured factors, such as personality traits, managerial support, or team dynamics. Future work could incorporate qualitative data or leverage more flexible modeling techniques to better capture the nuance of employee experience in remote environments.
 
 **Summary:** Remote work has shown both benefits—such as increased flexibility, productivity, and work-life balance—and drawbacks, including social isolation, blurred boundaries, and inconsistent productivity outcomes. Research highlights that individual, organizational, and contextual factors critically shape the mental health and effectiveness of remote workers, emphasizing the need for supportive policies and hybrid models. Utilizing a synthetic dataset from Kaggle simulating worker survey responses, we aim to analyse difference in job satisfaction between remote and on-site workers, explore linkages between isolation and mental health conditions in remote work, and tease out possible gender differences in stress levels.
 
@@ -79,9 +82,11 @@ test_data  <- data[-trainIndex, ]
 
 **Results:** 2-4 lines on our findings
 
-**Conclusion:** what are 1-2 takeaways.
 
-##### Keywords
+
+**Keywords:** Remote Work, Job Satisfaction, Mental Health, Logistic Regression, Stress
+
+
 
 ### 1. Introduction
 
@@ -204,6 +209,8 @@ Overall, results suggest that job satisfaction among telecommuters is a multifac
 
 ### 5. Conclusion
 
+The findings here indicate that while remote work has sparked widespread debate over its benefits and drawbacks, it is difficult to reliably predict satisfaction outcomes based solely on observable employee characteristics. Despite an extensive set of features, ranging from work location and job role to mental health status and company support, our logistic regression model performed only very slightly better than random. This suggests that remote work satisfaction is influenced by more nuanced, possibly unmeasurable factors such as communication quality, individual preferences, or organizational culture. From an analytical perspective, the dataset revealed limited predictive value, and the LASSO regression did not significantly improve feature selection. However, the exploratory phase did highlight patterns worth noting: depression and burnout were more commonly linked with lower productivity, and remote workers exhibited slightly higher stress levels on average. While these trends are not conclusive predictors, they highlight relevant areas for deeper investigation. Future research should consider mixed methods approaches that incorporate qualitative data, such as employee interviews or open text survey responses to capture more context around remote work satisfaction. Additionally, more sophisticated modeling techniques (e.g., tree-based models or ensemble methods) may be more effective at capturing nonlinear or interactive effects in employee mental health data.
+
 
 
 
@@ -288,11 +295,11 @@ p1 <- ggplot(data, aes(x = Work_Location, fill = Stress_Level)) +
 ### Relationships Exploration for Productivity Change vs Mental Health
 p2 <- ggplot(remote_work_df, aes(x = Mental_Health_Condition, fill = Productivity_Change)) +
   geom_bar(position = "dodge") +
-  labs(title = "Productivity Change by Mental Health Condition") +
+  labs(title = "Productivity Change\nby Mental Health Condition") +
   theme(
     legend.position = "bottom",
     legend.direction = "vertical"
-  ) 
+  )
 
 (p1 | p2)
 
