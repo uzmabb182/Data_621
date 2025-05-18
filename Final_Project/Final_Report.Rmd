@@ -106,7 +106,7 @@ The evidence on productivity remains mixed, with some studies indicating no clea
 Evidence on worker outcomes further emphasizes the importance of individual differences and organizational context in shaping remote work experiences. Through multiple and ordered logistic regression of survey data, Gorshkova and Lebedeva (2023) found that mental well-being improved by an average of 0.01 units for each additional year of the employees age suggesting that work experience and maturity may contribute to better outcomes for remote workers. Individuals with prior experience working remotely reported better mental health than those for whom remote work was a new experience. Research work conducted during COVID-19 pandemic offered another insight: the importance of personal choice in whether to work remotely or return to the office. Bloom (2015) noted that flexibility and autonomy were critical to satisfaction and effectiveness; alternatives such as hybrid work models could be preferable as they offer a balance between work-life needs and opportunities for team collaboration. Further, Como et al. (2021) and Shimura et al. (2021) suggested that the well-being of remote workers could be improved through greater organizational support, suggesting that structural and managerial factors remain central to successful implementation. 
 
 
-### 1.2. Hypotheses
+### 1.2. Hypothesis
 
 Given the conflicting results from prior work, this study builds of prior research to explore three outcomes between remote and onsite workers:
 * job satisfaction;
