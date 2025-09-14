@@ -5,9 +5,9 @@ title: "Remote Work, Mental Health and Work Satisfaction"
 author: "Mubashira Qari, Erick Hadi, Marco Castro, Zach Rose, Puja Roy"
 date: "2025-05-19"
 output:
+  html_document: default
   pdf_document:
     latex_engine: xelatex
-  html_document: default
 ---
 
 ```{r setup, include=FALSE}
